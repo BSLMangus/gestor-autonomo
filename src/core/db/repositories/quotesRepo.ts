@@ -1,0 +1,242 @@
+import { formatLocalDateIso, getLocalTodayIso, isValidIsoDate } from "../../fiscal/dateQuarter";
+import type { PdfPort, PdfQuoteDocumentInput } from "../../ports/mediaPorts";
+import type {
+  ClientRow,
+  JobRow,
+  JobStatus,
+  LocalFileBridge,
+  MemoryCoordinator,
+  QuoteItemRow,
+  QuoteRow,
+  QuoteStatus,
+  SqliteExecutor,
+} from "../../contracts/types";
+import { normalizeSpanishText } from "../../text/spanishText";
+
+export interface QuoteWithJobSummary extends QuoteRow {
+  job_code: string;
+  job_title: string;
+  job_status: JobStatus;
+}
+
+export class QuotesRepository {
+  constructor(
+    private readonly executor: SqliteExecutor,
+    private readonly memoryCoordinator?: MemoryCoordinator
+  ) {}
+
+  async getById(id: string): Promise<QuoteRow | null> {
+    const rows = await this.executor.query<QuoteRow>(
+      `SELECT * FROM quotes WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+
+  async listPaginated(opts?: {
+    search?: string;
+    status?: QuoteStatus;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: QuoteWithJobSummary[]; totalCount: number }> {
+    const limit = Math.max(1, Math.min(100, opts?.limit ?? 30));
+    const offset = Math.max(0, opts?.offset ?? 0);
+    const params: unknown[] = [];
+    const statusClause = opts?.status ? "WHERE q.status = ?" : "";
+    if (opts?.status) params.push(opts.status);
+
+    const rows = await this.executor.query<QuoteWithJobSummary & Record<string, unknown>>(
+      `SELECT q.*, j.job_code AS job_code, j.title AS job_title, j.status AS job_status
+       FROM quotes q
+       JOIN jobs j ON j.id = q.job_id
+       ${statusClause}
+       ORDER BY q.updated_at_ms DESC, q.created_at_ms DESC`,
+      params
+    );
+
+    const searchNorm = opts?.search ? normalizeSpanishText(opts.search) : "";
+    const filtered = searchNorm
+      ? rows.filter((r) => {
+          const haystack = normalizeSpanishText(
+            `${r.quote_code} ${r.client_name_snapshot} ${r.job_code} ${r.job_title} ${r.notes}`
+          );
+          return haystack.includes(searchNorm);
+        })
+      : rows;
+
+    return {
+      items: filtered.slice(offset, offset + limit),
+      totalCount: filtered.length,
+    };
+  }
+
+  async getActiveByJobId(jobId: string): Promise<QuoteRow | null> {
+    const rows = await this.executor.query<QuoteRow>(
+      `SELECT * FROM quotes WHERE job_id = ? AND status != 'rechazado' LIMIT 1`,
+      [jobId]
+    );
+    return rows[0] ?? null;
+  }
+
+  async listByJobId(jobId: string): Promise<QuoteRow[]> {
+    return this.executor.query<QuoteRow>(
+      `SELECT * FROM quotes WHERE job_id = ? ORDER BY created_at_ms DESC`,
+      [jobId]
+    );
+  }
+
+  async getItems(quoteId: string): Promise<QuoteItemRow[]> {
+    return this.executor.query<QuoteItemRow>(
+      `SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_order ASC`,
+      [quoteId]
+    );
+  }
+
+  async markSentManually(quoteId: string, sentAtIso = getLocalTodayIso()): Promise<QuoteRow> {
+    if (!isValidIsoDate(sentAtIso)) {
+      throw new Error(`SCHEMA_VALIDATION_ERROR: Fecha de envío inválida '${sentAtIso}'`);
+    }
+    const existing = await this.getById(quoteId);
+    if (!existing) {
+      throw new Error("INVALID_STATE_TRANSITION: Presupuesto no encontrado");
+    }
+    if (existing.status === "rechazado") {
+      throw new Error("INVALID_STATE_TRANSITION: No se puede marcar como enviado un presupuesto rechazado");
+    }
+    const nextStatus = existing.status === "borrador" ? "enviado" : existing.status;
+    await this.executor.run(
+      `UPDATE quotes SET status = ?, sent_at_iso = ?, updated_at_ms = ? WHERE id = ?`,
+      [nextStatus, sentAtIso, Date.now(), quoteId]
+    );
+    const updated = await this.getById(quoteId);
+    if (!updated) throw new Error("SQLITE_QUERY_ERROR: error actualizando presupuesto");
+    return updated;
+  }
+
+  async acceptOrReject(
+    quoteId: string,
+    targetStatus: "aceptado" | "rechazado"
+  ): Promise<QuoteRow> {
+    const existing = await this.getById(quoteId);
+    if (!existing) {
+      throw new Error("INVALID_STATE_TRANSITION: Presupuesto no encontrado");
+    }
+    if (existing.status === "rechazado") {
+      throw new Error(
+        "INVALID_STATE_TRANSITION: Un presupuesto rechazado no puede cambiar de estado; crea uno nuevo"
+      );
+    }
+    if (targetStatus === "rechazado") {
+      const invRows = await this.executor.query<{ cnt: number }>(
+        `SELECT COUNT(*) AS cnt FROM invoices WHERE quote_id = ?`,
+        [quoteId]
+      );
+      if ((invRows[0]?.cnt ?? 0) > 0) {
+        throw new Error(
+          "INVALID_STATE_TRANSITION: Prohibido rechazar un presupuesto con facturas emitidas"
+        );
+      }
+    }
+    await this.executor.run(
+      `UPDATE quotes SET status = ?, updated_at_ms = ? WHERE id = ?`,
+      [targetStatus, Date.now(), quoteId]
+    );
+    const updated = await this.getById(quoteId);
+    if (!updated) throw new Error("SQLITE_QUERY_ERROR: error actualizando estado de presupuesto");
+    return updated;
+  }
+
+  async regeneratePdfOnDemand(
+    quoteId: string,
+    pdfPort: PdfPort,
+    fileBridge: LocalFileBridge
+  ): Promise<string> {
+    const quote = await this.getById(quoteId);
+    if (!quote) {
+      throw new Error("INVALID_STATE_TRANSITION: Presupuesto no encontrado");
+    }
+    const items = await this.getItems(quoteId);
+    const jobRows = await this.executor.query<JobRow>(
+      `SELECT * FROM jobs WHERE id = ? LIMIT 1`,
+      [quote.job_id]
+    );
+    const job = jobRows[0];
+    if (!job) {
+      throw new Error("SQLITE_QUERY_ERROR: Obra vinculada al presupuesto no encontrada");
+    }
+    const settingsRows = await this.executor.query<{
+      emitter_name: string;
+      emitter_nif: string;
+      emitter_fiscal_address: string;
+      emitter_phone: string;
+      emitter_iban?: string;
+      emitter_logo_data_url?: string | null;
+    }>(
+      `SELECT emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone, emitter_iban, emitter_logo_data_url
+       FROM app_settings WHERE id = 1`
+    );
+    const emitter = settingsRows[0] ?? {
+      emitter_name: "",
+      emitter_nif: "",
+      emitter_fiscal_address: "",
+      emitter_phone: "",
+      emitter_iban: "",
+      emitter_logo_data_url: null,
+    };
+
+    const clientRows = await this.executor.query<ClientRow>(
+      `SELECT * FROM clients WHERE id = ? LIMIT 1`,
+      [quote.client_id]
+    );
+    const client = clientRows[0];
+
+    const pdfInput: PdfQuoteDocumentInput = {
+      kind: "quote",
+      quoteCode: quote.quote_code,
+      issuedDateIso: formatLocalDateIso(quote.created_at_ms),
+      emitter: {
+        name: emitter.emitter_name || "Autónomo",
+        nif: emitter.emitter_nif,
+        fiscalAddress: emitter.emitter_fiscal_address,
+        phone: emitter.emitter_phone,
+        iban: emitter.emitter_iban ?? "",
+        logoDataUrl: emitter.emitter_logo_data_url ?? null,
+      },
+      client: {
+        name: quote.client_name_snapshot || client?.name || "",
+        nif: quote.client_nif_snapshot || client?.nif || "",
+        fiscalAddress: quote.client_address_snapshot || client?.fiscal_address || "",
+        phone: quote.client_phone_snapshot || client?.phone || "",
+      },
+      jobTitle: job.title,
+      vatRate: quote.vat_rate,
+      subtotalCents: quote.subtotal_cents,
+      vatCents: quote.vat_cents,
+      totalCents: quote.total_cents,
+      notes: quote.notes,
+      lines: items.map((item) => ({
+        description: item.description,
+        unit: item.unit,
+        quantityThousandths: item.quantity_thousandths,
+        unitPriceCents: item.unit_price_cents,
+        lineSubtotalCents: item.line_subtotal_cents,
+      })),
+    };
+
+    const release = this.memoryCoordinator
+      ? await this.memoryCoordinator.acquireHeavyTask("pdf")
+      : async () => undefined;
+    try {
+      const { pdfBytes, fileName } = await pdfPort.buildDocumentPdf(pdfInput);
+      const pdfUri = await fileBridge.savePdf(pdfBytes, fileName);
+      await this.executor.run(`UPDATE quotes SET pdf_uri = ?, updated_at_ms = ? WHERE id = ?`, [
+        pdfUri,
+        Date.now(),
+        quoteId,
+      ]);
+      return pdfUri;
+    } finally {
+      await release();
+    }
+  }
+}

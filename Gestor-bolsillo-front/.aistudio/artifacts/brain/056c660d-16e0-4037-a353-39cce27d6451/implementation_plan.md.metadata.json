@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan de arquitectura, diseño visual fiel a Stitch y flujos interactivos para ObraLocal AI en React 19, TypeScript estricto y Tailwind CSS v4 con persistencia localStorage, overlays generativos de aprobación/edición y vista previa imprimible de PDF.",
+  "updatedAt":  "2026-11-21T16:27:39.128196927Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

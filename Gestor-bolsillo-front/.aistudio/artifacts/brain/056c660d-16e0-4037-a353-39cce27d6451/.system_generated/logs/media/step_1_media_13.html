@@ -1,0 +1,262 @@
+<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parte de Jornada — ObraLocal AI</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'terracotta': '#EA580C',
+        'terracotta-soft': '#FFF7ED',
+        'slate-ink': '#0F172A',
+        'warm-canvas': '#FAF9F6',
+        'card-white': '#FFFFFF',
+        'border-subtle': '#E2E8F0',
+        'emerald-free': '#059669',
+        'emerald-soft': '#ECFDF5',
+        'amber-tax': '#D97706',
+        'amber-soft': '#FFFBEB',
+        'coral-alert': '#DC2626',
+        'coral-soft': '#FEF2F2',
+        'primary': '#D04B00',
+        'on-primary': '#060606',
+        'primary-container': '#FFF7ED',
+        'on-primary-container': '#7F2B00',
+        'secondary': '#0F172A',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#F1F5F9',
+        'on-secondary-container': '#0F172A',
+        'surface': '#FAF9F6',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-warm-card': '#F4F0EA',
+        'surface-container-low': '#F8FAFC',
+        'surface-container': '#F1F5F9',
+        'on-surface': '#0F172A',
+        'on-surface-variant': '#475569',
+        'outline': '#64748B',
+        'outline-variant': '#E2E8F0',
+        'success': '#059669',
+        'on-success': '#1C1C1C',
+        'success-container': '#ECFDF5',
+        'on-success-container': '#003825',
+        'warning': '#D97706',
+        'on-warning': '#1A1C1A',
+        'warning-container': '#FFFBEB',
+        'on-warning-container': '#4D2600',
+        'error': '#DC2626',
+        'on-error': '#FFFFFF',
+        'error-container': '#FEF2F2',
+        'on-error-container': '#690005',
+        'info': '#2563EB',
+        'on-info': '#FFFFFF',
+        'info-container': '#EFF6FF',
+        'on-info-container': '#1E3A8A',
+      },
+      borderRadius: {
+        'sm': '8px',
+        'DEFAULT': '12px',
+        'md': '16px',
+        'lg': '20px',
+        'xl': '24px',
+        'full': '9999px',
+      },
+      spacing: {
+        'gutter-xs': '4px',
+        'gutter-sm': '8px',
+        'gutter-md': '12px',
+        'gutter-lg': '16px',
+        'gutter-xl': '24px',
+        'section': '24px',
+        'page-margin': '16px',
+      },
+      fontFamily: {
+        'display': ['"Inter"', 'sans-serif'],
+        'headline': ['"Inter"', 'sans-serif'],
+        'title': ['"Inter"', 'sans-serif'],
+        'body': ['"Inter"', 'sans-serif'],
+        'label': ['"Inter"', 'sans-serif'],
+        'mono': ['"JetBrains Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.75px', fontWeight: '700' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.35px', fontWeight: '700' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'title-lg': ['18px', { lineHeight: '24px', letterSpacing: '-0.15px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '600' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-lg': ['26px', { lineHeight: '32px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'mono-md': ['16px', { lineHeight: '22px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+        'surface-exit': '160ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+        'surface-exit': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col relative pb-28" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Cabecera contextual de modal a pantalla completa -->
+    <header class="sticky top-0 z-30 h-[56px] bg-surface border-b border-outline-variant px-gutter-lg flex items-center justify-between">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Cerrar parte" class="w-12 h-12 -ml-2 rounded-full text-on-surface inline-flex items-center justify-center hover:bg-surface-container">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
+      </button>
+
+      <div class="flex flex-col items-center">
+        <h1 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Parte del día</h1>
+        <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">OBR-2026-001 · 23 nov</span>
+      </div>
+
+      <span class="px-gutter-sm py-1 rounded-full bg-surface-container text-on-surface font-mono text-mono-sm tabular-nums">
+        <span data-design-text-token="mono-sm">38 €/h</span>
+      </span>
+    </header>
+
+    <main class="flex-1 px-page-margin pt-gutter-lg flex flex-col gap-gutter-lg">
+
+      <!-- Cálculo automático de planificación de obra -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-sm">
+        <div class="flex items-center justify-between">
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">Planificación: 22 nov – 30 nov</span>
+          <a href="#ajustar-dias" data-design-text-token="label-md" class="font-label text-label-md text-on-primary-container">Ajustar días</a>
+        </div>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-surface">
+          7 días laborables × 8h habituales = <strong class="font-mono tabular-nums">56 horas previstas</strong>
+        </p>
+        <div class="flex items-center gap-gutter-xs flex-wrap">
+          <span data-design-text-token="label-sm" class="font-label text-label-sm px-gutter-sm py-0.5 rounded-full bg-surface-container text-on-surface-variant">Sáb y Dom libres</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm px-gutter-sm py-0.5 rounded-full bg-surface-container text-on-surface-variant">Marcar festivo</span>
+        </div>
+      </section>
+
+      <!-- Cierre de jornada: Hora prevista vs Hora real -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+        <div class="grid grid-cols-2 gap-gutter-md">
+          <div class="bg-surface-container-low rounded-md p-gutter-md flex flex-col gap-1">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Salida prevista</span>
+            <span data-design-text-token="mono-lg" class="font-mono text-mono-lg text-on-surface tabular-nums">17:00</span>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">8,0 h</span>
+          </div>
+
+          <div class="bg-warning-container border border-outline-variant rounded-md p-gutter-md flex flex-col gap-1" id="real-box">
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-warning-container">Salida real</span>
+            <span id="real-time" data-design-text-token="mono-lg" class="font-mono text-mono-lg text-on-warning-container tabular-nums">19:00</span>
+            <span id="real-hours" data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-warning-container tabular-nums">10,0 h</span>
+          </div>
+        </div>
+
+        <!-- Botones rápidos de ajuste -->
+        <div class="grid grid-cols-3 gap-gutter-sm">
+          <button type="button" onclick="setDeviation(-1.5)" class="min-h-[44px] rounded bg-surface-container-low border border-outline-variant font-mono text-mono-sm text-on-surface hover:border-terracotta tabular-nums">-1,5 h</button>
+          <button type="button" onclick="setDeviation(-0.5)" class="min-h-[44px] rounded bg-surface-container-low border border-outline-variant font-mono text-mono-sm text-on-surface hover:border-terracotta tabular-nums">-30 m</button>
+          <button type="button" onclick="setDeviation(0)" class="min-h-[44px] rounded bg-surface-container-low border border-outline-variant font-label text-label-md text-on-surface hover:border-terracotta">En hora</button>
+          <button type="button" onclick="setDeviation(0.5)" class="min-h-[44px] rounded bg-surface-container-low border border-outline-variant font-mono text-mono-sm text-on-surface hover:border-terracotta tabular-nums">+30 m</button>
+          <button type="button" onclick="setDeviation(1)" class="min-h-[44px] rounded bg-surface-container-low border border-outline-variant font-mono text-mono-sm text-on-surface hover:border-terracotta tabular-nums">+1 h</button>
+          <button type="button" onclick="setDeviation(2)" class="min-h-[44px] rounded bg-terracotta-soft border-2 border-terracotta font-mono text-mono-sm text-on-primary-container tabular-nums">+2 h</button>
+        </div>
+
+        <!-- Banner dinámico de desviación -->
+        <div id="banner-extra" class="rounded-md bg-warning-container border border-outline-variant p-gutter-md flex items-center gap-gutter-sm">
+          <span class="material-symbols-outlined text-[20px] text-on-warning-container shrink-0" aria-hidden="true">more_time</span>
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-warning-container">Jornada alargada +2,0 h (+76,00 € según tu tarifa/hora)</span>
+        </div>
+
+        <div id="banner-early" class="hidden rounded-md bg-info-container border border-outline-variant p-gutter-md flex items-center gap-gutter-sm">
+          <span class="material-symbols-outlined text-[20px] text-on-info-container shrink-0" aria-hidden="true">check_circle</span>
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-info-container">Terminado 1,5 h antes de lo previsto</span>
+        </div>
+
+        <div id="banner-ontime" class="hidden rounded-md bg-success-container border border-outline-variant p-gutter-md flex items-center gap-gutter-sm">
+          <span class="material-symbols-outlined text-[20px] text-on-success-container shrink-0" aria-hidden="true">verified</span>
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-success-container">Jornada cumplida según horario habitual (8,0 h)</span>
+        </div>
+      </section>
+
+      <!-- Informe / Motivo del cambio -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+        <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Motivo del cambio</h2>
+
+        <div class="flex flex-wrap gap-gutter-xs">
+          <button type="button" aria-pressed="true" class="min-h-[40px] px-gutter-md rounded-full bg-terracotta-soft border border-terracotta text-on-primary-container font-label text-label-md">
+            <span data-design-text-token="label-md">Imprevisto en instalación</span>
+          </button>
+          <button type="button" class="min-h-[40px] px-gutter-md rounded-full bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-md">
+            <span data-design-text-token="label-md">Falta de material</span>
+          </button>
+          <button type="button" class="min-h-[40px] px-gutter-md rounded-full bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-md">
+            <span data-design-text-token="label-md">Más rápido de lo previsto</span>
+          </button>
+          <button type="button" class="min-h-[40px] px-gutter-md rounded-full bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-md">
+            <span data-design-text-token="label-md">Ampliación del cliente</span>
+          </button>
+        </div>
+
+        <textarea rows="2" class="w-full rounded bg-surface-container-low border border-outline-variant p-gutter-md font-body text-body-md text-on-surface focus:border-terracotta focus:ring-1 focus:ring-terracotta">Tuvimos que sustituir el codo de desagüe antiguo tras abrir la roza.</textarea>
+
+        <label class="flex items-center gap-gutter-sm min-h-[48px] px-gutter-md rounded bg-surface-container-low cursor-pointer">
+          <input type="checkbox" checked class="w-5 h-5 rounded border-outline text-terracotta focus:ring-terracotta">
+          <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Vincular esta nota al Diario de Obra</span>
+        </label>
+      </section>
+
+    </main>
+
+    <!-- Botones inferiores fijos -->
+    <footer class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-surface-container-lowest border-t border-outline-variant p-gutter-lg shadow-[0_-4px_16px_rgba(15,23,42,0.06)] grid grid-cols-3 gap-gutter-sm z-30">
+      <button data-component-id="button-tertiary" data-component-type="button" data-component-variant="tertiary" type="button" class="min-h-[48px] px-gutter-md rounded bg-surface-container text-on-surface font-label text-label-lg flex items-center justify-center">
+        <span data-design-text-token="label-lg">Cancelar</span>
+      </button>
+
+      <button data-component-id="button-primary" data-component-type="button" data-component-variant="primary" type="button" class="col-span-2 min-h-[48px] px-gutter-lg rounded bg-primary text-on-primary font-label text-label-lg flex items-center justify-center gap-gutter-xs shadow-sm">
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">save</span>
+        <span data-design-text-token="label-lg">Guardar parte del día</span>
+      </button>
+    </footer>
+
+  </div>
+
+  <script>
+    function setDeviation(delta) {
+      const baseMinutes = 17 * 60;
+      const realMinutes = baseMinutes + Math.round(delta * 60);
+      const hh = String(Math.floor(realMinutes / 60)).padStart(2, '0');
+      const mm = String(realMinutes % 60).padStart(2, '0');
+      document.getElementById('real-time').textContent = hh + ':' + mm;
+      document.getElementById('real-hours').textContent = (8 + delta).toFixed(1).replace('.', ',') + ' h';
+
+      document.getElementById('banner-extra').classList.toggle('hidden', delta <= 0);
+      document.getElementById('banner-early').classList.toggle('hidden', delta >= 0);
+      document.getElementById('banner-ontime').classList.toggle('hidden', delta !== 0);
+    }
+  </script>
+
+
+</body></html>

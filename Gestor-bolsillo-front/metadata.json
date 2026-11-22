@@ -1,0 +1,6 @@
+{
+  "name": "ObraLocal AI",
+  "description": "Cuaderno de obra, agenda de jornadas, presupuestos, facturación y hucha fiscal para autónomos de reformas y oficios en España.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,396 @@
+<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda y Calendario — ObraLocal AI</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'terracotta': '#EA580C',
+        'terracotta-soft': '#FFF7ED',
+        'slate-ink': '#0F172A',
+        'warm-canvas': '#FAF9F6',
+        'card-white': '#FFFFFF',
+        'border-subtle': '#E2E8F0',
+        'emerald-free': '#059669',
+        'emerald-soft': '#ECFDF5',
+        'amber-tax': '#D97706',
+        'amber-soft': '#FFFBEB',
+        'coral-alert': '#DC2626',
+        'coral-soft': '#FEF2F2',
+        'primary': '#D04B00',
+        'on-primary': '#060606',
+        'primary-container': '#FFF7ED',
+        'on-primary-container': '#7F2B00',
+        'secondary': '#0F172A',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#F1F5F9',
+        'on-secondary-container': '#0F172A',
+        'surface': '#FAF9F6',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-warm-card': '#F4F0EA',
+        'surface-container-low': '#F8FAFC',
+        'surface-container': '#F1F5F9',
+        'on-surface': '#0F172A',
+        'on-surface-variant': '#475569',
+        'outline': '#64748B',
+        'outline-variant': '#E2E8F0',
+        'success': '#059669',
+        'on-success': '#1C1C1C',
+        'success-container': '#ECFDF5',
+        'on-success-container': '#003825',
+        'warning': '#D97706',
+        'on-warning': '#1A1C1A',
+        'warning-container': '#FFFBEB',
+        'on-warning-container': '#4D2600',
+        'error': '#DC2626',
+        'on-error': '#FFFFFF',
+        'error-container': '#FEF2F2',
+        'on-error-container': '#690005',
+        'info': '#2563EB',
+        'on-info': '#FFFFFF',
+        'info-container': '#EFF6FF',
+        'on-info-container': '#1E3A8A',
+      },
+      borderRadius: {
+        'sm': '8px',
+        'DEFAULT': '12px',
+        'md': '16px',
+        'lg': '20px',
+        'xl': '24px',
+        'full': '9999px',
+      },
+      spacing: {
+        'gutter-xs': '4px',
+        'gutter-sm': '8px',
+        'gutter-md': '12px',
+        'gutter-lg': '16px',
+        'gutter-xl': '24px',
+        'section': '24px',
+        'page-margin': '16px',
+      },
+      fontFamily: {
+        'display': ['"Inter"', 'sans-serif'],
+        'headline': ['"Inter"', 'sans-serif'],
+        'title': ['"Inter"', 'sans-serif'],
+        'body': ['"Inter"', 'sans-serif'],
+        'label': ['"Inter"', 'sans-serif'],
+        'mono': ['"JetBrains Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.75px', fontWeight: '700' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.35px', fontWeight: '700' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'title-lg': ['18px', { lineHeight: '24px', letterSpacing: '-0.15px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '600' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-lg': ['26px', { lineHeight: '32px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'mono-md': ['16px', { lineHeight: '22px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+        'surface-exit': '160ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+        'surface-exit': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col relative pb-24" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Cabecera superior fija (56px) -->
+    <header class="sticky top-0 z-30 h-[56px] bg-surface border-b border-outline-variant px-gutter-lg flex items-center justify-between">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Abrir menú lateral" class="w-12 h-12 -ml-2 rounded-full text-on-surface inline-flex items-center justify-center hover:bg-surface-container transition-colors duration-state-change ease-state-change">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">menu</span>
+      </button>
+
+      <h1 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Agenda y Calendario</h1>
+
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Ajustes" class="w-12 h-12 -mr-2 rounded-full text-on-surface-variant inline-flex items-center justify-center hover:bg-surface-container transition-colors duration-state-change ease-state-change">
+        <span class="material-symbols-outlined text-[22px]" aria-hidden="true">settings</span>
+      </button>
+    </header>
+
+    <main class="flex-1 px-page-margin pt-gutter-lg flex flex-col gap-gutter-lg">
+
+      <!-- Cabecera del módulo: Mes, Toggle de vista y + Añadir -->
+      <section class="flex flex-col gap-gutter-sm">
+        <div class="flex items-center justify-between gap-gutter-sm">
+          <div class="flex items-center gap-1">
+            <button type="button" aria-label="Mes anterior" class="w-9 h-9 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_left</span>
+            </button>
+            <h2 data-design-text-token="title-lg" class="font-title text-title-lg text-on-surface px-1">Noviembre 2026</h2>
+            <button type="button" aria-label="Mes siguiente" class="w-9 h-9 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">chevron_right</span>
+            </button>
+          </div>
+
+          <button type="button" class="min-h-[40px] px-gutter-md rounded-full bg-secondary text-on-secondary font-label text-label-md inline-flex items-center gap-1 shrink-0">
+            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+            <span data-design-text-token="label-md">Añadir cita</span>
+          </button>
+        </div>
+
+        <!-- Toggle Mes | Semana | Lista de obras -->
+        <div class="grid grid-cols-3 gap-1 bg-surface-container-lowest border border-outline-variant rounded-full p-1">
+          <button type="button" aria-pressed="true" class="min-h-[36px] rounded-full bg-terracotta-soft text-on-primary-container font-label text-label-md">
+            <span data-design-text-token="label-md">Mes</span>
+          </button>
+          <button type="button" class="min-h-[36px] rounded-full text-on-surface-variant font-label text-label-md hover:bg-surface-container">
+            <span data-design-text-token="label-md">Semana</span>
+          </button>
+          <button type="button" class="min-h-[36px] rounded-full text-on-surface-variant font-label text-label-md hover:bg-surface-container">
+            <span data-design-text-token="label-md">Lista obras</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Vista de Calendario Visual -->
+      <section data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-md shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-sm">
+        <!-- Días de la semana -->
+        <div class="grid grid-cols-7 text-center pb-1 border-b border-outline-variant">
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">L</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">M</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">X</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">J</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">V</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-outline">S</span>
+          <span data-design-text-token="label-sm" class="font-label text-label-sm text-outline">D</span>
+        </div>
+
+        <!-- Semana 16–22 Nov (con bloque de obra Velázquez y Domingo 22 inicio Marta Ruiz) -->
+        <div class="grid grid-cols-7 gap-y-1 text-center">
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">16</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-free"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">17</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-free"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">18</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-tax"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">19</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-info"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums">20</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-free"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">21</span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft rounded-l-sm">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">22</span>
+          </div>
+        </div>
+
+        <!-- Semana 23–29 Nov (Lunes 23 seleccionado + rango continuo Marta Ruiz) -->
+        <div class="grid grid-cols-7 gap-y-1 text-center">
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta text-on-primary rounded-sm">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm tabular-nums">23</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-on-primary"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">24</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-free"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">25</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-tax"></span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">26</span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">27</span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-surface-container-low">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">28</span>
+          </div>
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-surface-container-low">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">29</span>
+          </div>
+        </div>
+
+        <!-- Semana 30 Nov -->
+        <div class="grid grid-cols-7 gap-y-1 text-center">
+          <div class="py-1 flex flex-col items-center gap-0.5 bg-terracotta-soft rounded-r-sm">
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-primary-container tabular-nums">30</span>
+          </div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">1</span></div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">2</span></div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">3</span></div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">4</span></div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">5</span></div>
+          <div class="py-1"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-outline tabular-nums">6</span></div>
+        </div>
+
+        <!-- Rango activo + Leyenda de puntos -->
+        <div class="pt-gutter-sm border-t border-outline-variant flex flex-col gap-gutter-xs">
+          <div class="flex items-center gap-gutter-xs bg-terracotta-soft px-gutter-sm py-1 rounded">
+            <span class="w-2 h-2 rounded-full bg-terracotta shrink-0"></span>
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-primary-container">22 nov – 30 nov · Reforma baño Marta Ruiz</span>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-free"></span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">En hora</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-amber-tax"></span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Horas extra</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-info"></span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Antes de hora</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tarjeta de Agenda del Día Seleccionado -->
+      <section data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+        <div class="flex items-center justify-between gap-gutter-sm">
+          <div class="flex flex-col">
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-primary-container">Lunes 23 Nov · Hoy</span>
+            <h3 data-design-text-token="title-lg" class="font-title text-title-lg text-on-surface text-balance">Reforma baño Marta Ruiz</h3>
+          </div>
+          <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant bg-surface-container px-gutter-sm py-1 rounded tabular-nums">OBR-2026-001</span>
+        </div>
+
+        <div class="flex flex-col gap-gutter-xs bg-surface-container-low rounded-md p-gutter-md">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-gutter-xs">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant" aria-hidden="true">schedule</span>
+              <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">08:00 – 17:00</span>
+            </div>
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-success-container bg-success-container px-gutter-sm py-0.5 rounded-full">8,0 h previstas</span>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center gap-gutter-xs">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant" aria-hidden="true">location_on</span>
+              <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">C/ Goya 82, 2º D · Madrid</span>
+            </div>
+            <a href="#mapa" data-design-text-token="label-md" class="font-label text-label-md text-on-primary-container">Cómo llegar</a>
+          </div>
+        </div>
+
+        <button data-component-id="button-primary" data-component-type="button" data-component-variant="primary" type="button" class="min-h-[48px] w-full px-gutter-lg rounded bg-primary text-on-primary font-label text-label-lg flex items-center justify-center gap-gutter-xs shadow-sm">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">edit_calendar</span>
+          <span data-design-text-token="label-lg">Registrar salida / Ajustar horas de hoy</span>
+        </button>
+      </section>
+
+      <!-- Gráfica Visual de Desviación de Plazos y Horas -->
+      <section data-component-id="card-elevated" data-component-type="card" data-component-variant="elevated" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+        <div class="flex items-center justify-between">
+          <h3 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Plazos y horas: previsto vs real</h3>
+          <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">38 €/h</span>
+        </div>
+
+        <div class="flex flex-col gap-gutter-md">
+          <!-- Obra 1: En plazo -->
+          <div class="flex flex-col gap-gutter-xs">
+            <div class="flex items-center justify-between gap-gutter-sm">
+              <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">OBR-2026-001 · Baño Marta Ruiz</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-success-container bg-success-container px-gutter-sm py-0.5 rounded-full shrink-0">En plazo</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-gutter-sm">
+                <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant w-14">Previsto</span>
+                <div class="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                  <div class="h-full bg-secondary rounded-full" style="width: 100%;"></div>
+                </div>
+                <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums w-12 text-right">56 h</span>
+              </div>
+              <div class="flex items-center gap-gutter-sm">
+                <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant w-14">Real</span>
+                <div class="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                  <div class="h-full bg-emerald-free rounded-full" style="width: 57%;"></div>
+                </div>
+                <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-success-container tabular-nums w-12 text-right">32 h</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Obra 2: Alargada con impacto económico -->
+          <div class="flex flex-col gap-gutter-xs pt-gutter-sm border-t border-outline-variant">
+            <div class="flex items-center justify-between gap-gutter-sm">
+              <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">OBR-2026-011 · Bajante Velázquez</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-warning-container bg-warning-container px-gutter-sm py-0.5 rounded-full shrink-0">+4,5 h (+171 €)</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-gutter-sm">
+                <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant w-14">Previsto</span>
+                <div class="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                  <div class="h-full bg-secondary rounded-full" style="width: 82%;"></div>
+                </div>
+                <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface tabular-nums w-12 text-right">24 h</span>
+              </div>
+              <div class="flex items-center gap-gutter-sm">
+                <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant w-14">Real</span>
+                <div class="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                  <div class="h-full bg-amber-tax rounded-full" style="width: 100%;"></div>
+                </div>
+                <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-warning-container tabular-nums w-12 text-right">28,5 h</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Barra de navegación inferior fija (64px) -->
+    <nav aria-label="Navegación principal" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] h-[64px] bg-surface-container-lowest border-t border-outline-variant px-gutter-xl flex items-center justify-between z-30">
+      <a href="#inicio" class="min-w-[64px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">home</span>
+        <span data-design-text-token="label-sm" class="font-label text-label-sm">Inicio</span>
+      </a>
+
+      <button data-component-id="button-with-icon" data-component-type="button" data-component-variant="with-icon" type="button" class="-mt-4 min-h-[52px] px-gutter-xl rounded-full bg-terracotta text-on-primary font-label text-label-lg inline-flex items-center justify-center gap-gutter-sm shadow-md active:scale-[0.97] transition-transform duration-state-change ease-state-change">
+        <span class="material-symbols-outlined text-[22px]" aria-hidden="true">mic</span>
+        <span data-design-text-token="label-lg">Voz</span>
+      </button>
+
+      <button type="button" class="min-w-[64px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">photo_camera</span>
+        <span data-design-text-token="label-sm" class="font-label text-label-sm">Cámara</span>
+      </button>
+    </nav>
+
+  </div>
+
+
+</body></html>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gestor Autónomo</string>
+    <string name="title_activity_main">Gestor Autónomo</string>
+    <string name="package_name">es.obralocal.app</string>
+    <string name="custom_url_scheme">es.obralocal.app</string>
+</resources>

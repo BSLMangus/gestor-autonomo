@@ -1,0 +1,243 @@
+<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menú Lateral — ObraLocal AI</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'terracotta': '#EA580C',
+        'terracotta-soft': '#FFF7ED',
+        'slate-ink': '#0F172A',
+        'warm-canvas': '#FAF9F6',
+        'card-white': '#FFFFFF',
+        'border-subtle': '#E2E8F0',
+        'emerald-free': '#059669',
+        'emerald-soft': '#ECFDF5',
+        'amber-tax': '#D97706',
+        'amber-soft': '#FFFBEB',
+        'coral-alert': '#DC2626',
+        'coral-soft': '#FEF2F2',
+        'primary': '#D04B00',
+        'on-primary': '#060606',
+        'primary-container': '#FFF7ED',
+        'on-primary-container': '#7F2B00',
+        'secondary': '#0F172A',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#F1F5F9',
+        'on-secondary-container': '#0F172A',
+        'surface': '#FAF9F6',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-warm-card': '#F4F0EA',
+        'surface-container-low': '#F8FAFC',
+        'surface-container': '#F1F5F9',
+        'on-surface': '#0F172A',
+        'on-surface-variant': '#475569',
+        'outline': '#64748B',
+        'outline-variant': '#E2E8F0',
+        'success': '#059669',
+        'on-success': '#1C1C1C',
+        'success-container': '#ECFDF5',
+        'on-success-container': '#003825',
+        'warning': '#D97706',
+        'on-warning': '#1A1C1A',
+        'warning-container': '#FFFBEB',
+        'on-warning-container': '#4D2600',
+        'error': '#DC2626',
+        'on-error': '#FFFFFF',
+        'error-container': '#FEF2F2',
+        'on-error-container': '#690005',
+        'info': '#2563EB',
+        'on-info': '#FFFFFF',
+        'info-container': '#EFF6FF',
+        'on-info-container': '#1E3A8A',
+      },
+      borderRadius: {
+        'sm': '8px',
+        'DEFAULT': '12px',
+        'md': '16px',
+        'lg': '20px',
+        'xl': '24px',
+        'full': '9999px',
+      },
+      spacing: {
+        'gutter-xs': '4px',
+        'gutter-sm': '8px',
+        'gutter-md': '12px',
+        'gutter-lg': '16px',
+        'gutter-xl': '24px',
+        'section': '24px',
+        'page-margin': '16px',
+      },
+      fontFamily: {
+        'display': ['"Inter"', 'sans-serif'],
+        'headline': ['"Inter"', 'sans-serif'],
+        'title': ['"Inter"', 'sans-serif'],
+        'body': ['"Inter"', 'sans-serif'],
+        'label': ['"Inter"', 'sans-serif'],
+        'mono': ['"JetBrains Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.75px', fontWeight: '700' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.35px', fontWeight: '700' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'title-lg': ['18px', { lineHeight: '24px', letterSpacing: '-0.15px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '600' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-lg': ['26px', { lineHeight: '32px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'mono-md': ['16px', { lineHeight: '22px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+        'surface-exit': '160ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+        'surface-exit': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface relative overflow-hidden flex" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Fondo atenuado de la pantalla detrás -->
+    <div class="absolute inset-0 bg-secondary/40 z-10" aria-hidden="true"></div>
+
+    <!-- Drawer lateral -->
+    <aside aria-label="Menú de módulos y conversaciones" class="relative z-20 w-[312px] min-h-[884px] bg-surface-container-lowest border-r border-outline-variant flex flex-col justify-between shadow-xl" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+      <div class="flex flex-col">
+        <!-- Cabecera del drawer -->
+        <div class="p-gutter-lg border-b border-outline-variant flex items-center justify-between">
+          <div class="flex items-center gap-gutter-sm">
+            <div class="w-10 h-10 rounded-md bg-terracotta text-on-primary flex items-center justify-center">
+              <span class="material-symbols-outlined text-[22px]" aria-hidden="true">handyman</span>
+            </div>
+            <div class="flex flex-col">
+              <span data-design-text-token="title-md" class="font-title text-title-md text-on-surface">ObraLocal AI</span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-success-container">100% Local · Sin nube</span>
+            </div>
+          </div>
+          <button type="button" aria-label="Cerrar menú" class="w-10 h-10 rounded-full text-on-surface-variant inline-flex items-center justify-center hover:bg-surface-container">
+            <span class="material-symbols-outlined text-[22px]" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <!-- Lista de módulos -->
+        <nav aria-label="Módulos de la aplicación" class="p-gutter-md flex flex-col gap-1 border-b border-outline-variant">
+          <a href="#inicio" class="min-h-[48px] px-gutter-md rounded-md bg-terracotta-soft text-on-primary-container flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-primary-container" aria-hidden="true">home</span>
+            <span data-design-text-token="label-lg" class="font-label text-label-lg">Inicio</span>
+          </a>
+          <a href="#obras" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center justify-between">
+            <div class="flex items-center gap-gutter-md">
+              <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">construction</span>
+              <span data-design-text-token="body-md" class="font-body text-body-md">Obras</span>
+            </div>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">4</span>
+          </a>
+          <a href="#calendario" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center justify-between">
+            <div class="flex items-center gap-gutter-md">
+              <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">calendar_month</span>
+              <span data-design-text-token="body-md" class="font-body text-body-md">Agenda y Calendario</span>
+            </div>
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-primary-container bg-terracotta-soft px-gutter-sm py-0.5 rounded-full">Hoy</span>
+          </a>
+          <a href="#presupuestos" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center justify-between">
+            <div class="flex items-center gap-gutter-md">
+              <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">description</span>
+              <span data-design-text-token="body-md" class="font-body text-body-md">Presupuestos y Facturas</span>
+            </div>
+            <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">7</span>
+          </a>
+          <a href="#clientes" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">groups</span>
+            <span data-design-text-token="body-md" class="font-body text-body-md">Clientes</span>
+          </a>
+          <a href="#hucha-fiscal" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">savings</span>
+            <span data-design-text-token="body-md" class="font-body text-body-md">Hucha Fiscal</span>
+          </a>
+          <a href="#tarifario" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">sell</span>
+            <span data-design-text-token="body-md" class="font-body text-body-md">Tarifario y Precios</span>
+          </a>
+          <a href="#actividad" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">auto_awesome</span>
+            <span data-design-text-token="body-md" class="font-body text-body-md">Actividad del asistente</span>
+          </a>
+        </nav>
+
+        <!-- Conversaciones recientes -->
+        <section class="p-gutter-md flex flex-col gap-gutter-sm">
+          <div class="flex items-center justify-between px-gutter-xs">
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">Conversaciones recientes</span>
+          </div>
+
+          <button data-component-id="button-secondary" data-component-type="button" data-component-variant="secondary" type="button" class="min-h-[48px] w-full px-gutter-md rounded-md bg-secondary text-on-secondary font-label text-label-lg flex items-center justify-center gap-gutter-xs">
+            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+            <span data-design-text-token="label-lg">+ Nueva conversación</span>
+          </button>
+
+          <a href="#chat-1" class="p-gutter-md rounded-md bg-warning-container border border-outline-variant flex flex-col gap-1">
+            <div class="flex items-center justify-between gap-1">
+              <span data-design-text-token="label-lg" class="font-label text-label-lg text-on-surface">Baño Elena Navarro</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-amber-tax"></span>
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-warning-container">Esperando confirmación</span>
+            </div>
+          </a>
+
+          <a href="#chat-2" class="p-gutter-md rounded-md hover:bg-surface-container flex flex-col gap-1">
+            <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Ticket Saneamientos García</span>
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Guardado en 2026-T4 · Ayer</span>
+          </a>
+
+          <a href="#chat-3" class="p-gutter-md rounded-md hover:bg-surface-container flex flex-col gap-1">
+            <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Subir tarifa hora fontanería</span>
+            <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Aplicado (38 €/h) · 14 nov</span>
+          </a>
+        </section>
+      </div>
+
+      <!-- Ajustes anclado abajo -->
+      <div class="p-gutter-md border-t border-outline-variant">
+        <a href="#ajustes" class="min-h-[48px] px-gutter-md rounded-md text-on-surface hover:bg-surface-container flex items-center justify-between">
+          <div class="flex items-center gap-gutter-md">
+            <span class="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">settings</span>
+            <span data-design-text-token="label-lg" class="font-label text-label-lg">Ajustes y datos fiscales</span>
+          </div>
+          <span class="material-symbols-outlined text-[18px] text-outline" aria-hidden="true">chevron_right</span>
+        </a>
+      </div>
+
+    </aside>
+  </div>
+
+
+</body></html>

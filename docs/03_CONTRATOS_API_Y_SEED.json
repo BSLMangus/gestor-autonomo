@@ -1,0 +1,2020 @@
+{
+  "meta": {
+    "schemaVersion": "1.4.0",
+    "checkpointSchemaVersion": "1.0.0",
+    "appName": "ObraLocal AI",
+    "runtime": "offline-typescript-langgraph-web",
+    "ddlReference": "docs/schema.sql",
+    "referenceQuarter": "2026-T4",
+    "timezoneStrategy": "device-local-calendar-date",
+    "cloud_cost_eur": 0.0
+  },
+  "localBridgeContracts": {
+    "description": "Contratos locales en proceso (TypeScript End-to-End strict: true, cero endpoints HTTP ni red externa).",
+    "graphRunnerApi": {
+      "bootstrapStorage": "() => Promise<{ ok: boolean; recoveredDrafts: RecoveredDraft[]; storageMode: 'capacitor_wal' | 'web_opfs_worker' | 'memory' }> (ejecuta migrateIncompatibleCheckpoints y reconcilia hilos interrumpidos a medias UPDATE chat_threads SET status='error' WHERE status='running')",
+      "createThread": "(params?: { title?: string; active_job_id?: string | null; active_quote_id?: string | null }) => Promise<ChatThreadRecord>",
+      "runTurn": "(threadId: string, input: InputPayload) => Promise<TurnExecutionResult>",
+      "resumeGate": "(threadId: string, decision: HumanDecision) => Promise<TurnExecutionResult>",
+      "reopenRecoveredDraft": "(draftId: string) => Promise<TurnExecutionResult> (crea thread nuevo congelado vía configurable.seed_override.recoveredDraftOverride en Gate 1/2 y marca recovered_drafts.dismissed = 1)",
+      "getThreadState": "(threadId: string) => Promise<{ thread: ChatThreadRecord; checkpointStatus: 'idle' | 'interrupted'; activeInterrupt: InterruptPayload | null; messages: ChatMessageRecord[] }>",
+      "rehydrateActiveThread": "() => Promise<{ threadId: string | null; activeInterrupt: InterruptPayload | null; recoveredDrafts: RecoveredDraft[] }> (appRestoredResult de cámara se procesa aparte en main.tsx vía cameraAdapter.ingestRestoredPhoto esperando appReadyPromise)",
+      "switchThread": "(threadId: string) => Promise<void>"
+    },
+    "coreDirectServices": {
+      "directory": {
+        "clientsCrud": "ClientRepository: listPaginated(opts?: { search?: string; limit?: number; offset?: number }) -> Promise<{ items: ClientRow[]; totalCount: number }> / create / update / delete (bloquea borrado si existen jobs/quotes/invoices)",
+        "catalogCrud": "CatalogRepository: listPaginated(opts?: { search?: string; category?: string; limit?: number; offset?: number }) -> Promise<{ items: CatalogItemRow[]; totalCount: number }> / create / update / deactivate",
+        "jobsOps": "JobRepository: listPaginated(opts?: { search?: string; status?: JobStatus; limit?: number; offset?: number }) / createDirectJob(OBR) / transitionStatus(pendiente|en_curso|finalizado|cancelado)",
+        "quotesManualOps": "QuoteRepository: markSentManually(borrador->enviado, sent_at_iso)/acceptOrReject/regeneratePdfOnDemand(pdfPort: PdfPort)",
+        "invoicesManualOps": "InvoiceRepository: syncOverdueOnRead(localTodayIso)/markPaid(pagado|pendiente_cobro)/markSentManually(sent_at_iso)/regeneratePdfOnDemand(pdfPort: PdfPort)",
+        "documentOpener": "DocumentOpenerService: openPdf(pdfUri: string | null, docKind: 'quote' | 'invoice', docId: string, pdfPort: PdfPort) -> Promise<void> (regenera vía PdfPort si falta; en Web abre URL.createObjectURL + descarga fallback; en Nativo abre @capacitor/share con toShareableNativeUri sin mutar sent_at_iso)",
+        "ticketsCrud": "TicketRepository: listByQuarterOrJob(opts: { quarter?: string; jobId?: string | null; limit?: number; offset?: number }) / updateWithin2Cents / delete (llama fileBridge.deleteCommittedMedia(image_uri)) / checkDuplicate",
+        "siteLogsCrud": "SiteLogService: stampAndSave(input: SiteLogInput) -> Promise<SiteLogRecord> (si viene new_job, crea OBR + site_log en única inTransaction)"
+      },
+      "fiscalService": {
+        "computePiggyBank": "(quarter: string) => Promise<FiscalPiggyBankPayload>",
+        "computeJobSummary": "(jobId: string) => Promise<JobFiscalSummary>"
+      },
+      "settingsService": {
+        "getAppSettings": "() => Promise<AppSettingsRecord>",
+        "updateEmitterProfile": "(emitter: EmitterProfileInput) => Promise<AppSettingsRecord>",
+        "configureSequences": "(fiscalYear: number, overrides: Partial<Record<'PRE'|'ANT'|'FAC'|'OBR', number>>) => Promise<void> (valida valor >= máximo emitido en fiscalYear)",
+        "setLocalLlmConfig": "(enabled: boolean, modelUri: string | null) => Promise<AppSettingsRecord> (en Web la referencia File vive en sesión salvo copia OPFS explícita; si no hay handle en recarga limpia llm_enabled=0)",
+        "unloadLocalLlm": "() => Promise<void> (invoca memoryCoordinator.releaseLlmIfLoaded() registrado externamente desde features/llm)",
+        "dismissRecoveredDraft": "(draftId: string) => Promise<void>"
+      },
+      "chatMaintenanceService": {
+        "deleteClosedThread": "(threadId: string) => Promise<void> (exige status !== 'interrupted', limpia app_settings.last_active_thread_id=null si coincide, elimina chat_thread y ejecuta checkpointsRepo.deleteThreadCheckpoints(threadId))",
+        "purgeClosedHistory": "() => Promise<{ deletedCount: number }> (borra únicamente threads con status IN ('idle','error'), limpia last_active_thread_id=null si estaba entre los eliminados y borra checkpoints vía checkpointsRepo)"
+      },
+      "backupAndDemo": {
+        "exportBackupJson": "(password?: string) => Promise<SymmetricBackupEnvelope>",
+        "importBackupJson": "(envelope: SymmetricBackupEnvelope | string, password?: string) => Promise<{ ok: true; restoredCounts: Record<string, number> }> (en único inTransaction usando exclusivamente tx: purga en orden inverso FK chat_messages, chat_threads, recovered_drafts, agent_traces, lg_checkpoint_writes, lg_checkpoints, feedback_corrections, site_logs, expense_tickets, quote_items, invoices, quotes, jobs, clients, catalog_items, sequences; reinicia app_settings.last_active_thread_id=null y pending_camera_context_json=null; e inserta datos validados del backup — sin reentrancia FIFO)",
+        "restoreDemoData": "(freezer: SeedGraphFreezerPort) => Promise<void> (Fase 1 en src/core/backup/resetService.ts dentro de inTransaction vía tx: purga dominio/chat/trazas/checkpoints e inserta maestro, dominio, chat_threads/chat_messages y tr_seed_03..05 desde seedData JSON; Fase 2 fuera de inTransaction tras COMMIT: invoca freezer.freezeDemoGates() en src/agent/demoSeeder.ts para congelar thr-seed-01-gate1 y thr-seed-02-gate2)",
+        "startFromScratch": "(seedSequences?: Partial<Record<'PRE'|'ANT'|'FAC'|'OBR', number>>) => Promise<void> (en único inTransaction vía tx: purga dominio/chat/trazas + lg_checkpoint_writes y lg_checkpoints en orden inverso FK; reinicia app_settings con emitter_name='', emitter_nif='', emitter_fiscal_address='', emitter_phone='', last_active_thread_id=null, pending_camera_context_json=null, boot_mode='clean'; e inserta seedSequences opcionales)"
+      },
+      "inspectorAndEvals": {
+        "listTraces": "(threadId?: string, limit?: number) => Promise<AgentTraceRecord[]>",
+        "listFeedbackCorrections": "(limit?: number) => Promise<FeedbackCorrectionRecord[]>",
+        "runInMemoryEvalSuite": "() => Promise<EvalSuiteReport> (Web Worker efímero :memory:, cloud_cost_eur = 0.0)"
+      }
+    },
+    "fileBridgeVirtualSchemeRule": {
+      "seedUriPrefix": "seed://",
+      "behavior": "Cualquier URI con prefijo 'seed://' representa un activo virtual de demostración: LocalFileBridge.commitMedia() omite copia física y devuelve null persistentemente salvo que el usuario adjunte foto real de cámara/galería."
+    },
+    "localStreamEvents": [
+      {
+        "event": "turn_started",
+        "payload": { "thread_id": "string", "turn_id": "string", "client_turn_id": "string", "started_at_ms": "number" }
+      },
+      {
+        "event": "node_entered",
+        "payload": { "thread_id": "string", "turn_id": "string", "node": "SpecialistRoute | intent_router | a2ui_dispatcher | quote_commit | ocr_commit | lifecycle_commit" }
+      },
+      {
+        "event": "rag_hits",
+        "payload": { "thread_id": "string", "turn_id": "string", "snippets": "RagSnippet[]" }
+      },
+      {
+        "event": "hitl_interrupt",
+        "payload": { "thread_id": "string", "turn_id": "string", "interruptPayload": "InterruptPayload", "trace_id": "string" }
+      },
+      {
+        "event": "widget_ready",
+        "payload": { "thread_id": "string", "turn_id": "string", "active_widget": "ActiveWidgetEnvelope | null", "quick_actions": "QuickAction[] | null" }
+      },
+      {
+        "event": "turn_completed",
+        "payload": { "thread_id": "string", "turn_id": "string", "trace_id": "string", "latency_ms": "number", "cloud_cost_eur": 0.0 }
+      },
+      {
+        "event": "turn_error",
+        "payload": { "thread_id": "string", "turn_id": "string", "error_code": "ErrorCode", "message_es": "string", "recoverable": "boolean" }
+      }
+    ]
+  },
+  "bridgeRecordSchemas": {
+    "PendingCameraContext": {
+      "source": "chat | scan_ticket | site_log",
+      "thread_id": "string | null",
+      "active_job_id": "string | null",
+      "started_at_ms": "integer >= 0"
+    },
+    "PendingCameraRestore": {
+      "media_uri": "string",
+      "context": "PendingCameraContext"
+    },
+    "EmitterProfileInput": {
+      "emitter_name": "string",
+      "emitter_nif": "string (validado por SpanishTaxIdSchema si no es vacío en emisión Gate 3)",
+      "emitter_fiscal_address": "string",
+      "emitter_phone": "string"
+    },
+    "AppSettingsRecord": {
+      "id": "1",
+      "emitter_name": "string",
+      "emitter_nif": "string",
+      "emitter_fiscal_address": "string",
+      "emitter_phone": "string",
+      "last_active_thread_id": "string | null",
+      "pending_camera_context": "PendingCameraContext | null (deserializado de pending_camera_context_json)",
+      "llm_enabled": "boolean (mapeado desde 0|1 SQLite)",
+      "llm_model_uri": "string | null",
+      "boot_mode": "demo | clean",
+      "updated_at_ms": "integer >= 0"
+    },
+    "ChatThreadRecord": {
+      "thread_id": "string",
+      "title": "string",
+      "status": "idle | running | interrupted | error",
+      "active_job_id": "string | null",
+      "active_quote_id": "string | null",
+      "pending_gate": "pending_gate enum | null",
+      "last_node": "string | null",
+      "is_seed": "boolean (mapeado desde 0|1 SQLite)",
+      "created_at_ms": "integer >= 0",
+      "updated_at_ms": "integer >= 0"
+    },
+    "ChatMessageRecord": {
+      "id": "string",
+      "thread_id": "string",
+      "client_turn_id": "string | null",
+      "role": "user | assistant | system",
+      "content": "string",
+      "widget_json": "ActiveWidgetEnvelope | null (objeto deserializado de TEXT JSON en repositorio)",
+      "quick_actions_json": "QuickAction[] | null (array deserializado de TEXT JSON en repositorio)",
+      "trace_id": "string | null",
+      "created_at_ms": "integer >= 0"
+    },
+    "TurnExecutionResult": {
+      "thread_id": "string",
+      "trace_id": "string",
+      "checkpoint_status": "idle | interrupted",
+      "active_interrupt": "InterruptPayload | null",
+      "active_widget": "ActiveWidgetEnvelope | null",
+      "quick_actions": "QuickAction[] | null",
+      "assistant_message": "ChatMessageRecord | null",
+      "active_job_id": "string | null",
+      "active_quote_id": "string | null",
+      "error_code": "error_code enum | null"
+    },
+    "RecoveredDraft": {
+      "id": "string",
+      "thread_id": "string",
+      "original_schema_version": "string",
+      "pending_gate": "gate_1_quote | gate_2_ticket",
+      "widget_json": "ActiveWidgetEnvelope (QuoteBuilderWidget | TicketOcrValidatorWidget)",
+      "active_job_id": "string | null",
+      "active_quote_id": "string | null",
+      "dismissed": "boolean (mapeado desde 0|1 SQLite)",
+      "recovered_at_ms": "integer >= 0"
+    },
+    "JobFiscalSummary": {
+      "job_id": "string",
+      "job_code": "string",
+      "quoted_base_cents": "integer >= 0",
+      "invoiced_base_cents": "integer >= 0",
+      "collected_gross_cents": "integer >= 0",
+      "pending_invoice_gross_cents": "integer >= 0",
+      "tickets_base_cents": "integer >= 0",
+      "tickets_gross_cents": "integer >= 0",
+      "net_profit_cents": "integer",
+      "has_advance_40": "boolean",
+      "has_final_invoice": "boolean"
+    },
+    "CameraCaptureResult": {
+      "discriminatedBy": "status",
+      "variants": [
+        "{ status: 'ok'; media_uri: string }",
+        "{ status: 'cancelled' }",
+        "{ status: 'permission_denied' }",
+        "{ status: 'error'; reason: string }"
+      ]
+    },
+    "SiteLogInput": {
+      "job_id": "string | null (XOR con new_job)",
+      "new_job": "{ title: string; address?: string } (opcional; si viene crea obra OBR + site_log en única inTransaction al confirmar)",
+      "category": "antes | despues | nota",
+      "note_text": "string",
+      "raw_media_uri": "string | null (exige note_text.trim().length > 0 || raw_media_uri !== null)"
+    },
+    "SiteLogRecord": {
+      "id": "string",
+      "job_id": "string",
+      "category": "antes | despues | nota",
+      "note_text": "string",
+      "photo_uri": "string | null",
+      "stamp_job_code": "string",
+      "stamp_client_name": "string",
+      "created_at_iso": "string (YYYY-MM-DD)",
+      "created_at_ms": "integer >= 0"
+    },
+    "FiscalPiggyBankPayload": {
+      "description": "Idéntico 1:1 a FiscalPiggyBankWidget.widget_payload en 02_GRAFO_LANGGRAPH_Y_ESTADO.md",
+      "quarter": "string /^\\d{4}-T[1-4]$/",
+      "cobrado_mismo_trimestre_cents": "integer >= 0",
+      "cobros_trimestres_anteriores_cents": "integer >= 0",
+      "pendiente_cobro_trimestre_cents": "integer >= 0",
+      "pendiente_cobro_anteriores_cents": "integer >= 0",
+      "iva_repercutido_cents": "integer >= 0",
+      "iva_soportado_cents": "integer >= 0",
+      "iva_to_reserve_cents": "integer >= 0",
+      "iva_to_compensate_cents": "integer >= 0",
+      "irpf_20_cents": "integer >= 0",
+      "untouchable_tax_cents": "integer >= 0",
+      "available_cash_cents": "integer",
+      "selected_job_profit_cents": "integer | null",
+      "job_profits": "Array<{ job_id: string; job_code: string; job_title: string; net_profit_cents: integer }>"
+    },
+    "AgentTraceRecord": {
+      "trace_id": "string",
+      "parent_trace_id": "string | null",
+      "thread_id": "string",
+      "turn_id": "string",
+      "turn_phase": "complete | pre_interrupt | post_resume",
+      "routed_intent": "string | null",
+      "node_sequence": "string[] (deserializado de node_sequence_json)",
+      "inference_engine": "inference_engine enum",
+      "latency_ms": "number >= 0",
+      "rag_snippets": "RagSnippet[] (deserializado de rag_snippets_json)",
+      "validated_widget": "ActiveWidgetEnvelope | null (deserializado de validated_widget_json)",
+      "hitl_gate_id": "pending_gate enum | null",
+      "hitl_outcome": "pending | approved | edited | rejected | null",
+      "rejection_reason": "string | null",
+      "error_code": "error_code enum | null",
+      "cloud_cost_eur": 0.0,
+      "created_at_ms": "integer >= 0"
+    },
+    "FeedbackCorrectionRecord": {
+      "id": "string",
+      "catalog_item_id": "string",
+      "item_description": "string (join desde catalog_items)",
+      "quote_id": "string | null",
+      "old_unit_price_cents": "integer >= 0",
+      "new_unit_price_cents": "integer > 0",
+      "created_at_ms": "integer >= 0"
+    },
+    "EvalSuiteReport": {
+      "executed_at_ms": "integer >= 0",
+      "total_cases": "integer > 0",
+      "passed": "integer >= 0",
+      "failed": "integer >= 0",
+      "duration_ms": "number >= 0",
+      "cloud_cost_eur": 0.0,
+      "results": "Array<{ id: string; category: 'fiscal' | 'rag' | 'zod' | 'graph'; passed: boolean; details: string }>"
+    }
+  },
+  "wireContracts": {
+    "columnMappings": {
+      "sent_at_to_sql": "El campo lógico 'sent_at' en PRD/dominio se persiste en SQLite como 'sent_at_iso TEXT' (YYYY-MM-DD).",
+      "ticket_vat_rate_to_sql": "Gate2TicketPayload.vat_rate (0 | 4 | 10 | 21 | 'mixed' | undefined) se convierte obligatoriamente en ocr_commit a expense_tickets.vat_rate_label = String(vat_rate ?? deriveRateOrMixed(base_cents, vat_cents))."
+    },
+    "enums": {
+      "job_status": ["pendiente", "en_curso", "finalizado", "cancelado"],
+      "quote_status": ["borrador", "enviado", "aceptado", "rechazado"],
+      "invoice_status": ["pendiente_cobro", "pagado", "vencido"],
+      "invoice_kind": ["advance_40", "final", "full"],
+      "series_type": ["PRE", "ANT", "FAC", "OBR"],
+      "billing_sub_intent": ["advance_40", "final_invoice", "share", "overview"],
+      "site_log_category": ["antes", "despues", "nota"],
+      "catalog_category": ["Fontanería", "Electricidad", "Albañilería", "Pintura", "General"],
+      "quote_vat_rate": [10, 21],
+      "ticket_vat_rate": [0, 4, 10, 21, "mixed"],
+      "ui_widget_type": [
+        "QuoteBuilderWidget",
+        "FiscalPiggyBankWidget",
+        "TicketOcrValidatorWidget",
+        "JobLifecycleActionWidget",
+        "SiteLogStampWidget"
+      ],
+      "pending_gate": ["gate_1_quote", "gate_2_ticket", "gate_3_invoice", "gate_4_share"],
+      "action_type": [
+        "free_text_or_voice",
+        "scan_ticket",
+        "manual_ticket_entry",
+        "start_empty_quote",
+        "start_job_quote",
+        "request_invoice_gate",
+        "request_advance_gate",
+        "request_share_gate",
+        "open_job_overview",
+        "open_fiscal_piggybank",
+        "resolve_disambiguation"
+      ],
+      "error_code": [
+        "OCR_ENGINE_ERROR",
+        "PDF_BUILD_ERROR",
+        "SQLITE_QUERY_ERROR",
+        "SCHEMA_VALIDATION_ERROR",
+        "INVALID_STATE_TRANSITION",
+        "LAZY_CHUNK_LOAD_ERROR",
+        "STORAGE_QUOTA_EXCEEDED"
+      ],
+      "inference_engine": [
+        "deterministic_rule_engine",
+        "mediapipe_local_llm",
+        "mediapipe_fallback_deterministic"
+      ]
+    },
+    "inputPayloadSchema": {
+      "type": "object",
+      "required": ["client_turn_id"],
+      "defaults": { "text": "", "action_type": "free_text_or_voice" },
+      "properties": {
+        "client_turn_id": "string (min 1, único por turno)",
+        "text": "string (max 4000, default '')",
+        "action_type": "action_type enum (default 'free_text_or_voice')",
+        "session_context": "{ active_job_id: string | null, active_quote_id: string | null }?",
+        "target_ids": "{ client_id?, job_id?, quote_id?, invoice_id?, catalog_item_id? }?",
+        "billing_sub_intent": "billing_sub_intent enum?",
+        "disambiguation_choice": "edit_existing_quote | create_annex_job | open_job_overview | scan_ticket | site_log?",
+        "quarter": "string /^\\d{4}-T[1-4]$/?",
+        "raw_media_uri": "string?",
+        "media_kind": "ticket_photo | site_photo | voice_transcript?"
+      }
+    },
+    "interruptPayloadSchema": {
+      "discriminatedBy": "gate_id",
+      "variants": {
+        "gate_1_quote": {
+          "gate_id": "gate_1_quote",
+          "title": "string",
+          "summary_es": "string",
+          "requires_fiscal_lock": false,
+          "ui_widget_type": "QuoteBuilderWidget",
+          "proposed_payload": "Gate1QuoteDraftPayloadSchema"
+        },
+        "gate_2_ticket": {
+          "gate_id": "gate_2_ticket",
+          "title": "string",
+          "summary_es": "string",
+          "requires_fiscal_lock": false,
+          "ui_widget_type": "TicketOcrValidatorWidget",
+          "proposed_payload": "Gate2TicketDraftPayloadSchema"
+        },
+        "gate_3_invoice": {
+          "gate_id": "gate_3_invoice",
+          "title": "string",
+          "summary_es": "string",
+          "requires_fiscal_lock": true,
+          "ui_widget_type": "JobLifecycleActionWidget",
+          "proposed_payload": "Gate3InvoiceDraftPayloadSchema"
+        },
+        "gate_4_share": {
+          "gate_id": "gate_4_share",
+          "title": "string",
+          "summary_es": "string",
+          "requires_fiscal_lock": false,
+          "ui_widget_type": "JobLifecycleActionWidget",
+          "proposed_payload": "Gate4ShareDraftPayloadSchema"
+        }
+      }
+    },
+    "humanDecisionSchema": {
+      "description": "Enviado en Command({ resume: HumanDecision }). edited_payload obligatorio iff action === 'edit', prohibido en 'approve' y 'reject'.",
+      "required": ["gate_id", "action", "client_validated_at_ms"],
+      "properties": {
+        "gate_id": "pending_gate enum",
+        "action": "approve | edit | reject",
+        "edited_payload": "Gate*CommitPayloadSchema (únicamente en edit)",
+        "rejection_reason": "string (max 300, opcional en reject)",
+        "client_validated_at_ms": "integer >= 0"
+      }
+    },
+    "symmetricBackupSchema": {
+      "version": "1.0.0",
+      "discriminatedBy": "encrypted",
+      "variants": {
+        "encryptedTrue": {
+          "format": "'obralocal-backup-v1'",
+          "encrypted": true,
+          "kdf": "'PBKDF2-SHA256'",
+          "cipher": "'AES-256-GCM'",
+          "iterations": 210000,
+          "salt_b64": "string (16 bytes en Base64)",
+          "iv_b64": "string (12 bytes en Base64)",
+          "ciphertext_b64": "string (AES-GCM sobre UTF-8 JSON de SymmetricBackupPlaintext)"
+        },
+        "encryptedFalse": {
+          "format": "'obralocal-backup-v1'",
+          "encrypted": false,
+          "kdf": null,
+          "cipher": null,
+          "iterations": null,
+          "salt_b64": null,
+          "iv_b64": null,
+          "payload": "SymmetricBackupPlaintext"
+        }
+      },
+      "plaintextSchema": {
+        "app_settings_emitter": {
+          "emitter_name": "string",
+          "emitter_nif": "string",
+          "emitter_fiscal_address": "string",
+          "emitter_phone": "string"
+        },
+        "sequences": "SequenceRow[]",
+        "clients": "ClientRow[]",
+        "catalog_items": "CatalogItemRow[]",
+        "jobs": "JobRow[]",
+        "quotes": "QuoteRow[]",
+        "quote_items": "QuoteItemRow[]",
+        "invoices": "InvoiceRow[]",
+        "expense_tickets": "ExpenseTicketRow[]",
+        "site_logs": "SiteLogRow[]",
+        "feedback_corrections": "FeedbackCorrectionRow[]"
+      },
+      "excludedFromBackup": [
+        "chat_threads",
+        "chat_messages",
+        "lg_checkpoints",
+        "lg_checkpoint_writes",
+        "recovered_drafts",
+        "agent_traces",
+        "binary_media_files",
+        "generated_pdf_files"
+      ]
+    }
+  },
+  "seedData": {
+    "seedingStrategy": {
+      "mode": "domain-first-then-deterministic-graph-freeze",
+      "notes": "Ejecución estricta en 2 fases desacoplada por SeedGraphFreezerPort: (Fase 1, src/core/backup/resetService.ts dentro de único inTransaction vía tx) purga tablas/checkpoints e inserta maestro, dominio, chat_threads, chat_messages y trazas históricas de escenarios 3–5 (tr_seed_03_pre, tr_seed_03_post, tr_seed_04_qa, tr_seed_04_fiscal, tr_seed_05_sl). (Fase 2, src/agent/demoSeeder.ts implementando freezeDemoGates() fuera de inTransaction tras el COMMIT) congela thr-seed-01-gate1 y thr-seed-02-gate2 ejecutando compiledGraph.invoke(replayInputToFreeze, { configurable: { thread_id, seed_override } }), mapeando quoteFixtureOverride.trace_id / ocrFixtureOverride.trace_id hacia seed_override.traceIdOverride ('tr_seed_01_pre' | 'tr_seed_02_pre') y grabando lg_checkpoints + __interrupt__ sin cargar WASM OCR ni pdfmake."
+    },
+    "app_settings": {
+      "id": 1,
+      "emitter_name": "Carlos Morales García — Instalaciones y Reformas",
+      "emitter_nif": "12345678Z",
+      "emitter_fiscal_address": "C/ de Bravo Murillo 148, 28020 Madrid",
+      "emitter_phone": "+34600112233",
+      "last_active_thread_id": "thr-seed-01-gate1",
+      "pending_camera_context_json": null,
+      "llm_enabled": 1,
+      "llm_model_uri": null,
+      "boot_mode": "demo",
+      "updated_at_ms": 1794988800000
+    },
+    "sequences": [
+      { "series_type": "OBR", "fiscal_year": 2026, "last_seq": 5, "updated_at_ms": 1794988800000 },
+      { "series_type": "PRE", "fiscal_year": 2026, "last_seq": 4, "updated_at_ms": 1794988800000 },
+      { "series_type": "ANT", "fiscal_year": 2026, "last_seq": 2, "updated_at_ms": 1794988800000 },
+      { "series_type": "FAC", "fiscal_year": 2026, "last_seq": 2, "updated_at_ms": 1794988800000 }
+    ],
+    "clients": [
+      {
+        "id": "cli_elena_garcia",
+        "name": "Elena García Martín",
+        "nif": "45891234R",
+        "fiscal_address": "C/ Narváez 42, 4ºB, 28009 Madrid",
+        "phone": "+34612345678",
+        "email": "elena.garcia@ejemplo.local",
+        "notes": "Vivienda habitual. Acceso por portería de 9:00 a 19:00.",
+        "created_at_ms": 1788000000000,
+        "updated_at_ms": 1794668400000
+      },
+      {
+        "id": "cli_javier_garcia",
+        "name": "Javier García López",
+        "nif": "",
+        "fiscal_address": "",
+        "phone": "+34623456789",
+        "email": "",
+        "notes": "Alta rápida en visita. Pedir NIF y dirección si acepta presupuesto.",
+        "created_at_ms": 1794906000000,
+        "updated_at_ms": 1794906000000
+      },
+      {
+        "id": "cli_comunidad_alcala",
+        "name": "C.P. Alcalá 142",
+        "nif": "H84321090",
+        "fiscal_address": "Av. de Alcalá 142, 28009 Madrid",
+        "phone": "+34634567890",
+        "email": "junta@alcala142.ejemplo.local",
+        "notes": "Comunidad de propietarios: aplicar IVA general 21 %.",
+        "created_at_ms": 1789000000000,
+        "updated_at_ms": 1794100000000
+      },
+      {
+        "id": "cli_marta_ruiz",
+        "name": "Marta Ruiz Sánchez",
+        "nif": "39481205A",
+        "fiscal_address": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "phone": "+34645678901",
+        "email": "",
+        "notes": "Clienta recurrente en reformas de baño y vivienda.",
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792900000000
+      }
+    ],
+    "catalog_items": [
+      {
+        "id": "cat_termo_80l",
+        "description": "Termo eléctrico 80L vertical bajo consumo",
+        "category": "Fontanería",
+        "unit": "ud",
+        "unit_price_cents": 32000,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_llave_escuadra",
+        "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+        "category": "Fontanería",
+        "unit": "ud",
+        "unit_price_cents": 1450,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_mano_obra_font",
+        "description": "Mano de obra oficial fontanería",
+        "category": "Fontanería",
+        "unit": "h",
+        "unit_price_cents": 3800,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1791200000000
+      },
+      {
+        "id": "cat_grifo_cocina",
+        "description": "Grifo monomando cocina caño alto extraíble",
+        "category": "Fontanería",
+        "unit": "ud",
+        "unit_price_cents": 8900,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_plato_ducha",
+        "description": "Plato de ducha resina carga mineral antideslizante 120x80",
+        "category": "Albañilería",
+        "unit": "ud",
+        "unit_price_cents": 41000,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_alicatado_m2",
+        "description": "Alicatado porcelánico rectificado (incluye cemento cola)",
+        "category": "Albañilería",
+        "unit": "m2",
+        "unit_price_cents": 3400,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_desescombro",
+        "description": "Desescombro, sacos y tasa punto limpio autorizado",
+        "category": "Albañilería",
+        "unit": "lote",
+        "unit_price_cents": 9500,
+        "default_vat_rate": 21,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_cuadro_elec",
+        "description": "Cuadro eléctrico vivienda/comunidad 18 módulos ICP+IGA+PIAs",
+        "category": "Electricidad",
+        "unit": "ud",
+        "unit_price_cents": 24500,
+        "default_vat_rate": 21,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_punto_luz",
+        "description": "Punto de luz conmutado completo y mecanismo",
+        "category": "Electricidad",
+        "unit": "ud",
+        "unit_price_cents": 4200,
+        "default_vat_rate": 21,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_boletin_cie",
+        "description": "Certificado Instalación Eléctrica (Boletín CIE)",
+        "category": "Electricidad",
+        "unit": "ud",
+        "unit_price_cents": 18000,
+        "default_vat_rate": 21,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_pintura_m2",
+        "description": "Pintura plástica mate lavable 2 manos (material + mano de obra)",
+        "category": "Pintura",
+        "unit": "m2",
+        "unit_price_cents": 1250,
+        "default_vat_rate": 10,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      },
+      {
+        "id": "cat_visita_diag",
+        "description": "Desplazamiento y diagnóstico técnico en obra",
+        "category": "General",
+        "unit": "ud",
+        "unit_price_cents": 4500,
+        "default_vat_rate": 21,
+        "active": 1,
+        "created_at_ms": 1787000000000,
+        "updated_at_ms": 1792000000000
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_00_t3",
+        "job_code": "OBR-2026-001",
+        "client_id": "cli_marta_ruiz",
+        "title": "Sustitución columna montante y llave paso general Ruiz",
+        "address": "C/ López de Hoyos 88, 2ºA, Madrid",
+        "status": "finalizado",
+        "created_at_iso": "2026-09-14",
+        "created_at_ms": 1789372800000,
+        "updated_at_ms": 1791000000000
+      },
+      {
+        "id": "job_01",
+        "job_code": "OBR-2026-002",
+        "client_id": "cli_marta_ruiz",
+        "title": "Reforma ducha resina y alicatado baño vivienda Ruiz",
+        "address": "C/ López de Hoyos 88, 2ºA, Madrid",
+        "status": "finalizado",
+        "created_at_iso": "2026-10-05",
+        "created_at_ms": 1791187200000,
+        "updated_at_ms": 1793174400000
+      },
+      {
+        "id": "job_02",
+        "job_code": "OBR-2026-003",
+        "client_id": "cli_comunidad_alcala",
+        "title": "Renovación cuadro eléctrico portal y alumbrado Alcalá 142",
+        "address": "Av. de Alcalá 142, Portal, Madrid",
+        "status": "en_curso",
+        "created_at_iso": "2026-11-02",
+        "created_at_ms": 1793606400000,
+        "updated_at_ms": 1794668400000
+      },
+      {
+        "id": "job_03",
+        "job_code": "OBR-2026-004",
+        "client_id": "cli_elena_garcia",
+        "title": "Sustitución bajante PVC y pintura cocina Elena García",
+        "address": "C/ Narváez 42, 4ºB, Madrid",
+        "status": "en_curso",
+        "created_at_iso": "2026-11-12",
+        "created_at_ms": 1794470400000,
+        "updated_at_ms": 1794668400000
+      },
+      {
+        "id": "job_04",
+        "job_code": "OBR-2026-005",
+        "client_id": "cli_elena_garcia",
+        "title": "Cambio grifo monomando cocina y revisión tomas",
+        "address": "C/ Narváez 42, 4ºB, Madrid",
+        "status": "pendiente",
+        "created_at_iso": "2026-11-17",
+        "created_at_ms": 1794906000000,
+        "updated_at_ms": 1794906000000
+      }
+    ],
+    "quotes": [
+      {
+        "id": "quote_00_t3",
+        "quote_code": "PRE-2026-001",
+        "job_id": "job_00_t3",
+        "client_id": "cli_marta_ruiz",
+        "client_name_snapshot": "Marta Ruiz Sánchez",
+        "client_nif_snapshot": "39481205A",
+        "client_address_snapshot": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "client_phone_snapshot": "+34645678901",
+        "vat_rate": 10,
+        "subtotal_cents": 120000,
+        "vat_cents": 12000,
+        "total_cents": 132000,
+        "status": "aceptado",
+        "notes": "Trabajo completado y cobrado en octubre.",
+        "pdf_uri": null,
+        "sent_at_iso": "2026-09-15",
+        "created_at_ms": 1789372800000,
+        "updated_at_ms": 1789891200000
+      },
+      {
+        "id": "quote_01",
+        "quote_code": "PRE-2026-002",
+        "job_id": "job_01",
+        "client_id": "cli_marta_ruiz",
+        "client_name_snapshot": "Marta Ruiz Sánchez",
+        "client_nif_snapshot": "39481205A",
+        "client_address_snapshot": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "client_phone_snapshot": "+34645678901",
+        "vat_rate": 10,
+        "subtotal_cents": 150700,
+        "vat_cents": 15070,
+        "total_cents": 165770,
+        "status": "aceptado",
+        "notes": "IVA reducido 10 % por reforma de vivienda habitual.",
+        "pdf_uri": null,
+        "sent_at_iso": "2026-10-06",
+        "created_at_ms": 1791187200000,
+        "updated_at_ms": 1791360000000
+      },
+      {
+        "id": "quote_02",
+        "quote_code": "PRE-2026-003",
+        "job_id": "job_02",
+        "client_id": "cli_comunidad_alcala",
+        "client_name_snapshot": "C.P. Alcalá 142",
+        "client_nif_snapshot": "H84321090",
+        "client_address_snapshot": "Av. de Alcalá 142, 28009 Madrid",
+        "client_phone_snapshot": "+34634567890",
+        "vat_rate": 21,
+        "subtotal_cents": 76100,
+        "vat_cents": 15981,
+        "total_cents": 92081,
+        "status": "aceptado",
+        "notes": "Comunidad de propietarios: IVA general 21 % + CIE incluido.",
+        "pdf_uri": null,
+        "sent_at_iso": "2026-11-03",
+        "created_at_ms": 1793606400000,
+        "updated_at_ms": 1793865600000
+      },
+      {
+        "id": "quote_03",
+        "quote_code": "PRE-2026-004",
+        "job_id": "job_04",
+        "client_id": "cli_elena_garcia",
+        "client_name_snapshot": "Elena García Martín",
+        "client_nif_snapshot": "45891234R",
+        "client_address_snapshot": "C/ Narváez 42, 4ºB, 28009 Madrid",
+        "client_phone_snapshot": "+34612345678",
+        "vat_rate": 10,
+        "subtotal_cents": 12700,
+        "vat_cents": 1270,
+        "total_cents": 13970,
+        "status": "borrador",
+        "notes": "Borrador listo para reeditar o enviar desde Directorio.",
+        "pdf_uri": null,
+        "sent_at_iso": null,
+        "created_at_ms": 1794906000000,
+        "updated_at_ms": 1794906000000
+      }
+    ],
+    "quote_items": [
+      {
+        "id": "qi_00_1",
+        "quote_id": "quote_00_t3",
+        "line_order": 0,
+        "catalog_item_id": "cat_mano_obra_font",
+        "description": "Sustitución columna montante y llave paso general vivienda",
+        "category": "Fontanería",
+        "unit": "ud",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 120000,
+        "line_subtotal_cents": 120000
+      },
+      {
+        "id": "qi_01_1",
+        "quote_id": "quote_01",
+        "line_order": 0,
+        "catalog_item_id": "cat_plato_ducha",
+        "description": "Plato de ducha resina carga mineral antideslizante 120x80",
+        "category": "Albañilería",
+        "unit": "ud",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 41000,
+        "line_subtotal_cents": 41000
+      },
+      {
+        "id": "qi_01_2",
+        "quote_id": "quote_01",
+        "line_order": 1,
+        "catalog_item_id": "cat_alicatado_m2",
+        "description": "Alicatado porcelánico rectificado (incluye cemento cola)",
+        "category": "Albañilería",
+        "unit": "m2",
+        "quantity_thousandths": 8500,
+        "unit_price_cents": 3400,
+        "line_subtotal_cents": 28900
+      },
+      {
+        "id": "qi_01_3",
+        "quote_id": "quote_01",
+        "line_order": 2,
+        "catalog_item_id": "cat_mano_obra_font",
+        "description": "Mano de obra oficial fontanería",
+        "category": "Fontanería",
+        "unit": "h",
+        "quantity_thousandths": 18000,
+        "unit_price_cents": 3800,
+        "line_subtotal_cents": 68400
+      },
+      {
+        "id": "qi_01_4",
+        "quote_id": "quote_01",
+        "line_order": 3,
+        "catalog_item_id": "cat_desescombro",
+        "description": "Desescombro, sacos y tasa punto limpio autorizado",
+        "category": "Albañilería",
+        "unit": "lote",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 9500,
+        "line_subtotal_cents": 9500
+      },
+      {
+        "id": "qi_01_5",
+        "quote_id": "quote_01",
+        "line_order": 4,
+        "catalog_item_id": "cat_llave_escuadra",
+        "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+        "category": "Fontanería",
+        "unit": "ud",
+        "quantity_thousandths": 2000,
+        "unit_price_cents": 1450,
+        "line_subtotal_cents": 2900
+      },
+      {
+        "id": "qi_02_1",
+        "quote_id": "quote_02",
+        "line_order": 0,
+        "catalog_item_id": "cat_cuadro_elec",
+        "description": "Cuadro eléctrico vivienda/comunidad 18 módulos ICP+IGA+PIAs",
+        "category": "Electricidad",
+        "unit": "ud",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 24500,
+        "line_subtotal_cents": 24500
+      },
+      {
+        "id": "qi_02_2",
+        "quote_id": "quote_02",
+        "line_order": 1,
+        "catalog_item_id": "cat_punto_luz",
+        "description": "Punto de luz conmutado completo y mecanismo",
+        "category": "Electricidad",
+        "unit": "ud",
+        "quantity_thousandths": 8000,
+        "unit_price_cents": 4200,
+        "line_subtotal_cents": 33600
+      },
+      {
+        "id": "qi_02_3",
+        "quote_id": "quote_02",
+        "line_order": 2,
+        "catalog_item_id": "cat_boletin_cie",
+        "description": "Certificado Instalación Eléctrica (Boletín CIE)",
+        "category": "Electricidad",
+        "unit": "ud",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 18000,
+        "line_subtotal_cents": 18000
+      },
+      {
+        "id": "qi_03_1",
+        "quote_id": "quote_03",
+        "line_order": 0,
+        "catalog_item_id": "cat_grifo_cocina",
+        "description": "Grifo monomando cocina caño alto extraíble",
+        "category": "Fontanería",
+        "unit": "ud",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 8900,
+        "line_subtotal_cents": 8900
+      },
+      {
+        "id": "qi_03_2",
+        "quote_id": "quote_03",
+        "line_order": 1,
+        "catalog_item_id": "cat_mano_obra_font",
+        "description": "Mano de obra oficial fontanería",
+        "category": "Fontanería",
+        "unit": "h",
+        "quantity_thousandths": 1000,
+        "unit_price_cents": 3800,
+        "line_subtotal_cents": 3800
+      }
+    ],
+    "invoices": [
+      {
+        "id": "inv_00_fac",
+        "invoice_number": "FAC-2026-001",
+        "series_type": "FAC",
+        "fiscal_year": 2026,
+        "kind": "full",
+        "job_id": "job_00_t3",
+        "quote_id": "quote_00_t3",
+        "client_id": "cli_marta_ruiz",
+        "emitter_nif_snapshot": "12345678Z",
+        "emitter_name_snapshot": "Carlos Morales García — Instalaciones y Reformas",
+        "emitter_address_snapshot": "C/ de Bravo Murillo 148, 28020 Madrid",
+        "client_name_snapshot": "Marta Ruiz Sánchez",
+        "client_nif_snapshot": "39481205A",
+        "client_address_snapshot": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "client_phone_snapshot": "+34645678901",
+        "issued_at_iso": "2026-09-20",
+        "due_at_iso": "2026-10-20",
+        "quarter": "2026-T3",
+        "paid_at_iso": "2026-10-03",
+        "paid_quarter": "2026-T4",
+        "sent_at_iso": "2026-09-20",
+        "vat_rate": 10,
+        "base_cents": 120000,
+        "vat_cents": 12000,
+        "total_cents": 132000,
+        "advance_deducted_base_cents": 0,
+        "advance_deducted_vat_cents": 0,
+        "advance_invoice_id": null,
+        "status": "pagado",
+        "notes": "Factura emitida en T3 y cobrada el 03/10 (T4).",
+        "pdf_uri": null,
+        "created_at_ms": 1789891200000,
+        "updated_at_ms": 1791014400000
+      },
+      {
+        "id": "inv_01_ant",
+        "invoice_number": "ANT-2026-001",
+        "series_type": "ANT",
+        "fiscal_year": 2026,
+        "kind": "advance_40",
+        "job_id": "job_01",
+        "quote_id": "quote_01",
+        "client_id": "cli_marta_ruiz",
+        "emitter_nif_snapshot": "12345678Z",
+        "emitter_name_snapshot": "Carlos Morales García — Instalaciones y Reformas",
+        "emitter_address_snapshot": "C/ de Bravo Murillo 148, 28020 Madrid",
+        "client_name_snapshot": "Marta Ruiz Sánchez",
+        "client_nif_snapshot": "39481205A",
+        "client_address_snapshot": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "client_phone_snapshot": "+34645678901",
+        "issued_at_iso": "2026-10-08",
+        "due_at_iso": "2026-11-07",
+        "quarter": "2026-T4",
+        "paid_at_iso": "2026-10-09",
+        "paid_quarter": "2026-T4",
+        "sent_at_iso": "2026-10-08",
+        "vat_rate": 10,
+        "base_cents": 60280,
+        "vat_cents": 6028,
+        "total_cents": 66308,
+        "advance_deducted_base_cents": 0,
+        "advance_deducted_vat_cents": 0,
+        "advance_invoice_id": null,
+        "status": "pagado",
+        "notes": "Anticipo 40 % previo al inicio de obra sobre PRE-2026-002.",
+        "pdf_uri": null,
+        "created_at_ms": 1791446400000,
+        "updated_at_ms": 1791532800000
+      },
+      {
+        "id": "inv_01_fac",
+        "invoice_number": "FAC-2026-002",
+        "series_type": "FAC",
+        "fiscal_year": 2026,
+        "kind": "final",
+        "job_id": "job_01",
+        "quote_id": "quote_01",
+        "client_id": "cli_marta_ruiz",
+        "emitter_nif_snapshot": "12345678Z",
+        "emitter_name_snapshot": "Carlos Morales García — Instalaciones y Reformas",
+        "emitter_address_snapshot": "C/ de Bravo Murillo 148, 28020 Madrid",
+        "client_name_snapshot": "Marta Ruiz Sánchez",
+        "client_nif_snapshot": "39481205A",
+        "client_address_snapshot": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+        "client_phone_snapshot": "+34645678901",
+        "issued_at_iso": "2026-10-24",
+        "due_at_iso": "2026-11-23",
+        "quarter": "2026-T4",
+        "paid_at_iso": "2026-10-28",
+        "paid_quarter": "2026-T4",
+        "sent_at_iso": "2026-10-24",
+        "vat_rate": 10,
+        "base_cents": 90420,
+        "vat_cents": 9042,
+        "total_cents": 99462,
+        "advance_deducted_base_cents": 60280,
+        "advance_deducted_vat_cents": 6028,
+        "advance_invoice_id": "inv_01_ant",
+        "status": "pagado",
+        "notes": "Factura final liquidada con deducción íntegra de ANT-2026-001.",
+        "pdf_uri": null,
+        "created_at_ms": 1792828800000,
+        "updated_at_ms": 1793174400000
+      },
+      {
+        "id": "inv_02_ant",
+        "invoice_number": "ANT-2026-002",
+        "series_type": "ANT",
+        "fiscal_year": 2026,
+        "kind": "advance_40",
+        "job_id": "job_02",
+        "quote_id": "quote_02",
+        "client_id": "cli_comunidad_alcala",
+        "emitter_nif_snapshot": "12345678Z",
+        "emitter_name_snapshot": "Carlos Morales García — Instalaciones y Reformas",
+        "emitter_address_snapshot": "C/ de Bravo Murillo 148, 28020 Madrid",
+        "client_name_snapshot": "C.P. Alcalá 142",
+        "client_nif_snapshot": "H84321090",
+        "client_address_snapshot": "Av. de Alcalá 142, 28009 Madrid",
+        "client_phone_snapshot": "+34634567890",
+        "issued_at_iso": "2026-11-05",
+        "due_at_iso": "2026-12-05",
+        "quarter": "2026-T4",
+        "paid_at_iso": null,
+        "paid_quarter": null,
+        "sent_at_iso": "2026-11-05",
+        "vat_rate": 21,
+        "base_cents": 30440,
+        "vat_cents": 6392,
+        "total_cents": 36832,
+        "advance_deducted_base_cents": 0,
+        "advance_deducted_vat_cents": 0,
+        "advance_invoice_id": null,
+        "status": "pendiente_cobro",
+        "notes": "Anticipo 40 % pendiente de transferencia de la comunidad.",
+        "pdf_uri": null,
+        "created_at_ms": 1793865600000,
+        "updated_at_ms": 1793865600000
+      }
+    ],
+    "expense_tickets": [
+      {
+        "id": "tkt_01",
+        "job_id": "job_01",
+        "supplier_name": "Suministros Fontanería Madrid S.L.",
+        "supplier_nif": "B63459820",
+        "issue_date_iso": "2026-10-12",
+        "quarter": "2026-T4",
+        "category": "materiales",
+        "vat_rate_label": "21",
+        "base_cents": 24500,
+        "vat_cents": 5145,
+        "total_cents": 29645,
+        "ocr_confidence": 96,
+        "image_uri": null,
+        "created_at_ms": 1791792000000,
+        "updated_at_ms": 1791792000000
+      },
+      {
+        "id": "tkt_02",
+        "job_id": "job_02",
+        "supplier_name": "Almacén Eléctrico Centro S.L.",
+        "supplier_nif": "B87654323",
+        "issue_date_iso": "2026-11-07",
+        "quarter": "2026-T4",
+        "category": "materiales",
+        "vat_rate_label": "21",
+        "base_cents": 18500,
+        "vat_cents": 3885,
+        "total_cents": 22385,
+        "ocr_confidence": 94,
+        "image_uri": null,
+        "created_at_ms": 1794038400000,
+        "updated_at_ms": 1794038400000
+      },
+      {
+        "id": "tkt_03_general",
+        "job_id": null,
+        "supplier_name": "Ferretería Industrial Sur",
+        "supplier_nif": "B74125899",
+        "issue_date_iso": "2026-11-10",
+        "quarter": "2026-T4",
+        "category": "herramienta",
+        "vat_rate_label": "21",
+        "base_cents": 6200,
+        "vat_cents": 1302,
+        "total_cents": 7502,
+        "ocr_confidence": 89,
+        "image_uri": null,
+        "created_at_ms": 1794297600000,
+        "updated_at_ms": 1794297600000
+      }
+    ],
+    "site_logs": [
+      {
+        "id": "sl_01",
+        "job_id": "job_03",
+        "category": "antes",
+        "note_text": "Retirada de mueble fregadero y localización de fuga en bajante PVC de 110 mm.",
+        "photo_uri": null,
+        "stamp_job_code": "OBR-2026-004",
+        "stamp_client_name": "Elena García Martín",
+        "created_at_iso": "2026-11-12",
+        "created_at_ms": 1794470400000
+      },
+      {
+        "id": "sl_02",
+        "job_id": "job_03",
+        "category": "despues",
+        "note_text": "Manguito elástico y tramo PVC nuevos colocados, prueba de estanqueidad OK y paramento pintado.",
+        "photo_uri": null,
+        "stamp_job_code": "OBR-2026-004",
+        "stamp_client_name": "Elena García Martín",
+        "created_at_iso": "2026-11-14",
+        "created_at_ms": 1794668400000
+      }
+    ],
+    "feedback_corrections": [
+      {
+        "id": "fb_01",
+        "catalog_item_id": "cat_mano_obra_font",
+        "quote_id": "quote_01",
+        "old_unit_price_cents": 3500,
+        "new_unit_price_cents": 3800,
+        "created_at_ms": 1791200000000
+      }
+    ],
+    "seedThreads": [
+      {
+        "thread_id": "thr-seed-01-gate1",
+        "scenario": "Escenario 1: Gate 1 pausado en QuoteBuilderWidget listo para Aprobar/Editar/Rechazar al abrir la app",
+        "threadRecord": {
+          "thread_id": "thr-seed-01-gate1",
+          "title": "Presupuesto termo Javier García (Pausa HITL)",
+          "status": "interrupted",
+          "active_job_id": null,
+          "active_quote_id": null,
+          "pending_gate": "gate_1_quote",
+          "last_node": "quote_commit",
+          "is_seed": 1,
+          "created_at_ms": 1794988800000,
+          "updated_at_ms": 1794988805000
+        },
+        "replayInputToFreeze": {
+          "client_turn_id": "seed-turn-01-gate1",
+          "text": "Presupuesto para Javier García: 1 termo eléctrico 80L, 2 llaves de escuadra y desmontaje de termo antiguo por 45 euros, IVA 10% vivienda.",
+          "action_type": "free_text_or_voice",
+          "session_context": { "active_job_id": null, "active_quote_id": null }
+        },
+        "quoteFixtureOverride": {
+          "trace_id": "tr_seed_01_pre",
+          "summary_es": "Presupuesto borrador para Javier García López (3 líneas, IVA 10 %, total 433,40 €).",
+          "proposed_payload": {
+            "quote_id": null,
+            "client_id": "cli_javier_garcia",
+            "job_id": null,
+            "job_title": "Cambio termo eléctrico y llaves escuadra vivienda García",
+            "vat_rate": 10,
+            "notes": "IVA 10 % sujeto a requisitos de reforma en vivienda.",
+            "lines": [
+              {
+                "catalog_item_id": "cat_termo_80l",
+                "description": "Termo eléctrico 80L vertical bajo consumo",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 32000,
+                "original_unit_price_cents": 32000,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": "cat_llave_escuadra",
+                "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 2000,
+                "unit_price_cents": 1450,
+                "original_unit_price_cents": 1450,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": null,
+                "description": "Desmontaje y retirada de termo antiguo a punto limpio",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 4500,
+                "original_unit_price_cents": 0,
+                "save_to_catalog": true
+              }
+            ]
+          }
+        },
+        "expectedInterruptPayload": {
+          "gate_id": "gate_1_quote",
+          "title": "Confirmar presupuesto y catálogo",
+          "summary_es": "Presupuesto borrador para Javier García López (3 líneas, IVA 10 %, total 433,40 €).",
+          "requires_fiscal_lock": false,
+          "ui_widget_type": "QuoteBuilderWidget",
+          "proposed_payload": {
+            "quote_id": null,
+            "client_id": "cli_javier_garcia",
+            "job_id": null,
+            "job_title": "Cambio termo eléctrico y llaves escuadra vivienda García",
+            "vat_rate": 10,
+            "notes": "IVA 10 % sujeto a requisitos de reforma en vivienda.",
+            "lines": [
+              {
+                "catalog_item_id": "cat_termo_80l",
+                "description": "Termo eléctrico 80L vertical bajo consumo",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 32000,
+                "original_unit_price_cents": 32000,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": "cat_llave_escuadra",
+                "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 2000,
+                "unit_price_cents": 1450,
+                "original_unit_price_cents": 1450,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": null,
+                "description": "Desmontaje y retirada de termo antiguo a punto limpio",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 4500,
+                "original_unit_price_cents": 0,
+                "save_to_catalog": true
+              }
+            ]
+          }
+        },
+        "expectedActiveWidget": {
+          "ui_widget_type": "QuoteBuilderWidget",
+          "widget_payload": {
+            "quote_id": null,
+            "client_id": "cli_javier_garcia",
+            "job_id": null,
+            "job_title": "Cambio termo eléctrico y llaves escuadra vivienda García",
+            "vat_rate": 10,
+            "notes": "IVA 10 % sujeto a requisitos de reforma en vivienda.",
+            "lines": [
+              {
+                "catalog_item_id": "cat_termo_80l",
+                "description": "Termo eléctrico 80L vertical bajo consumo",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 32000,
+                "original_unit_price_cents": 32000,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": "cat_llave_escuadra",
+                "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 2000,
+                "unit_price_cents": 1450,
+                "original_unit_price_cents": 1450,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": null,
+                "description": "Desmontaje y retirada de termo antiguo a punto limpio",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 4500,
+                "original_unit_price_cents": 0,
+                "save_to_catalog": true
+              }
+            ],
+            "subtotal_cents": 39400,
+            "vat_cents": 3940,
+            "total_cents": 43340
+          }
+        },
+        "messages": [
+          {
+            "id": "msg_s1_u1",
+            "thread_id": "thr-seed-01-gate1",
+            "client_turn_id": "seed-turn-01-gate1",
+            "role": "user",
+            "content": "Presupuesto para Javier García: 1 termo eléctrico 80L, 2 llaves de escuadra y desmontaje de termo antiguo por 45 euros, IVA 10% vivienda.",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1794988800000
+          },
+          {
+            "id": "msg_s1_a1",
+            "thread_id": "thr-seed-01-gate1",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "He preparado el borrador de presupuesto para Javier García López con precios de tu tarifario (394,00 € base + 39,40 € IVA = 433,40 €). Ajusta cantidades o precios si lo necesitas y confirma para guardar y generar el PDF.",
+            "widget_json": {
+              "ui_widget_type": "QuoteBuilderWidget",
+              "widget_payload": {
+                "quote_id": null,
+                "client_id": "cli_javier_garcia",
+                "job_id": null,
+                "job_title": "Cambio termo eléctrico y llaves escuadra vivienda García",
+                "vat_rate": 10,
+                "notes": "IVA 10 % sujeto a requisitos de reforma en vivienda.",
+                "lines": [
+                  {
+                    "catalog_item_id": "cat_termo_80l",
+                    "description": "Termo eléctrico 80L vertical bajo consumo",
+                    "category": "Fontanería",
+                    "unit": "ud",
+                    "quantity_thousandths": 1000,
+                    "unit_price_cents": 32000,
+                    "original_unit_price_cents": 32000,
+                    "save_to_catalog": false
+                  },
+                  {
+                    "catalog_item_id": "cat_llave_escuadra",
+                    "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+                    "category": "Fontanería",
+                    "unit": "ud",
+                    "quantity_thousandths": 2000,
+                    "unit_price_cents": 1450,
+                    "original_unit_price_cents": 1450,
+                    "save_to_catalog": false
+                  },
+                  {
+                    "catalog_item_id": null,
+                    "description": "Desmontaje y retirada de termo antiguo a punto limpio",
+                    "category": "Fontanería",
+                    "unit": "ud",
+                    "quantity_thousandths": 1000,
+                    "unit_price_cents": 4500,
+                    "original_unit_price_cents": 0,
+                    "save_to_catalog": true
+                  }
+                ],
+                "subtotal_cents": 39400,
+                "vat_cents": 3940,
+                "total_cents": 43340
+              }
+            },
+            "quick_actions_json": null,
+            "trace_id": "tr_seed_01_pre",
+            "created_at_ms": 1794988801000
+          }
+        ]
+      },
+      {
+        "thread_id": "thr-seed-02-gate2",
+        "scenario": "Escenario 2: Gate 2 pausado en TicketOcrValidatorWidget sin lanzar WASM OCR en arranque",
+        "threadRecord": {
+          "thread_id": "thr-seed-02-gate2",
+          "title": "Ticket Obramat Madrid Norte (Validar Gate 2)",
+          "status": "interrupted",
+          "active_job_id": "job_02",
+          "active_quote_id": "quote_02",
+          "pending_gate": "gate_2_ticket",
+          "last_node": "ocr_commit",
+          "is_seed": 1,
+          "created_at_ms": 1794825000000,
+          "updated_at_ms": 1794825005000
+        },
+        "replayInputToFreeze": {
+          "client_turn_id": "seed-turn-02-gate2",
+          "text": "",
+          "action_type": "scan_ticket",
+          "session_context": { "active_job_id": "job_02", "active_quote_id": "quote_02" }
+        },
+        "ocrFixtureOverride": {
+          "trace_id": "tr_seed_02_pre",
+          "rawText": "OBRAMAT MADRID NORTE SL\nNIF B85296341\nFECHA 16/11/2026\nBASE IMP 21%: 124,50 EUR\nIVA 21%: 26,14 EUR\nTOTAL TICKET: 150,65 EUR",
+          "parsed": {
+            "supplierName": "Obramat Madrid Norte",
+            "supplierNif": "B85296341",
+            "issueDateIso": "2026-11-16",
+            "vatRate": 21,
+            "baseCents": 12450,
+            "vatCents": 2614,
+            "totalCents": 15065
+          },
+          "confidence": 91
+        },
+        "expectedInterruptPayload": {
+          "gate_id": "gate_2_ticket",
+          "title": "Validar ticket de gasto antes de archivar",
+          "summary_es": "Ticket detectado de Obramat Madrid Norte (150,65 €, diferencia térmica de 0,01 € dentro de tolerancia) para obra OBR-2026-003.",
+          "requires_fiscal_lock": false,
+          "ui_widget_type": "TicketOcrValidatorWidget",
+          "proposed_payload": {
+            "supplier_name": "Obramat Madrid Norte",
+            "supplier_nif": "B85296341",
+            "issue_date_iso": "2026-11-16",
+            "quarter": "2026-T4",
+            "base_cents": 12450,
+            "vat_rate": 21,
+            "vat_cents": 2614,
+            "total_cents": 15065,
+            "ocr_confidence": 91,
+            "job_id": "job_02",
+            "category": "materiales",
+            "media_uri": null
+          }
+        },
+        "expectedActiveWidget": {
+          "ui_widget_type": "TicketOcrValidatorWidget",
+          "widget_payload": {
+            "supplier_name": "Obramat Madrid Norte",
+            "supplier_nif": "B85296341",
+            "issue_date_iso": "2026-11-16",
+            "quarter": "2026-T4",
+            "base_cents": 12450,
+            "vat_rate": 21,
+            "vat_cents": 2614,
+            "total_cents": 15065,
+            "ocr_confidence": 91,
+            "job_id": "job_02",
+            "category": "materiales",
+            "media_uri": null,
+            "ocr_fallback_reason": null
+          }
+        },
+        "messages": [
+          {
+            "id": "msg_s2_u1",
+            "thread_id": "thr-seed-02-gate2",
+            "client_turn_id": "seed-turn-02-gate2",
+            "role": "user",
+            "content": "[Ticket escaneado: Obramat 16/11/2026]",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1794825000000
+          },
+          {
+            "id": "msg_s2_a1",
+            "thread_id": "thr-seed-02-gate2",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "Lectura OCR completada (91 % confianza): Obramat Madrid Norte por 150,65 € en 2026-T4. Verifica el importe y la obra vinculada antes de archivar en Hacienda.",
+            "widget_json": {
+              "ui_widget_type": "TicketOcrValidatorWidget",
+              "widget_payload": {
+                "supplier_name": "Obramat Madrid Norte",
+                "supplier_nif": "B85296341",
+                "issue_date_iso": "2026-11-16",
+                "quarter": "2026-T4",
+                "base_cents": 12450,
+                "vat_rate": 21,
+                "vat_cents": 2614,
+                "total_cents": 15065,
+                "ocr_confidence": 91,
+                "job_id": "job_02",
+                "category": "materiales",
+                "media_uri": null,
+                "ocr_fallback_reason": null
+              }
+            },
+            "quick_actions_json": null,
+            "trace_id": "tr_seed_02_pre",
+            "created_at_ms": 1794825001000
+          }
+        ]
+      },
+      {
+        "thread_id": "thr-seed-03-lifecycle-paid",
+        "scenario": "Escenario 3: Obra completada con PRE-2026-002 -> ANT-2026-001 (40 %) -> FAC-2026-002 cobrada",
+        "threadRecord": {
+          "thread_id": "thr-seed-03-lifecycle-paid",
+          "title": "Obra baño Ruiz (Completada y cobrada)",
+          "status": "idle",
+          "active_job_id": "job_01",
+          "active_quote_id": "quote_01",
+          "pending_gate": null,
+          "last_node": "__end__",
+          "is_seed": 1,
+          "created_at_ms": 1792828800000,
+          "updated_at_ms": 1793174400000
+        },
+        "messages": [
+          {
+            "id": "msg_s3_u1",
+            "thread_id": "thr-seed-03-lifecycle-paid",
+            "client_turn_id": "seed-turn-03-fact",
+            "role": "user",
+            "content": "Emite la factura final de la reforma de ducha de Marta Ruiz descontando el anticipo.",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1792828800000
+          },
+          {
+            "id": "msg_s3_a1",
+            "thread_id": "thr-seed-03-lifecycle-paid",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "Factura final FAC-2026-002 emitida para Marta Ruiz Sánchez descontando íntegramente ANT-2026-001 (663,08 €). Importe final liquidado: 994,62 € (904,20 € base + 90,42 € IVA 10 %).",
+            "widget_json": {
+              "ui_widget_type": "JobLifecycleActionWidget",
+              "widget_payload": {
+                "job_id": "job_01",
+                "quote_id": "quote_01",
+                "invoice_id": "inv_01_fac",
+                "mode": "overview",
+                "pdf_uri": null
+              }
+            },
+            "quick_actions_json": null,
+            "trace_id": "tr_seed_03_post",
+            "created_at_ms": 1792828802000
+          }
+        ]
+      },
+      {
+        "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+        "scenario": "Escenario 4: Hilo multi-turno (active_job_id = job_02) con assistant_qa_node + FiscalPiggyBankWidget 2026-T4",
+        "threadRecord": {
+          "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+          "title": "Alcalá 142 y Hucha Fiscal 2026-T4",
+          "status": "idle",
+          "active_job_id": "job_02",
+          "active_quote_id": "quote_02",
+          "pending_gate": null,
+          "last_node": "__end__",
+          "is_seed": 1,
+          "created_at_ms": 1794643200000,
+          "updated_at_ms": 1794950000000
+        },
+        "messages": [
+          {
+            "id": "msg_s4_u1",
+            "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+            "client_turn_id": "seed-turn-04-qa1",
+            "role": "user",
+            "content": "¿Cuánto llevo gastado en la obra de Alcalá 142 y qué falta por cobrar?",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1794643200000
+          },
+          {
+            "id": "msg_s4_a1",
+            "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "En OBR-2026-003 (C.P. Alcalá 142) tienes 1 ticket registrado de 185,00 € base (223,85 € con IVA). Se emitió el anticipo ANT-2026-002 por 368,32 € (pendiente de cobro) sobre el presupuesto PRE-2026-003 de 920,81 €; quedan 552,49 € pendientes de facturar al finalizar.",
+            "widget_json": null,
+            "quick_actions_json": [
+              {
+                "id": "qa_fiscal_q4",
+                "label": "Ver Hucha Fiscal 2026-T4",
+                "action_type": "open_fiscal_piggybank",
+                "payload": { "quarter": "2026-T4" }
+              }
+            ],
+            "trace_id": "tr_seed_04_qa",
+            "created_at_ms": 1794643200120
+          },
+          {
+            "id": "msg_s4_u2",
+            "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+            "client_turn_id": "seed-turn-04-fiscal",
+            "role": "user",
+            "content": "Enséñame la hucha fiscal del trimestre.",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1794950000000
+          },
+          {
+            "id": "msg_s4_a2",
+            "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "Resumen fiscal 2026-T4 calculado sobre tus facturas y tickets reales: Dinero Intocable para Hacienda 375,18 € (111,30 € IVA neto + 263,88 € IRPF 20 %) y Saldo Disponible Real del trimestre 687,20 € (aparte 1.320,00 € cobrados de T3).",
+            "widget_json": {
+              "ui_widget_type": "FiscalPiggyBankWidget",
+              "widget_payload": {
+                "quarter": "2026-T4",
+                "cobrado_mismo_trimestre_cents": 165770,
+                "cobros_trimestres_anteriores_cents": 132000,
+                "pendiente_cobro_trimestre_cents": 36832,
+                "pendiente_cobro_anteriores_cents": 0,
+                "iva_repercutido_cents": 21462,
+                "iva_soportado_cents": 10332,
+                "iva_to_reserve_cents": 11130,
+                "iva_to_compensate_cents": 0,
+                "irpf_20_cents": 26388,
+                "untouchable_tax_cents": 37518,
+                "available_cash_cents": 68720,
+                "selected_job_profit_cents": 11940,
+                "job_profits": [
+                  { "job_id": "job_01", "job_code": "OBR-2026-002", "job_title": "Reforma ducha resina y alicatado baño vivienda Ruiz", "net_profit_cents": 126200 },
+                  { "job_id": "job_02", "job_code": "OBR-2026-003", "job_title": "Renovación cuadro eléctrico portal y alumbrado Alcalá 142", "net_profit_cents": 11940 },
+                  { "job_id": "job_03", "job_code": "OBR-2026-004", "job_title": "Sustitución bajante PVC y pintura cocina Elena García", "net_profit_cents": 0 },
+                  { "job_id": "job_04", "job_code": "OBR-2026-005", "job_title": "Cambio grifo monomando cocina y revisión tomas", "net_profit_cents": 0 }
+                ]
+              }
+            },
+            "quick_actions_json": null,
+            "trace_id": "tr_seed_04_fiscal",
+            "created_at_ms": 1794950000090
+          }
+        ]
+      },
+      {
+        "thread_id": "thr-seed-05-site-log",
+        "scenario": "Escenario 5: Diario de obra Antes/Después en OBR-2026-004 (Elena García Martín)",
+        "threadRecord": {
+          "thread_id": "thr-seed-05-site-log",
+          "title": "Diario obra cocina Elena García",
+          "status": "idle",
+          "active_job_id": "job_03",
+          "active_quote_id": null,
+          "pending_gate": null,
+          "last_node": "__end__",
+          "is_seed": 1,
+          "created_at_ms": 1794470400000,
+          "updated_at_ms": 1794668400080
+        },
+        "messages": [
+          {
+            "id": "msg_s5_u1",
+            "thread_id": "thr-seed-05-site-log",
+            "client_turn_id": "seed-turn-05-sitelog",
+            "role": "user",
+            "content": "Añade nota de acabado en el diario de la cocina de Elena.",
+            "widget_json": null,
+            "quick_actions_json": null,
+            "trace_id": null,
+            "created_at_ms": 1794668400000
+          },
+          {
+            "id": "msg_s5_a1",
+            "thread_id": "thr-seed-05-site-log",
+            "client_turn_id": null,
+            "role": "assistant",
+            "content": "Entrada preparada para OBR-2026-004 (Elena García Martín) en categoría 'despues'. Revisa la nota o adjunta foto sellada y guarda en el diario.",
+            "widget_json": {
+              "ui_widget_type": "SiteLogStampWidget",
+              "widget_payload": {
+                "candidate_job_id": "job_03",
+                "category": "despues",
+                "note_text": "Manguito elástico y tramo PVC nuevos colocados, prueba de estanqueidad OK y paramento pintado.",
+                "raw_media_uri": null,
+                "stamp_preview_meta": {
+                  "job_code": "OBR-2026-004",
+                  "client_name": "Elena García Martín",
+                  "timestamp_iso": "2026-11-14T16:00:00"
+                }
+              }
+            },
+            "quick_actions_json": null,
+            "trace_id": "tr_seed_05_sl",
+            "created_at_ms": 1794668400080
+          }
+        ]
+      }
+    ],
+    "agent_traces": [
+      {
+        "trace_id": "tr_seed_01_pre",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-01-gate1",
+        "turn_id": "seed-turn-01-gate1",
+        "turn_phase": "pre_interrupt",
+        "routed_intent": "quote_specialist",
+        "node_sequence_json": ["intent_router", "quote_specialist", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 14.2,
+        "rag_snippets_json": [
+          { "source_table": "clients", "record_id": "cli_javier_garcia", "title": "Javier García López", "snippet_text": "Tel +34623456789", "bm25_score": -2.18 },
+          { "source_table": "catalog_items", "record_id": "cat_termo_80l", "title": "Termo eléctrico 80L vertical bajo consumo", "snippet_text": "Fontanería · 320,00 €/ud", "bm25_score": -1.94 }
+        ],
+        "validated_widget_json": {
+          "ui_widget_type": "QuoteBuilderWidget",
+          "widget_payload": {
+            "quote_id": null,
+            "client_id": "cli_javier_garcia",
+            "job_id": null,
+            "job_title": "Cambio termo eléctrico y llaves escuadra vivienda García",
+            "vat_rate": 10,
+            "notes": "IVA 10 % sujeto a requisitos de reforma en vivienda.",
+            "lines": [
+              {
+                "catalog_item_id": "cat_termo_80l",
+                "description": "Termo eléctrico 80L vertical bajo consumo",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 32000,
+                "original_unit_price_cents": 32000,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": "cat_llave_escuadra",
+                "description": "Llave de escuadra cromada 1/2-3/8 con teflón",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 2000,
+                "unit_price_cents": 1450,
+                "original_unit_price_cents": 1450,
+                "save_to_catalog": false
+              },
+              {
+                "catalog_item_id": null,
+                "description": "Desmontaje y retirada de termo antiguo a punto limpio",
+                "category": "Fontanería",
+                "unit": "ud",
+                "quantity_thousandths": 1000,
+                "unit_price_cents": 4500,
+                "original_unit_price_cents": 0,
+                "save_to_catalog": true
+              }
+            ],
+            "subtotal_cents": 39400,
+            "vat_cents": 3940,
+            "total_cents": 43340
+          }
+        },
+        "hitl_gate_id": "gate_1_quote",
+        "hitl_outcome": "pending",
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1794988801000
+      },
+      {
+        "trace_id": "tr_seed_02_pre",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-02-gate2",
+        "turn_id": "seed-turn-02-gate2",
+        "turn_phase": "pre_interrupt",
+        "routed_intent": "ocr_ticket_specialist",
+        "node_sequence_json": ["intent_router", "ocr_ticket_specialist", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 6.8,
+        "rag_snippets_json": [],
+        "validated_widget_json": {
+          "ui_widget_type": "TicketOcrValidatorWidget",
+          "widget_payload": {
+            "supplier_name": "Obramat Madrid Norte",
+            "supplier_nif": "B85296341",
+            "issue_date_iso": "2026-11-16",
+            "quarter": "2026-T4",
+            "base_cents": 12450,
+            "vat_rate": 21,
+            "vat_cents": 2614,
+            "total_cents": 15065,
+            "ocr_confidence": 91,
+            "job_id": "job_02",
+            "category": "materiales",
+            "media_uri": null,
+            "ocr_fallback_reason": null
+          }
+        },
+        "hitl_gate_id": "gate_2_ticket",
+        "hitl_outcome": "pending",
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1794825001000
+      },
+      {
+        "trace_id": "tr_seed_03_pre",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-03-lifecycle-paid",
+        "turn_id": "seed-turn-03-fact",
+        "turn_phase": "pre_interrupt",
+        "routed_intent": "lifecycle_billing_specialist",
+        "node_sequence_json": ["intent_router", "lifecycle_billing_specialist", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 18.4,
+        "rag_snippets_json": [
+          { "source_table": "jobs", "record_id": "job_01", "title": "OBR-2026-002 Reforma ducha Ruiz", "snippet_text": "Marta Ruiz Sánchez — PRE-2026-002", "bm25_score": -2.41 }
+        ],
+        "validated_widget_json": {
+          "ui_widget_type": "JobLifecycleActionWidget",
+          "widget_payload": {
+            "job_id": "job_01",
+            "quote_id": "quote_01",
+            "invoice_id": null,
+            "mode": "preview_gate_3",
+            "pdf_uri": null,
+            "gate_3_draft": {
+              "sub_intent": "final_invoice",
+              "quote_id": "quote_01",
+              "job_id": "job_01",
+              "issued_at_iso": "2026-10-24",
+              "due_at_iso": "2026-11-23",
+              "emitter_name": "Carlos Morales García — Instalaciones y Reformas",
+              "emitter_nif": "12345678Z",
+              "emitter_fiscal_address": "C/ de Bravo Murillo 148, 28020 Madrid",
+              "client_id": "cli_marta_ruiz",
+              "client_nif": "39481205A",
+              "client_fiscal_address": "C/ López de Hoyos 88, 2ºA, 28002 Madrid",
+              "notes": "Factura final liquidada con deducción íntegra de ANT-2026-001."
+            }
+          }
+        },
+        "hitl_gate_id": "gate_3_invoice",
+        "hitl_outcome": "pending",
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1792828800020
+      },
+      {
+        "trace_id": "tr_seed_03_post",
+        "parent_trace_id": "tr_seed_03_pre",
+        "thread_id": "thr-seed-03-lifecycle-paid",
+        "turn_id": "seed-turn-03-fact",
+        "turn_phase": "post_resume",
+        "routed_intent": "lifecycle_billing_specialist",
+        "node_sequence_json": ["lifecycle_commit"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 12.1,
+        "rag_snippets_json": [],
+        "validated_widget_json": {
+          "ui_widget_type": "JobLifecycleActionWidget",
+          "widget_payload": {
+            "job_id": "job_01",
+            "quote_id": "quote_01",
+            "invoice_id": "inv_01_fac",
+            "mode": "overview",
+            "pdf_uri": null
+          }
+        },
+        "hitl_gate_id": "gate_3_invoice",
+        "hitl_outcome": "approved",
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1792828802000
+      },
+      {
+        "trace_id": "tr_seed_04_qa",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+        "turn_id": "seed-turn-04-qa1",
+        "turn_phase": "complete",
+        "routed_intent": "assistant_qa_node",
+        "node_sequence_json": ["intent_router", "assistant_qa_node", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 9.6,
+        "rag_snippets_json": [
+          { "source_table": "jobs", "record_id": "job_02", "title": "OBR-2026-003 Alcalá 142", "snippet_text": "Renovación cuadro eléctrico portal y alumbrado Alcalá 142", "bm25_score": -1.87 }
+        ],
+        "validated_widget_json": null,
+        "hitl_gate_id": null,
+        "hitl_outcome": null,
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1794643200120
+      },
+      {
+        "trace_id": "tr_seed_04_fiscal",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-04-multiturn-qa-fiscal",
+        "turn_id": "seed-turn-04-fiscal",
+        "turn_phase": "complete",
+        "routed_intent": "fiscal_piggybank_specialist",
+        "node_sequence_json": ["intent_router", "fiscal_piggybank_specialist", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 7.3,
+        "rag_snippets_json": [],
+        "validated_widget_json": {
+          "ui_widget_type": "FiscalPiggyBankWidget",
+          "widget_payload": {
+            "quarter": "2026-T4",
+            "cobrado_mismo_trimestre_cents": 165770,
+            "cobros_trimestres_anteriores_cents": 132000,
+            "pendiente_cobro_trimestre_cents": 36832,
+            "pendiente_cobro_anteriores_cents": 0,
+            "iva_repercutido_cents": 21462,
+            "iva_soportado_cents": 10332,
+            "iva_to_reserve_cents": 11130,
+            "iva_to_compensate_cents": 0,
+            "irpf_20_cents": 26388,
+            "untouchable_tax_cents": 37518,
+            "available_cash_cents": 68720,
+            "selected_job_profit_cents": 11940,
+            "job_profits": [
+              { "job_id": "job_01", "job_code": "OBR-2026-002", "job_title": "Reforma ducha resina y alicatado baño vivienda Ruiz", "net_profit_cents": 126200 },
+              { "job_id": "job_02", "job_code": "OBR-2026-003", "job_title": "Renovación cuadro eléctrico portal y alumbrado Alcalá 142", "net_profit_cents": 11940 },
+              { "job_id": "job_03", "job_code": "OBR-2026-004", "job_title": "Sustitución bajante PVC y pintura cocina Elena García", "net_profit_cents": 0 },
+              { "job_id": "job_04", "job_code": "OBR-2026-005", "job_title": "Cambio grifo monomando cocina y revisión tomas", "net_profit_cents": 0 }
+            ]
+          }
+        },
+        "hitl_gate_id": null,
+        "hitl_outcome": null,
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1794950000090
+      },
+      {
+        "trace_id": "tr_seed_05_sl",
+        "parent_trace_id": null,
+        "thread_id": "thr-seed-05-site-log",
+        "turn_id": "seed-turn-05-sitelog",
+        "turn_phase": "complete",
+        "routed_intent": "site_log_specialist",
+        "node_sequence_json": ["intent_router", "site_log_specialist", "a2ui_dispatcher"],
+        "inference_engine": "deterministic_rule_engine",
+        "latency_ms": 8.4,
+        "rag_snippets_json": [
+          { "source_table": "clients", "record_id": "cli_elena_garcia", "title": "Elena García Martín", "snippet_text": "C/ Narváez 42, 4ºB", "bm25_score": -1.52 }
+        ],
+        "validated_widget_json": {
+          "ui_widget_type": "SiteLogStampWidget",
+          "widget_payload": {
+            "candidate_job_id": "job_03",
+            "category": "despues",
+            "note_text": "Manguito elástico y tramo PVC nuevos colocados, prueba de estanqueidad OK y paramento pintado.",
+            "raw_media_uri": null,
+            "stamp_preview_meta": {
+              "job_code": "OBR-2026-004",
+              "client_name": "Elena García Martín",
+              "timestamp_iso": "2026-11-14T16:00:00"
+            }
+          }
+        },
+        "hitl_gate_id": null,
+        "hitl_outcome": null,
+        "rejection_reason": null,
+        "error_code": null,
+        "cloud_cost_eur": 0.0,
+        "created_at_ms": 1794668400080
+      }
+    ]
+  },
+  "onDeviceEvalFixtures": {
+    "description": "Casos ejecutables en :memory: SQLite por EvalRunner (sin red, cloud_cost_eur = 0.0).",
+    "fiscalCases": [
+      {
+        "id": "eval_fiscal_adv_40_10",
+        "input": { "base_cents": 150700, "vat_rate": 10 },
+        "expected": { "advance_base_cents": 60280, "advance_vat_cents": 6028, "final_base_cents": 90420, "final_vat_cents": 9042, "total_sum_cents": 165770 }
+      },
+      {
+        "id": "eval_fiscal_half_up",
+        "input": { "qty_thousandths": 1500, "unit_price_cents": 333, "vat_rate": 21 },
+        "expected": { "line_base_cents": 500, "vat_cents": 105, "total_cents": 605 }
+      },
+      {
+        "id": "eval_fiscal_iva_compensar",
+        "input": { "iva_repercutido_cents": 8000, "iva_soportado_cents": 15500, "base_facturada_q": 40000, "base_gastos_q": 75000 },
+        "expected": { "iva_to_reserve_cents": 0, "iva_to_compensate_cents": 7500, "irpf_20_cents": 0, "untouchable_tax_cents": 0 }
+      },
+      {
+        "id": "eval_ocr_tolerance_2_cents",
+        "input": { "base_cents": 12450, "vat_cents": 2614, "total_cents": 15065 },
+        "expected": { "valid": true, "diff_cents": 1 }
+      }
+    ],
+    "fts5SanitizationRule": "sanitizeFts5Query(raw) sustituye caracteres especiales (- / % \" * ( )) por espacios y elimina tokens operadores booleanos independientes (AND | OR | NOT | NEAR) antes de entrecomillar cada término restante bajo semántica implícita AND de FTS5 (p. ej. 'OBR-2026-003 AND NOT' -> '\"OBR\" \"2026\" \"003\"').",
+    "parserAndRagCases": [
+      {
+        "id": "eval_rag_sanitized_code",
+        "rawQuery": "OBR-2026-003 AND NOT",
+        "expectedSanitizedQuery": "\"OBR\" \"2026\" \"003\"",
+        "expectedSanitizedNonThrowing": true,
+        "expectedTopJobId": "job_02"
+      },
+      {
+        "id": "eval_rag_diacritics_termo",
+        "rawQuery": "termo electrico",
+        "expectedMatchedIds": ["cat_termo_80l"]
+      },
+      {
+        "id": "eval_rag_diacritics_alicatado",
+        "rawQuery": "alicatado porcelanico",
+        "expectedMatchedIds": ["cat_alicatado_m2"]
+      },
+      {
+        "id": "eval_parser_disambiguate_garcia",
+        "text": "Presupuesto para García",
+        "expectedRoute": "clarification_node",
+        "minCandidates": 2
+      },
+      {
+        "id": "eval_multiturn_qa_context",
+        "active_job_id": "job_02",
+        "text": "¿Cuánto llevo gastado en esta obra?",
+        "expectedRoute": "assistant_qa_node",
+        "mustContainTextFragments": ["185,00", "223,85", "OBR-2026-003"]
+      }
+    ]
+  }
+}

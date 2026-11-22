@@ -1,0 +1,349 @@
+<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Constructor de Presupuesto — ObraLocal AI</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'terracotta': '#EA580C',
+        'terracotta-soft': '#FFF7ED',
+        'slate-ink': '#0F172A',
+        'warm-canvas': '#FAF9F6',
+        'card-white': '#FFFFFF',
+        'border-subtle': '#E2E8F0',
+        'emerald-free': '#059669',
+        'emerald-soft': '#ECFDF5',
+        'amber-tax': '#D97706',
+        'amber-soft': '#FFFBEB',
+        'coral-alert': '#DC2626',
+        'coral-soft': '#FEF2F2',
+        'primary': '#D04B00',
+        'on-primary': '#060606',
+        'primary-container': '#FFF7ED',
+        'on-primary-container': '#7F2B00',
+        'secondary': '#0F172A',
+        'on-secondary': '#FFFFFF',
+        'secondary-container': '#F1F5F9',
+        'on-secondary-container': '#0F172A',
+        'surface': '#FAF9F6',
+        'surface-container-lowest': '#FFFFFF',
+        'surface-warm-card': '#F4F0EA',
+        'surface-container-low': '#F8FAFC',
+        'surface-container': '#F1F5F9',
+        'on-surface': '#0F172A',
+        'on-surface-variant': '#475569',
+        'outline': '#64748B',
+        'outline-variant': '#E2E8F0',
+        'success': '#059669',
+        'on-success': '#1C1C1C',
+        'success-container': '#ECFDF5',
+        'on-success-container': '#003825',
+        'warning': '#D97706',
+        'on-warning': '#1A1C1A',
+        'warning-container': '#FFFBEB',
+        'on-warning-container': '#4D2600',
+        'error': '#DC2626',
+        'on-error': '#FFFFFF',
+        'error-container': '#FEF2F2',
+        'on-error-container': '#690005',
+        'info': '#2563EB',
+        'on-info': '#FFFFFF',
+        'info-container': '#EFF6FF',
+        'on-info-container': '#1E3A8A',
+      },
+      borderRadius: {
+        'sm': '8px',
+        'DEFAULT': '12px',
+        'md': '16px',
+        'lg': '20px',
+        'xl': '24px',
+        'full': '9999px',
+      },
+      spacing: {
+        'gutter-xs': '4px',
+        'gutter-sm': '8px',
+        'gutter-md': '12px',
+        'gutter-lg': '16px',
+        'gutter-xl': '24px',
+        'section': '24px',
+        'page-margin': '16px',
+      },
+      fontFamily: {
+        'display': ['"Inter"', 'sans-serif'],
+        'headline': ['"Inter"', 'sans-serif'],
+        'title': ['"Inter"', 'sans-serif'],
+        'body': ['"Inter"', 'sans-serif'],
+        'label': ['"Inter"', 'sans-serif'],
+        'mono': ['"JetBrains Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['36px', { lineHeight: '42px', letterSpacing: '-0.75px', fontWeight: '700' }],
+        'display-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'headline-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.35px', fontWeight: '700' }],
+        'headline-md': ['20px', { lineHeight: '26px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'title-lg': ['18px', { lineHeight: '24px', letterSpacing: '-0.15px', fontWeight: '600' }],
+        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '600' }],
+        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '600' }],
+        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.2px', fontWeight: '600' }],
+        'mono-lg': ['26px', { lineHeight: '32px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'mono-md': ['16px', { lineHeight: '22px', letterSpacing: '-0.2px', fontWeight: '600' }],
+        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+        'surface-exit': '160ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+        'surface-exit': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased">
+  <div class="min-h-[884px] max-w-[390px] mx-auto bg-surface flex flex-col relative pb-44" data-stitch-vh="min-h-[884px]===min-h-screen">
+
+    <!-- Cabecera contextual de hoja a pantalla completa -->
+    <header class="sticky top-0 z-30 h-[56px] bg-surface border-b border-outline-variant px-gutter-lg flex items-center justify-between">
+      <button data-component-id="button-icon" data-component-type="button" data-component-variant="icon" type="button" aria-label="Cerrar constructor" class="w-12 h-12 -ml-2 rounded-full text-on-surface inline-flex items-center justify-center hover:bg-surface-container">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">close</span>
+      </button>
+
+      <div class="flex flex-col items-center">
+        <h1 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Revisar presupuesto</h1>
+        <span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-on-surface-variant tabular-nums">PRE-2026-014</span>
+      </div>
+
+      <span data-component-id="badge-draft" data-component-type="badge" data-component-variant="status" class="px-gutter-sm py-gutter-xs rounded-full bg-terracotta-soft text-on-primary-container font-label text-label-sm">
+        <span data-design-text-token="label-sm">Borrador IA</span>
+      </span>
+    </header>
+
+    <main class="flex-1 px-page-margin pt-gutter-lg flex flex-col gap-gutter-lg">
+
+      <!-- Nota de origen por voz -->
+      <div class="bg-terracotta-soft border border-outline-variant rounded-md p-gutter-md flex items-start gap-gutter-sm">
+        <span class="material-symbols-outlined text-[20px] text-on-primary-container shrink-0 mt-0.5" aria-hidden="true">graphic_eq</span>
+        <p data-design-text-token="body-md" class="font-body text-body-md text-on-primary-container text-pretty">
+          Preparado a partir de tu nota de voz: «Presupuesto para Elena Navarro, baño completo en Calle Alcalá, 8 m² de alicatado y plato de ducha».
+        </p>
+      </div>
+
+      <!-- Datos generales: Cliente, Título e IVA -->
+      <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+        <div class="flex flex-col gap-gutter-xs">
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface">Cliente</span>
+          <div class="grid grid-cols-2 gap-gutter-sm">
+            <button type="button" aria-pressed="true" class="min-h-[48px] px-gutter-md rounded bg-secondary text-on-secondary font-label text-label-lg flex items-center justify-center gap-gutter-xs">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">person</span>
+              <span data-design-text-token="label-lg">Elena Navarro</span>
+            </button>
+            <button type="button" class="min-h-[48px] px-gutter-md rounded bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-lg flex items-center justify-center gap-gutter-xs">
+              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">person_add</span>
+              <span data-design-text-token="label-lg">Nuevo cliente</span>
+            </button>
+          </div>
+        </div>
+
+        <label data-component-id="input-field-text" data-component-type="input-field" data-component-variant="text" class="flex flex-col gap-gutter-xs">
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface">Título de la obra</span>
+          <input type="text" value="Reforma baño principal — Calle Alcalá" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-md font-body text-body-md text-on-surface focus:border-terracotta focus:ring-1 focus:ring-terracotta">
+        </label>
+
+        <div class="flex flex-col gap-gutter-xs">
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface">Tipo de IVA aplicable</span>
+          <div class="grid grid-cols-3 gap-gutter-sm">
+            <button type="button" aria-pressed="true" class="min-h-[48px] px-gutter-xs rounded bg-terracotta-soft border-2 border-terracotta text-on-primary-container font-label text-label-sm text-center">
+              <span data-design-text-token="label-sm">10% Vivienda</span>
+            </button>
+            <button type="button" class="min-h-[48px] px-gutter-xs rounded bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-sm text-center">
+              <span data-design-text-token="label-sm">21% General</span>
+            </button>
+            <button type="button" class="min-h-[48px] px-gutter-xs rounded bg-surface-container-low border border-outline-variant text-on-surface font-label text-label-sm text-center">
+              <span data-design-text-token="label-sm">Otro %</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Partidas editables -->
+      <section class="flex flex-col gap-gutter-md">
+        <div class="flex items-center justify-between">
+          <h2 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Partidas del presupuesto</h2>
+          <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">3 conceptos</span>
+        </div>
+
+        <!-- Partida 1 -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+          <div class="flex items-start justify-between gap-gutter-sm">
+            <h3 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Alicatado pared porcelánico</h3>
+            <button type="button" aria-label="Eliminar partida" class="text-outline hover:text-coral-alert p-1">
+              <span class="material-symbols-outlined text-[20px]" aria-hidden="true">delete_outline</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-gutter-sm">
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Cantidad</span>
+              <input type="text" value="18" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Unidad</span>
+              <select class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-label text-label-md text-on-surface">
+                <option selected>m2</option>
+                <option>ud</option>
+                <option>h</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Precio ud.</span>
+              <input type="text" value="42,00 €" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between pt-gutter-sm border-t border-outline-variant">
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">Subtotal partida</span>
+            <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">756,00 €</span>
+          </div>
+
+          <label class="flex items-center gap-gutter-sm min-h-[48px] px-gutter-md rounded bg-surface-container-low cursor-pointer">
+            <input type="checkbox" checked class="w-5 h-5 rounded border-outline text-terracotta focus:ring-terracotta">
+            <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Guardar este precio en mi tarifario para la próxima vez</span>
+          </label>
+        </article>
+
+        <!-- Partida 2 -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+          <div class="flex items-start justify-between gap-gutter-sm">
+            <h3 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Plato de ducha resina instalado</h3>
+            <button type="button" aria-label="Eliminar partida" class="text-outline hover:text-coral-alert p-1">
+              <span class="material-symbols-outlined text-[20px]" aria-hidden="true">delete_outline</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-gutter-sm">
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Cantidad</span>
+              <input type="text" value="1" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Unidad</span>
+              <select class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-label text-label-md text-on-surface">
+                <option selected>ud</option>
+                <option>m2</option>
+                <option>h</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Precio ud.</span>
+              <input type="text" value="680,00 €" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between pt-gutter-sm border-t border-outline-variant">
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">Subtotal partida</span>
+            <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">680,00 €</span>
+          </div>
+
+          <label class="flex items-center gap-gutter-sm min-h-[48px] px-gutter-md rounded bg-surface-container-low cursor-pointer">
+            <input type="checkbox" class="w-5 h-5 rounded border-outline text-terracotta focus:ring-terracotta">
+            <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Guardar este precio en mi tarifario para la próxima vez</span>
+          </label>
+        </article>
+
+        <!-- Partida 3 -->
+        <article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-gutter-lg shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-gutter-md">
+          <div class="flex items-start justify-between gap-gutter-sm">
+            <h3 data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Fontanería y desagües</h3>
+            <button type="button" aria-label="Eliminar partida" class="text-outline hover:text-coral-alert p-1">
+              <span class="material-symbols-outlined text-[20px]" aria-hidden="true">delete_outline</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-gutter-sm">
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Cantidad</span>
+              <input type="text" value="12" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Unidad</span>
+              <select class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-label text-label-md text-on-surface">
+                <option selected>h</option>
+                <option>ud</option>
+                <option>m2</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span data-design-text-token="label-sm" class="font-label text-label-sm text-on-surface-variant">Precio ud.</span>
+              <input type="text" value="38,00 €" class="min-h-[48px] w-full rounded bg-surface-container-low border border-outline-variant px-gutter-sm font-mono text-mono-md text-on-surface tabular-nums">
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between pt-gutter-sm border-t border-outline-variant">
+            <span data-design-text-token="label-md" class="font-label text-label-md text-on-surface-variant">Subtotal partida</span>
+            <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">456,00 €</span>
+          </div>
+
+          <label class="flex items-center gap-gutter-sm min-h-[48px] px-gutter-md rounded bg-surface-container-low cursor-pointer">
+            <input type="checkbox" checked class="w-5 h-5 rounded border-outline text-terracotta focus:ring-terracotta">
+            <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface">Guardar este precio en mi tarifario para la próxima vez</span>
+          </label>
+        </article>
+      </section>
+
+    </main>
+
+    <!-- Resumen inferior fijo -->
+    <footer class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-surface-container-lowest border-t border-outline-variant p-gutter-lg shadow-[0_-4px_16px_rgba(15,23,42,0.06)] flex flex-col gap-gutter-md z-30">
+      <div class="flex flex-col gap-1">
+        <div class="flex items-center justify-between">
+          <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">Base Imponible</span>
+          <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">1.892,00 €</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span data-design-text-token="body-md" class="font-body text-body-md text-on-surface-variant">IVA (10% Vivienda)</span>
+          <span data-design-text-token="mono-md" class="font-mono text-mono-md text-on-surface tabular-nums">189,20 €</span>
+        </div>
+        <div class="flex items-center justify-between pt-1 border-t border-outline-variant">
+          <span data-design-text-token="title-md" class="font-title text-title-md text-on-surface">Total</span>
+          <span data-design-text-token="mono-lg" class="font-mono text-mono-lg text-on-primary-container tabular-nums">2.081,20 €</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-gutter-sm">
+        <button data-component-id="button-destructive" data-component-type="button" data-component-variant="destructive" type="button" class="min-h-[48px] px-gutter-md rounded bg-error-container text-on-error-container font-label text-label-lg flex items-center justify-center">
+          <span data-design-text-token="label-lg">Rechazar</span>
+        </button>
+
+        <button data-component-id="button-primary" data-component-type="button" data-component-variant="primary" type="button" class="col-span-2 min-h-[48px] px-gutter-lg rounded bg-primary text-on-primary font-label text-label-lg flex items-center justify-center gap-gutter-xs shadow-sm">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">picture_as_pdf</span>
+          <span data-design-text-token="label-lg">Aprobar y generar PDF</span>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+
+</body></html>

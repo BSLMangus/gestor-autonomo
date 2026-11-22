@@ -1,0 +1,232 @@
+import { useEffect, useMemo, useState } from "react";
+import { ClientProfileCommitSchema } from "../../../core/contracts/schemas";
+import type { ActiveWidgetEnvelope } from "../../../core/contracts/types";
+import { ClientsRepository } from "../../../core/db/repositories/clientsRepo";
+import type { WidgetCommonProps } from "./widgetTypes";
+
+type ClientWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "ClientProfileWidget" }>;
+
+export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCommonProps) {
+  const payload = (widget as ClientWidget).widget_payload;
+  const payloadKey = useMemo(() => JSON.stringify(payload), [payload]);
+
+  const [name, setName] = useState(payload.name);
+  const [phone, setPhone] = useState(payload.phone);
+  const [nif, setNif] = useState(payload.nif);
+  const [fiscalAddress, setFiscalAddress] = useState(payload.fiscal_address);
+  const [email, setEmail] = useState(payload.email);
+  const [notes, setNotes] = useState(payload.notes);
+  const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(payload.name);
+    setPhone(payload.phone);
+    setNif(payload.nif);
+    setFiscalAddress(payload.fiscal_address);
+    setEmail(payload.email);
+    setNotes(payload.notes);
+    setErrorMsg(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payloadKey]);
+
+  const isEditing = payload.client_id !== null;
+  const disabled = busy || isSubmitting;
+
+  const handleSave = async () => {
+    setErrorMsg(null);
+    const parsed = ClientProfileCommitSchema.safeParse({
+      client_id: payload.client_id,
+      name,
+      phone,
+      nif,
+      fiscal_address: fiscalAddress,
+      email,
+      notes,
+    });
+    if (!parsed.success) {
+      setErrorMsg(parsed.error.issues.map((i) => i.message).join(" · "));
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const repo = new ClientsRepository(runtime.executor);
+      const saved =
+        payload.client_id !== null
+          ? await repo.update(payload.client_id, {
+              name: parsed.data.name,
+              phone: parsed.data.phone,
+              nif: parsed.data.nif,
+              fiscal_address: parsed.data.fiscal_address,
+              email: parsed.data.email,
+              notes: parsed.data.notes,
+            })
+          : await repo.create({
+              name: parsed.data.name,
+              phone: parsed.data.phone,
+              nif: parsed.data.nif,
+              fiscal_address: parsed.data.fiscal_address,
+              email: parsed.data.email,
+              notes: parsed.data.notes,
+            });
+      await runtime.onDataMutated?.();
+      runtime.onClientSaved?.(saved, !isEditing);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section
+      data-testid="client-profile-widget"
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900 space-y-3"
+    >
+      <div className="border-b border-slate-100 pb-2.5">
+        <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900">
+          {isEditing ? "Editar ficha de cliente" : "Alta de cliente"}
+        </span>
+        <h3 className="mt-1 text-base font-bold text-slate-900">
+          {name.trim() || "Nuevo cliente"}
+        </h3>
+      </div>
+
+      {payload.validation_hint && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs font-medium text-amber-950">
+          {payload.validation_hint}
+        </div>
+      )}
+
+      <div className="space-y-2.5">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-name">
+            Nombre o razón social *
+          </label>
+          <input
+            id="cpw-name"
+            data-testid="client-widget-name-input"
+            type="text"
+            disabled={disabled}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej: Laura Méndez Ruiz"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-phone">
+              Teléfono
+            </label>
+            <input
+              id="cpw-phone"
+              data-testid="client-widget-phone-input"
+              type="tel"
+              disabled={disabled}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+34 600 123 456"
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-nif">
+              NIF / NIE / CIF (opcional)
+            </label>
+            <input
+              id="cpw-nif"
+              data-testid="client-widget-nif-input"
+              type="text"
+              disabled={disabled}
+              value={nif}
+              onChange={(e) => setNif(e.target.value.toUpperCase())}
+              placeholder="Ej: 12345678Z"
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-address">
+            Domicilio fiscal / obra
+          </label>
+          <input
+            id="cpw-address"
+            data-testid="client-widget-address-input"
+            type="text"
+            disabled={disabled}
+            value={fiscalAddress}
+            onChange={(e) => setFiscalAddress(e.target.value)}
+            placeholder="Calle, número, código postal y ciudad"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-email">
+            Correo electrónico
+          </label>
+          <input
+            id="cpw-email"
+            data-testid="client-widget-email-input"
+            type="email"
+            disabled={disabled}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="cliente@ejemplo.local"
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-notes">
+            Notas internas
+          </label>
+          <textarea
+            id="cpw-notes"
+            data-testid="client-widget-notes-input"
+            rows={2}
+            disabled={disabled}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Horarios de acceso, preferencias de facturación..."
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+          />
+        </div>
+      </div>
+
+      {errorMsg && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-medium text-rose-800"
+        >
+          {errorMsg}
+        </div>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          data-testid="client-widget-cancel-btn"
+          disabled={disabled}
+          onClick={() => runtime.onDismissOverlay?.()}
+          className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          data-testid="client-widget-save-btn"
+          disabled={disabled}
+          onClick={() => void handleSave()}
+          className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+        >
+          {busy ? "Guardando ficha..." : isEditing ? "Guardar cambios" : "Guardar cliente"}
+        </button>
+      </div>
+    </section>
+  );
+}
