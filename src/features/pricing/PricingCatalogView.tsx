@@ -1,4 +1,6 @@
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
 import type { DocumentImportReviewDraft, SqliteExecutor } from "../../core/contracts/types";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import type { OcrPort } from "../../core/ports/mediaPorts";
 import { PricingCatalogPanel } from "./PricingCatalogPanel";
 
@@ -6,6 +8,9 @@ interface PricingCatalogViewProps {
   executor: SqliteExecutor;
   ocrPort: OcrPort;
   refreshTick: number;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onOpenDocumentImport: (draft: DocumentImportReviewDraft, currentHourlyRateCents: number) => void;
   onDataChanged: () => Promise<void>;
 }

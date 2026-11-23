@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  patchTicketDraftByVoice,
+  type VoiceDisambiguationPayload,
+} from "../../../agent/voiceFormPatcher";
 import { Gate2TicketCommitPayloadSchema } from "../../../core/contracts/schemas";
+import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
 import type {
   ActiveWidgetEnvelope,
   ExpenseTicketRow,
@@ -55,10 +60,18 @@ export function TicketOcrValidatorWidget({
   const [duplicates, setDuplicates] = useState<ExpenseTicketRow[]>([]);
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<Gate2TicketDraftPayload[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
+  const [voiceDisambig, setVoiceDisambig] = useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
     setDraft(initialDraft);
     setValidationError(null);
+    setUndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
+    setVoiceDisambig(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialJson]);
 
@@ -127,6 +140,63 @@ export function TicketOcrValidatorWidget({
   const canAct = isActiveGate && activePendingGate === "gate_2_ticket";
   const isDirty = useMemo(() => JSON.stringify(draft) !== initialJson, [draft, initialJson]);
   const diffCents = Math.abs(draft.base_cents + draft.vat_cents - draft.total_cents);
+
+  useRegisterOverlayVoice({
+    enabled: canAct && !isSubmitting,
+    title: "Dictar datos del ticket",
+    placeholder: "Ej: Proveedor Obramat, total 84,70 euros, categoría materiales",
+    examples: [
+      "Proveedor Ferretería El Martillo, NIF B85296341",
+      "Total 121 euros con IVA al 21 %",
+      "Categoría transporte, fecha de ayer",
+    ],
+    buttonLabel: "Dictar ticket",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: undoStack.length > 0,
+    onUndo: () => {
+      const prev = undoStack[undoStack.length - 1];
+      if (!prev) return;
+      setUndoStack((s) => s.slice(0, -1));
+      setDraft(prev);
+      setVoiceChanges(["Último dictado deshecho"]);
+      setVoiceWarnings([]);
+      setVoiceDisambig(null);
+    },
+    disambiguation: voiceDisambig
+      ? {
+          prompt: voiceDisambig.prompt,
+          options: voiceDisambig.options,
+          onSelect: (id) => {
+            setUndoStack((s) => [...s.slice(-9), draft]);
+            setDraft((prev) => ({ ...prev, job_id: id }));
+            const hit = jobs.find((j) => j.id === id);
+            setVoiceChanges([hit ? `Obra: ${hit.job_code}` : "Obra vinculada"]);
+            setVoiceWarnings([]);
+            setVoiceDisambig(null);
+          },
+          onDismiss: () => setVoiceDisambig(null),
+        }
+      : null,
+    onTranscript: async (text) => {
+      const res = await patchTicketDraftByVoice(draft, text, {
+        executor: runtime.executor,
+        inferenceAdapter: runtime.inferenceAdapter,
+      });
+      if (res.changed) {
+        setUndoStack((s) => [...s.slice(-9), draft]);
+        setDraft(res.nextState);
+        setVoiceChanges(res.appliedChanges);
+        setVoiceWarnings(res.warnings);
+      } else if (!res.disambiguation) {
+        setVoiceChanges([]);
+        setVoiceWarnings([
+          "No detecté cambios claros. Prueba: «Proveedor ..., total ... euros».",
+        ]);
+      }
+      setVoiceDisambig(res.disambiguation ?? null);
+    },
+  });
 
   const handleDateChange = (nextDate: string) => {
     setDraft((p) => ({

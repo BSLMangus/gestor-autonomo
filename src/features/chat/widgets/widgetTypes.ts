@@ -1,3 +1,4 @@
+import type { LocalInferenceAdapterImpl } from "../../../agent/inference/localInferenceAdapter";
 import type {
   ActiveWidgetEnvelope,
   CameraCaptureResult,
@@ -12,6 +13,7 @@ import type {
 } from "../../../core/contracts/types";
 import type { DocumentOpenerService } from "../../../core/files/documentOpener";
 import type { CameraAdapter } from "../../../core/hardware/cameraAdapter";
+import type { VoiceInputAdapter } from "../../../core/hardware/voiceAdapter";
 import type { AppRoute } from "../../../core/navigation/routes";
 import type { PdfPort } from "../../../core/ports/mediaPorts";
 import type { SiteLogService } from "../../sitelog/siteLogService";
@@ -23,6 +25,9 @@ export interface WidgetRuntimeContext {
   documentOpener: DocumentOpenerService;
   cameraAdapter: CameraAdapter;
   siteLogService: SiteLogService;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onCapturePhoto?: (
     source: "scan_ticket" | "site_log" | "chat" | "global_camera",
     activeJobId: string | null

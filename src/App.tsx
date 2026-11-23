@@ -846,6 +846,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     documentOpener,
     cameraAdapter,
     siteLogService,
+    voiceAdapter,
+    inferenceAdapter,
+    registerBackHandler,
     onCapturePhoto: async (source, activeJobId) =>
       cameraAdapter.captureOrPick(source, activeThreadIdRef.current, activeJobId),
     onDataMutated: async () => {
@@ -1107,6 +1110,8 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             fileBridge={fileBridge}
             refreshTick={refreshTick}
             initialFocusJobId={route.focusJobId ?? null}
+            voiceAdapter={voiceAdapter}
+            inferenceAdapter={inferenceAdapter}
             onStartJobQuote={handleStartJobQuote}
             onOpenClient={(cid) => navigate({ name: "client_detail", clientId: cid })}
             onOpenQuote={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
@@ -1124,6 +1129,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             refreshTick={refreshTick}
             initialFocusDateIso={route.focusDateIso}
+            voiceAdapter={voiceAdapter}
+            inferenceAdapter={inferenceAdapter}
+            registerBackHandler={registerBackHandler}
             onOpenScheduleWidget={(widget) =>
               openWidgetInOverlay({
                 widget,
@@ -1214,6 +1222,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             fileBridge={fileBridge}
             refreshTick={refreshTick}
+            voiceAdapter={voiceAdapter}
+            inferenceAdapter={inferenceAdapter}
+            registerBackHandler={registerBackHandler}
             onBack={() => {
               goBack();
             }}
@@ -1309,6 +1320,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             ocrPort={ocrPort}
             refreshTick={refreshTick}
+            voiceAdapter={voiceAdapter}
+            inferenceAdapter={inferenceAdapter}
+            registerBackHandler={registerBackHandler}
             onOpenDocumentImport={handleOpenDocumentImport}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
@@ -1324,6 +1338,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             capacitorLlmAdapter={capacitorLlmAdapter}
             memoryCoordinator={memoryCoordinator}
             ocrPort={ocrPort}
+            voiceAdapter={voiceAdapter}
             refreshTick={refreshTick}
             activeSection={route.section ?? "general"}
             activeAccount={activeAccount}

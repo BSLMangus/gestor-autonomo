@@ -7,6 +7,13 @@ import type {
 } from "../../core/contracts/types";
 import { deriveFiscalQuarter, getLocalTodayIso, isValidIsoDate } from "../../core/fiscal/dateQuarter";
 import { normalizeSpanishText, parseEurosToCents } from "../../core/text/spanishText";
+import {
+  extractAddress,
+  extractFlexibleDateRange,
+  extractFlexibleSpanishDateIso,
+  extractSpanishPhone,
+  extractSpanishTaxId,
+} from "./spanishFormParsers";
 
 export { normalizeSpanishText, parseEurosToCents };
 
@@ -201,7 +208,7 @@ export function extractTicketFieldsFromText(text: string): ParsedTicketFields {
   };
 }
 
-function parseQuoteLinesAndMeta(text: string): {
+export function parseQuoteLinesAndMeta(text: string): {
   client_query: string | null;
   vat_rate: QuoteVatRate | undefined;
   lines: ParsedQuoteLine[];
@@ -306,32 +313,36 @@ function parseQuoteLinesAndMeta(text: string): {
 }
 
 export function extractClientFieldsFromText(text: string): ParsedClientFields {
-  const nifMatch = /\b([A-Z]\d{7}[0-9A-J]|\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\b/i.exec(text);
-  const nif = nifMatch ? nifMatch[1]!.toUpperCase() : null;
+  const taxMatch = extractSpanishTaxId(text);
+  const nif = taxMatch ? taxMatch.value : null;
 
-  const phoneMatch = /(?:(?:\+|00)34[\s.-]?)?([6789](?:[\s.-]?\d){8})\b/.exec(text);
-  let phone: string | null = null;
-  if (phoneMatch?.[1]) {
-    const digits = phoneMatch[1].replace(/\D/g, "");
-    if (digits.length === 9) {
-      phone = `+34${digits}`;
-    }
-  }
+  const phone = extractSpanishPhone(text);
+  const fiscalAddress = extractAddress(text);
 
   let name: string | null = null;
   const explicitName =
-    /(?:nombre(?:\s+completo)?|cliente(?:\s+nuevo)?|se\s+llama)[:\s]+([^,;\n]+?)(?=(?:\s*(?:,|;|\btel[eé]fono\b|\btfno\b|\btel\b|\bm[oó]vil\b|\bnif\b|\bcif\b|\bdni\b|\+34|\b[6789]\d{8}\b)|$))/i.exec(
+    /(?:nombre(?:\s+completo)?|cliente(?:\s+nuevo)?|se\s+llama)[:\s]+([^,;\n]+?)(?=(?:\s*(?:,|;|\btel[eé]fono\b|\btfno\b|\btel\b|\bm[oó]vil\b|\bnif\b|\bcif\b|\bdni\b|\bdomicilio\b|\bdirecci[oó]n\b|\bcorreo\b|\bemail\b|\+34|\b[6789]\d{8}\b)|$))/i.exec(
       text
     );
   if (explicitName?.[1]) {
     name = explicitName[1].trim();
   } else {
     let cleaned = text;
-    if (nifMatch?.[0]) cleaned = cleaned.replace(nifMatch[0], " ");
-    if (phoneMatch?.[0]) cleaned = cleaned.replace(phoneMatch[0], " ");
+    if (taxMatch?.value) {
+      cleaned = cleaned.replace(
+        /\b([A-Z][\s-]?(?:\d[\s-]?){7}[0-9A-J]|(?:\d[\s-]?){8}[A-Z])\b/i,
+        " "
+      );
+    }
+    if (phone) {
+      cleaned = cleaned.replace(/(?:(?:\+|00)\s*34[\s.-]?)?[6789](?:[\s.-]?\d){8}\b/, " ");
+    }
+    if (fiscalAddress) {
+      cleaned = cleaned.replace(fiscalAddress, " ");
+    }
     cleaned = cleaned
       .replace(
-        /\b(nuevo cliente|cliente nuevo|alta de cliente|crear cliente|registrar cliente|a[ñn]adir cliente|dar de alta|quiero crear un cliente|sin nif|nif opcional|opcional|tel[eé]fono|tfno|tel\.?|m[oó]vil|nif|cif|dni|nombre(?:\s+completo)?|y su|con el|con|su|el|la)\b/gi,
+        /\b(nuevo cliente|cliente nuevo|alta de cliente|crear cliente|registrar cliente|a[ñn]adir cliente|dar de alta|quiero crear un cliente|sin nif|nif opcional|opcional|tel[eé]fono|tfno|tel\.?|m[oó]vil|nif|cif|dni|domicilio\s+fiscal|direcci[oó]n(?:\s+fiscal)?|nombre(?:\s+completo)?|y su|con el|con|su|el|la)\b/gi,
         " "
       )
       .replace(/[,:;.-]+/g, " ")
@@ -346,7 +357,7 @@ export function extractClientFieldsFromText(text: string): ParsedClientFields {
     name: name && name.length >= 2 ? name : null,
     phone,
     nif,
-    fiscal_address: null,
+    fiscal_address: fiscalAddress,
   };
 }
 
@@ -367,27 +378,6 @@ function extractJobQuery(text: string): string | null {
   return null;
 }
 
-const SPANISH_MONTHS: Record<string, number> = {
-  enero: 1,
-  febrero: 2,
-  marzo: 3,
-  abril: 4,
-  mayo: 5,
-  junio: 6,
-  julio: 7,
-  agosto: 8,
-  septiembre: 9,
-  setiembre: 9,
-  octubre: 10,
-  noviembre: 11,
-  diciembre: 12,
-};
-
-function buildIsoIfValid(year: number, month: number, day: number): string | null {
-  const candidate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return isValidIsoDate(candidate) ? candidate : null;
-}
-
 function extractScheduleJobQuery(text: string): string | null {
   const codeMatch = /\bOBR-\d{4}-\d{3,}\b/i.exec(text);
   if (codeMatch) return codeMatch[0].toUpperCase();
@@ -405,69 +395,15 @@ function extractScheduleJobQuery(text: string): string | null {
   return null;
 }
 
-function extractScheduleDateRange(text: string): {
-  start_date_iso: string | null;
-  end_date_iso: string | null;
-} {
-  const todayIso = getLocalTodayIso();
-  const currentYear = Number(todayIso.slice(0, 4));
-  const norm = normalizeSpanishText(text);
-
-  // Patrón "del 22 de noviembre al 5 de diciembre [de 2026]"
-  const twoMonthsMatch =
-    /\b(?:del|desde\s+el)\s+(\d{1,2})\s+de\s+([a-z]+)\s+(?:al|hasta\s+el)\s+(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(20\d{2}))?\b/i.exec(
-      norm
-    );
-  if (twoMonthsMatch) {
-    const d1 = Number(twoMonthsMatch[1]);
-    const m1 = SPANISH_MONTHS[twoMonthsMatch[2] ?? ""];
-    const d2 = Number(twoMonthsMatch[3]);
-    const m2 = SPANISH_MONTHS[twoMonthsMatch[4] ?? ""];
-    const yr = twoMonthsMatch[5] ? Number(twoMonthsMatch[5]) : currentYear;
-    if (m1 && m2) {
-      const startIso = buildIsoIfValid(yr, m1, d1);
-      const endYear = m2 < m1 ? yr + 1 : yr;
-      const endIso = buildIsoIfValid(endYear, m2, d2);
-      if (startIso && endIso) return { start_date_iso: startIso, end_date_iso: endIso };
-    }
-  }
-
-  // Patrón "del 22 al 30 de noviembre [de 2026]"
-  const sameMonthMatch =
-    /\b(?:del|desde\s+el)\s+(\d{1,2})\s+(?:al|hasta\s+el)\s+(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(20\d{2}))?\b/i.exec(
-      norm
-    );
-  if (sameMonthMatch) {
-    const d1 = Number(sameMonthMatch[1]);
-    const d2 = Number(sameMonthMatch[2]);
-    const m = SPANISH_MONTHS[sameMonthMatch[3] ?? ""];
-    const yr = sameMonthMatch[4] ? Number(sameMonthMatch[4]) : currentYear;
-    if (m) {
-      const startIso = buildIsoIfValid(yr, m, d1);
-      const endIso = buildIsoIfValid(yr, m, d2);
-      if (startIso && endIso) return { start_date_iso: startIso, end_date_iso: endIso };
-    }
-  }
-
-  // Fechas explícitas ISO / dd-mm-yyyy
-  const allIsoMatches = Array.from(
-    text.matchAll(/\b(20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/g)
-  ).map((m) => m[1]!);
-  if (allIsoMatches.length >= 2 && isValidIsoDate(allIsoMatches[0]!) && isValidIsoDate(allIsoMatches[1]!)) {
-    return { start_date_iso: allIsoMatches[0]!, end_date_iso: allIsoMatches[1]! };
-  }
-
-  return { start_date_iso: null, end_date_iso: null };
-}
-
 function parseScheduleIntent(text: string, norm: string): ParsedScheduleFields | null {
   const todayIso = getLocalTodayIso();
-  const explicitDate = extractSpanishDateIso(text) ?? todayIso;
-  const dateRange = extractScheduleDateRange(text);
+  const explicitDate = extractFlexibleSpanishDateIso(text, todayIso) ?? extractSpanishDateIso(text) ?? todayIso;
+  const dateRange = extractFlexibleDateRange(text, todayIso);
 
   const isPlanRange =
     /\b(planifica|planificar|programa|programar|agenda|agendar|calendario)\b/.test(norm) &&
-    (dateRange.start_date_iso !== null || /\b(del\s+\d+\s+al\s+\d+|semana|fechas)\b/.test(norm));
+    (dateRange.start_date_iso !== null ||
+      /\b(del\s+\d+\s+al\s+\d+|semana|fechas|obra|calendario|planificar)\b/.test(norm));
 
   if (isPlanRange) {
     return {
@@ -482,7 +418,7 @@ function parseScheduleIntent(text: string, norm: string): ParsedScheduleFields |
   }
 
   const isDailyLog =
-    /\b(parte del dia|parte de jornada|parte de hoy|registrar salida|ajustar horas|horas extra|en hora)\b/.test(
+    /\b(parte del dia|parte de jornada|parte de hoy|nuevo parte|abrir parte|registrar parte|registrar salida|registrar horas|ajustar horas|horas extra|en hora)\b/.test(
       norm
     ) ||
     (/\b(termine|terminamos|acabe|acabamos|sali|salimos|alargo|alargamos|echamos|estuvimos|trabaje|jornada)\b/.test(

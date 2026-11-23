@@ -1,7 +1,13 @@
 import { ArrowLeft, Pencil, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
+import {
+  patchTicketDraftByVoice,
+  type VoiceDisambiguationPayload,
+} from "../../agent/voiceFormPatcher";
 import type {
   ExpenseTicketRow,
+  Gate2TicketDraftPayload,
   JobRow,
   LocalFileBridge,
   SqliteExecutor,
@@ -11,12 +17,17 @@ import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { deriveFiscalQuarter, isValidIsoDate } from "../../core/fiscal/dateQuarter";
 import { computeInverseVat21, formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
+import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 
 interface TicketDetailViewProps {
   ticketId: string;
   executor: SqliteExecutor;
   fileBridge: LocalFileBridge;
   refreshTick: number;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onBack: () => void;
   onOpenJob: (jobId: string) => void;
   onDataChanged: () => Promise<void>;
@@ -40,6 +51,9 @@ export function TicketDetailView({
   executor,
   fileBridge,
   refreshTick,
+  voiceAdapter,
+  inferenceAdapter,
+  registerBackHandler,
   onBack,
   onOpenJob,
   onDataChanged,
@@ -60,6 +74,10 @@ export function TicketDetailView({
   const [baseCents, setBaseCents] = useState(0);
   const [vatCents, setVatCents] = useState(0);
   const [totalCents, setTotalCents] = useState(0);
+  const [voiceUndoStack, setVoiceUndoStack] = useState<Gate2TicketDraftPayload[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
+  const [voiceDisambig, setVoiceDisambig] = useState<VoiceDisambiguationPayload | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -400,6 +418,94 @@ export function TicketDetailView({
           className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-3"
         >
           <div className="text-[14px] font-bold text-on-surface">Editar ticket de gasto</div>
+
+          <InlineVoiceFormTrigger
+            voiceAdapter={voiceAdapter}
+            registerBackHandler={registerBackHandler}
+            testId="ticket-edit-voice-btn"
+            title="Dictar cambios del ticket"
+            placeholder="Ej: Proveedor Obramat, total 84,70 euros, categoría herramientas"
+            examples={[
+              "Total 145 euros con IVA al 21 %",
+              "Categoría transporte, fecha de ayer",
+            ]}
+            buttonLabel="Dictar cambios"
+            disabled={busy}
+            lastChanges={voiceChanges}
+            lastWarnings={voiceWarnings}
+            canUndo={voiceUndoStack.length > 0}
+            onUndo={() => {
+              const prev = voiceUndoStack[voiceUndoStack.length - 1];
+              if (!prev) return;
+              setVoiceUndoStack((s) => s.slice(0, -1));
+              setSupplierName(prev.supplier_name);
+              setSupplierNif(prev.supplier_nif);
+              setIssueDateIso(prev.issue_date_iso);
+              setCategory(prev.category);
+              setJobId(prev.job_id);
+              setVatRate(prev.vat_rate ?? 21);
+              setBaseCents(prev.base_cents);
+              setVatCents(prev.vat_cents);
+              setTotalCents(prev.total_cents);
+              setVoiceChanges(["Último dictado deshecho"]);
+              setVoiceWarnings([]);
+              setVoiceDisambig(null);
+            }}
+            disambiguation={
+              voiceDisambig
+                ? {
+                    prompt: voiceDisambig.prompt,
+                    options: voiceDisambig.options,
+                    onSelect: (id) => {
+                      setJobId(id);
+                      const hit = jobs.find((j) => j.id === id);
+                      setVoiceChanges([hit ? `Obra: ${hit.job_code}` : "Obra vinculada"]);
+                      setVoiceWarnings([]);
+                      setVoiceDisambig(null);
+                    },
+                    onDismiss: () => setVoiceDisambig(null),
+                  }
+                : null
+            }
+            onTranscript={async (text) => {
+              const currentDraft: Gate2TicketDraftPayload = {
+                supplier_name: supplierName,
+                supplier_nif: supplierNif,
+                issue_date_iso: issueDateIso,
+                quarter: computedQuarter,
+                base_cents: baseCents,
+                vat_rate: vatRate,
+                vat_cents: vatCents,
+                total_cents: totalCents,
+                ocr_confidence: ticket.ocr_confidence,
+                job_id: jobId,
+                category,
+                media_uri: ticket.image_uri,
+              };
+              const res = await patchTicketDraftByVoice(currentDraft, text, {
+                executor,
+                inferenceAdapter,
+              });
+              if (res.changed) {
+                setVoiceUndoStack((s) => [...s.slice(-9), currentDraft]);
+                setSupplierName(res.nextState.supplier_name);
+                setSupplierNif(res.nextState.supplier_nif);
+                setIssueDateIso(res.nextState.issue_date_iso);
+                setCategory(res.nextState.category);
+                setJobId(res.nextState.job_id);
+                if (res.nextState.vat_rate !== undefined) setVatRate(res.nextState.vat_rate);
+                setBaseCents(res.nextState.base_cents);
+                setVatCents(res.nextState.vat_cents);
+                setTotalCents(res.nextState.total_cents);
+                setVoiceChanges(res.appliedChanges);
+                setVoiceWarnings(res.warnings);
+              } else if (!res.disambiguation) {
+                setVoiceChanges([]);
+                setVoiceWarnings(["No detecté cambios claros para el ticket."]);
+              }
+              setVoiceDisambig(res.disambiguation ?? null);
+            }}
+          />
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>

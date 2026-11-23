@@ -198,6 +198,7 @@ export function getRouteTitle(route: AppRoute): string {
 }
 
 export const BACK_PRIORITY = {
+  CONTEXTUAL_VOICE: 110,
   VOICE_OVERLAY: 100,
   CAMERA_SHEET: 90,
   WIDGET_OVERLAY: 80,

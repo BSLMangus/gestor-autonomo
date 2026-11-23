@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  patchQuoteDraftByVoice,
+  type QuoteBuilderFormState,
+  type VoiceDisambiguationPayload,
+} from "../../../agent/voiceFormPatcher";
+import {
   Gate1QuoteCommitPayloadSchema,
 } from "../../../core/contracts/schemas";
+import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
 import type {
   ActiveWidgetEnvelope,
   CatalogCategory,
@@ -137,6 +143,10 @@ export function QuoteBuilderWidget({
     Boolean(initialDraft.new_client && !initialDraft.client_id)
   );
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [voiceUndoStack, setVoiceUndoStack] = useState<QuoteBuilderFormState[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
+  const [voiceDisambig, setVoiceDisambig] = useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
     setDraft(initialDraft);
@@ -144,6 +154,10 @@ export function QuoteBuilderWidget({
     setValidationError(null);
     setShowCatalogPicker(false);
     setCatalogFilter("");
+    setVoiceUndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
+    setVoiceDisambig(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialJson]);
 
@@ -169,6 +183,77 @@ export function QuoteBuilderWidget({
   }, [runtime.executor]);
 
   const canAct = isActiveGate && activePendingGate === "gate_1_quote";
+
+  useRegisterOverlayVoice({
+    enabled: canAct && !isSubmitting,
+    title: "Dictar datos del presupuesto",
+    placeholder: "Ej: Para Marta, añade 1 plato de ducha y cambia el IVA al 10%",
+    examples: [
+      "Para Marta Ruiz, título Reforma de baño",
+      "Añade 1 plato de ducha y 12 m2 de alicatado",
+      "Cambia el IVA al 10 % y añade en notas garantía 2 años",
+    ],
+    buttonLabel: "Dictar presupuesto",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: voiceUndoStack.length > 0,
+    onUndo: () => {
+      const prev = voiceUndoStack[voiceUndoStack.length - 1];
+      if (!prev) return;
+      setVoiceUndoStack((s) => s.slice(0, -1));
+      setDraft(prev.draft);
+      setUseNewClient(prev.useNewClient);
+      setVoiceChanges(["Último dictado deshecho"]);
+      setVoiceWarnings([]);
+      setVoiceDisambig(null);
+    },
+    disambiguation: voiceDisambig
+      ? {
+          prompt: voiceDisambig.prompt,
+          options: voiceDisambig.options,
+          onSelect: (id) => {
+            const snapshot: QuoteBuilderFormState = { draft, useNewClient };
+            setVoiceUndoStack((s) => [...s.slice(-9), snapshot]);
+            const cl = clients.find((c) => c.id === id);
+            setUseNewClient(false);
+            setDraft((prev) => ({
+              ...prev,
+              client_id: id,
+              new_client: undefined,
+              job_title: prev.job_title.trim()
+                ? prev.job_title
+                : cl
+                  ? `Presupuesto trabajos ${cl.name}`
+                  : prev.job_title,
+            }));
+            setVoiceChanges([cl ? `Cliente: ${cl.name}` : "Cliente seleccionado"]);
+            setVoiceWarnings([]);
+            setVoiceDisambig(null);
+          },
+          onDismiss: () => setVoiceDisambig(null),
+        }
+      : null,
+    onTranscript: async (text) => {
+      const snapshot: QuoteBuilderFormState = { draft, useNewClient };
+      const res = await patchQuoteDraftByVoice(snapshot, text, {
+        executor: runtime.executor,
+        inferenceAdapter: runtime.inferenceAdapter,
+      });
+      if (res.changed) {
+        setVoiceUndoStack((s) => [...s.slice(-9), snapshot]);
+        setDraft(res.nextState.draft);
+        setUseNewClient(res.nextState.useNewClient);
+        setVoiceChanges(res.appliedChanges);
+        setVoiceWarnings(res.warnings);
+      } else if (!res.disambiguation) {
+        setVoiceChanges([]);
+        setVoiceWarnings([
+          "No detecté cambios claros. Prueba: «Añade 1 plato de ducha» o «IVA al 10 %».",
+        ]);
+      }
+      setVoiceDisambig(res.disambiguation ?? null);
+    },
+  });
   const totals = useMemo(
     () => computeQuoteTotals(draft.lines, draft.vat_rate),
     [draft.lines, draft.vat_rate]

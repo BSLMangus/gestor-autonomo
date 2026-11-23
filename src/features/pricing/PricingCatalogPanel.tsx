@@ -1,5 +1,11 @@
 import { Calculator, Clock, FileUp, Plus, Sliders, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
+import {
+  patchCatalogItemByVoice,
+  patchWorkScheduleDefaultsByVoice,
+  type CatalogItemFormState,
+} from "../../agent/voiceFormPatcher";
 import type {
   CatalogCategory,
   CatalogItemRow,
@@ -16,7 +22,9 @@ import {
 } from "../../core/db/repositories/scheduleRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import type { OcrPort } from "../../core/ports/mediaPorts";
+import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 import {
   computeTemplatePreviewPriceCents,
   findMatchingCatalogItemForTemplate,
@@ -33,6 +41,9 @@ interface PricingCatalogPanelProps {
   executor: SqliteExecutor;
   ocrPort: OcrPort;
   refreshTick: number;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onOpenDocumentImport: (draft: DocumentImportReviewDraft, currentHourlyRateCents: number) => void;
   onDataChanged: () => Promise<void>;
 }
@@ -89,6 +100,9 @@ export function PricingCatalogPanel({
   executor,
   ocrPort,
   refreshTick,
+  voiceAdapter,
+  inferenceAdapter,
+  registerBackHandler,
   onOpenDocumentImport,
   onDataChanged,
 }: PricingCatalogPanelProps) {
@@ -118,6 +132,12 @@ export function PricingCatalogPanel({
   const [importingDocs, setImportingDocs] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [schedUndoStack, setSchedUndoStack] = useState<WorkScheduleDefaults[]>([]);
+  const [schedVoiceChanges, setSchedVoiceChanges] = useState<string[]>([]);
+  const [schedVoiceWarnings, setSchedVoiceWarnings] = useState<string[]>([]);
+  const [catUndoStack, setCatUndoStack] = useState<CatalogItemFormState[]>([]);
+  const [catVoiceChanges, setCatVoiceChanges] = useState<string[]>([]);
+  const [catVoiceWarnings, setCatVoiceWarnings] = useState<string[]>([]);
 
   const loadData = async () => {
     const [settings, filteredRes, fullRes, scheduleDefaults] = await Promise.all([
@@ -413,6 +433,53 @@ export function PricingCatalogPanel({
           </span>
         </div>
 
+        <InlineVoiceFormTrigger
+          voiceAdapter={voiceAdapter}
+          registerBackHandler={registerBackHandler}
+          testId="work-schedule-voice-btn"
+          title="Dictar horario habitual"
+          placeholder="Ej: De lunes a viernes, mañanas de 8 a 14 y tardes de 15 a 18"
+          examples={[
+            "De lunes a sábado, mañanas de 8 a 14 y tardes de 15 a 18",
+            "Jornada continua de 8 a 15 sin tardes",
+            "Añade los sábados y cambia salida a las 18:00",
+          ]}
+          buttonLabel="Dictar horario"
+          disabled={busy}
+          lastChanges={schedVoiceChanges}
+          lastWarnings={schedVoiceWarnings}
+          canUndo={schedUndoStack.length > 0}
+          onUndo={() => {
+            const prev = schedUndoStack[schedUndoStack.length - 1];
+            if (!prev) return;
+            setSchedUndoStack((s) => s.slice(0, -1));
+            setSchedVoiceChanges(["Último dictado deshecho"]);
+            setSchedVoiceWarnings([]);
+            void handleUpdateWorkSchedule(prev);
+          }}
+          onTranscript={async (text) => {
+            const snap: WorkScheduleDefaults = {
+              ...workSchedule,
+              work_days: [...workSchedule.work_days],
+            };
+            const res = await patchWorkScheduleDefaultsByVoice(snap, text, {
+              executor,
+              inferenceAdapter,
+            });
+            if (res.changed) {
+              setSchedUndoStack((s) => [...s.slice(-9), snap]);
+              setSchedVoiceChanges(res.appliedChanges);
+              setSchedVoiceWarnings(res.warnings);
+              await handleUpdateWorkSchedule(res.nextState);
+            } else {
+              setSchedVoiceChanges([]);
+              setSchedVoiceWarnings([
+                "No detecté días u horas. Prueba: «De lunes a viernes de 8 a 14 y de 15 a 18».",
+              ]);
+            }
+          }}
+        />
+
         <div className="grid grid-cols-7 gap-1.5">
           {WEEKDAY_BUTTONS.map((day) => {
             const active = workSchedule.work_days.includes(day.id);
@@ -669,6 +736,69 @@ export function PricingCatalogPanel({
             <div className="font-bold text-slate-900">
               {editingItemId ? "Editar partida" : "Nueva partida personalizada"}
             </div>
+            <InlineVoiceFormTrigger
+              voiceAdapter={voiceAdapter}
+              registerBackHandler={registerBackHandler}
+              testId="catalog-item-voice-btn"
+              title={editingItemId ? "Dictar cambios de partida" : "Dictar nueva partida"}
+              placeholder="Ej: Pintura plástica m2, categoría pintura, precio fijo 14 euros"
+              examples={[
+                "Descripción Alicatado suelo, categoría albañilería, en m2, 2 horas y materiales 15 euros",
+                "Precio fijo 65 euros, IVA 10 %",
+              ]}
+              buttonLabel="Dictar partida"
+              disabled={busy}
+              lastChanges={catVoiceChanges}
+              lastWarnings={catVoiceWarnings}
+              canUndo={catUndoStack.length > 0}
+              onUndo={() => {
+                const prev = catUndoStack[catUndoStack.length - 1];
+                if (!prev) return;
+                setCatUndoStack((s) => s.slice(0, -1));
+                setFormDesc(prev.desc);
+                setFormCat(prev.cat);
+                setFormUnit(prev.unit);
+                setFormMode(prev.mode);
+                setFormHoursInput(prev.hoursInput);
+                setFormMaterialsInput(prev.materialsInput);
+                setFormFixedPriceInput(prev.fixedPriceInput);
+                setFormVatInput(prev.vatInput);
+                setCatVoiceChanges(["Último dictado deshecho"]);
+                setCatVoiceWarnings([]);
+              }}
+              onTranscript={async (text) => {
+                const snap: CatalogItemFormState = {
+                  desc: formDesc,
+                  cat: formCat,
+                  unit: formUnit,
+                  mode: formMode,
+                  hoursInput: formHoursInput,
+                  materialsInput: formMaterialsInput,
+                  fixedPriceInput: formFixedPriceInput,
+                  vatInput: formVatInput,
+                };
+                const res = await patchCatalogItemByVoice(snap, text, {
+                  executor,
+                  inferenceAdapter,
+                });
+                if (res.changed) {
+                  setCatUndoStack((s) => [...s.slice(-9), snap]);
+                  setFormDesc(res.nextState.desc);
+                  setFormCat(res.nextState.cat);
+                  setFormUnit(res.nextState.unit);
+                  setFormMode(res.nextState.mode);
+                  setFormHoursInput(res.nextState.hoursInput);
+                  setFormMaterialsInput(res.nextState.materialsInput);
+                  setFormFixedPriceInput(res.nextState.fixedPriceInput);
+                  setFormVatInput(res.nextState.vatInput);
+                  setCatVoiceChanges(res.appliedChanges);
+                  setCatVoiceWarnings(res.warnings);
+                } else {
+                  setCatVoiceChanges([]);
+                  setCatVoiceWarnings(["No detecté cambios claros para la partida."]);
+                }
+              }}
+            />
             <input
               type="text"
               data-testid="pricing-custom-desc-input"

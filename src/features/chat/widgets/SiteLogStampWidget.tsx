@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
+import {
+  patchSiteLogByVoice,
+  type SiteLogFormState,
+  type VoiceDisambiguationPayload,
+} from "../../../agent/voiceFormPatcher";
 import type {
   ActiveWidgetEnvelope,
   JobRow,
   SiteLogCategory,
 } from "../../../core/contracts/types";
+import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
 import { JobsRepository } from "../../../core/db/repositories/jobsRepo";
 import type { WidgetCommonProps } from "./widgetTypes";
 
@@ -26,6 +32,10 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<SiteLogFormState[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
+  const [voiceDisambig, setVoiceDisambig] = useState<VoiceDisambiguationPayload | null>(null);
 
   const initialSlJson = JSON.stringify(sl);
 
@@ -37,8 +47,93 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
     setMediaUri(sl.raw_media_uri);
     setErrorMsg(null);
     setSavedBanner(null);
+    setUndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
+    setVoiceDisambig(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSlJson]);
+
+  const applySiteLogState = (st: SiteLogFormState) => {
+    setSelectedJobId(st.selectedJobId);
+    setCreateNewJob(st.createNewJob);
+    setNewJobTitle(st.newJobTitle);
+    setNewJobAddress(st.newJobAddress);
+    setCategory(st.category);
+    setNoteText(st.noteText);
+  };
+
+  useRegisterOverlayVoice({
+    enabled: !busy && !savedBanner,
+    title: "Dictar nota de diario",
+    placeholder: "Ej: Categoría después, alicatado terminado sin incidencias",
+    examples: [
+      "Categoría antes, revisando bajante antigua",
+      "Añade en notas que falta rematar la silicona",
+      "Categoría después en la obra de Marta",
+    ],
+    buttonLabel: "Dictar diario",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: undoStack.length > 0,
+    onUndo: () => {
+      const prev = undoStack[undoStack.length - 1];
+      if (!prev) return;
+      setUndoStack((s) => s.slice(0, -1));
+      applySiteLogState(prev);
+      setVoiceChanges(["Último dictado deshecho"]);
+      setVoiceWarnings([]);
+      setVoiceDisambig(null);
+    },
+    disambiguation: voiceDisambig
+      ? {
+          prompt: voiceDisambig.prompt,
+          options: voiceDisambig.options,
+          onSelect: (id) => {
+            const snapshot: SiteLogFormState = {
+              selectedJobId,
+              createNewJob,
+              newJobTitle,
+              newJobAddress,
+              category,
+              noteText,
+            };
+            setUndoStack((s) => [...s.slice(-9), snapshot]);
+            setCreateNewJob(false);
+            setSelectedJobId(id);
+            const hit = jobs.find((j) => j.id === id);
+            setVoiceChanges([hit ? `Obra: ${hit.job_code}` : "Obra seleccionada"]);
+            setVoiceWarnings([]);
+            setVoiceDisambig(null);
+          },
+          onDismiss: () => setVoiceDisambig(null),
+        }
+      : null,
+    onTranscript: async (text) => {
+      const snapshot: SiteLogFormState = {
+        selectedJobId,
+        createNewJob,
+        newJobTitle,
+        newJobAddress,
+        category,
+        noteText,
+      };
+      const res = await patchSiteLogByVoice(snapshot, text, {
+        executor: runtime.executor,
+        inferenceAdapter: runtime.inferenceAdapter,
+      });
+      if (res.changed) {
+        setUndoStack((s) => [...s.slice(-9), snapshot]);
+        applySiteLogState(res.nextState);
+        setVoiceChanges(res.appliedChanges);
+        setVoiceWarnings(res.warnings);
+      } else if (!res.disambiguation) {
+        setVoiceChanges([]);
+        setVoiceWarnings(["No detecté cambios claros para el diario."]);
+      }
+      setVoiceDisambig(res.disambiguation ?? null);
+    },
+  });
 
   useEffect(() => {
     let active = true;

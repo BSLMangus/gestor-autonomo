@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
+import { extractFlexibleDateRange, extractFlexibleSpanishDateIso } from "../../agent/inference/spanishFormParsers";
 import type {
   ClientRow,
   ExpenseTicketRow,
@@ -17,13 +19,17 @@ import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
 import { SiteLogsRepository } from "../../core/db/repositories/siteLogsRepo";
 import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { LocalFileBridge, SqliteExecutor } from "../../core/contracts/types";
+import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 
 interface JobDetailDrawerProps {
   jobId: string | null;
   executor: SqliteExecutor;
   fileBridge: LocalFileBridge;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
   onClose: () => void;
   onOpenClient?: (clientId: string) => void;
   onOpenQuote: (quoteId: string) => void;
@@ -85,6 +91,8 @@ export function JobDetailDrawer({
   jobId,
   executor,
   fileBridge,
+  voiceAdapter,
+  inferenceAdapter: _inferenceAdapter,
   onClose,
   onOpenClient,
   onOpenQuote,
@@ -103,6 +111,9 @@ export function JobDetailDrawer({
   const [scheduleSummary, setScheduleSummary] = useState<JobScheduleDeviationSummary | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [datesUndoStack, setDatesUndoStack] = useState<Array<{ start: string; end: string }>>([]);
+  const [datesVoiceChanges, setDatesVoiceChanges] = useState<string[]>([]);
+  const [datesVoiceWarnings, setDatesVoiceWarnings] = useState<string[]>([]);
   const [scheduleSavedMsg, setScheduleSavedMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -288,6 +299,59 @@ export function JobDetailDrawer({
                     </span>
                   )}
                 </div>
+
+                <InlineVoiceFormTrigger
+                  voiceAdapter={voiceAdapter}
+                  registerBackHandler={registerBackHandler}
+                  testId="job-detail-dates-voice-btn"
+                  title="Dictar fechas de la obra"
+                  placeholder="Ej: Del 24 al 30 de este mes"
+                  examples={[
+                    "Del 24 al 30 de este mes",
+                    "Inicio el lunes y fin el viernes",
+                  ]}
+                  buttonLabel="Dictar fechas"
+                  disabled={busy}
+                  lastChanges={datesVoiceChanges}
+                  lastWarnings={datesVoiceWarnings}
+                  canUndo={datesUndoStack.length > 0}
+                  onUndo={() => {
+                    const prev = datesUndoStack[datesUndoStack.length - 1];
+                    if (!prev) return;
+                    setDatesUndoStack((s) => s.slice(0, -1));
+                    setEditStartDate(prev.start);
+                    setEditEndDate(prev.end);
+                    setDatesVoiceChanges(["Último dictado deshecho"]);
+                    setDatesVoiceWarnings([]);
+                  }}
+                  onTranscript={(text) => {
+                    const snap = { start: editStartDate, end: editEndDate };
+                    const range = extractFlexibleDateRange(text);
+                    if (range.start_date_iso && range.end_date_iso) {
+                      setDatesUndoStack((s) => [...s.slice(-9), snap]);
+                      setEditStartDate(range.start_date_iso);
+                      setEditEndDate(range.end_date_iso);
+                      setDatesVoiceChanges([`Fechas: ${range.start_date_iso} → ${range.end_date_iso}`]);
+                      setDatesVoiceWarnings([]);
+                      return;
+                    }
+                    const single = extractFlexibleSpanishDateIso(text);
+                    if (single) {
+                      setDatesUndoStack((s) => [...s.slice(-9), snap]);
+                      if (/\bfin\b|\bhasta\b/.test(text.toLowerCase())) {
+                        setEditEndDate(single);
+                        setDatesVoiceChanges([`Fin: ${single}`]);
+                      } else {
+                        setEditStartDate(single);
+                        setDatesVoiceChanges([`Inicio: ${single}`]);
+                      }
+                      setDatesVoiceWarnings([]);
+                    } else {
+                      setDatesVoiceChanges([]);
+                      setDatesVoiceWarnings(["Di un rango como «del 24 al 30 de este mes»."]);
+                    }
+                  }}
+                />
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">

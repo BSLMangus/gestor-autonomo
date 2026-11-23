@@ -1,5 +1,10 @@
 import { CalendarCheck2, CalendarPlus, CheckCircle2, Clock, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  patchScheduleWidgetByVoice,
+  type ScheduleWidgetFormState,
+  type VoiceDisambiguationPayload,
+} from "../../agent/voiceFormPatcher";
 import type {
   ActiveWidgetEnvelope,
   JobRow,
@@ -7,6 +12,7 @@ import type {
   ScheduleStatus,
   WorkScheduleDefaults,
 } from "../../core/contracts/types";
+import { useRegisterOverlayVoice } from "../../ui/overlayVoiceContext";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import {
   computeDailyWorkHoursThousandths,
@@ -85,6 +91,10 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
   const [alsoLogInSiteLogs, setAlsoLogInSiteLogs] = useState<boolean>(true);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<ScheduleWidgetFormState[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
+  const [voiceDisambig, setVoiceDisambig] = useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
     setMode(payload.mode);
@@ -96,6 +106,10 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     setReason(payload.suggested_reason || DEVIATION_REASONS[0]!);
     setNotes(payload.suggested_notes || "");
     setErrorMsg(null);
+    setUndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
+    setVoiceDisambig(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payloadKey]);
 
@@ -147,11 +161,126 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runtime.executor, payloadKey]);
 
+  // Refrescar bloque previsto y resumen de obra cuando cambie obra o fecha sin machacar campos dictados
+  useEffect(() => {
+    let active = true;
+    const syncSelection = async () => {
+      const scheduleRepo = new ScheduleRepository(runtime.executor);
+      const [existingEntry, entriesForJob] = await Promise.all([
+        selectedJobId
+          ? scheduleRepo.getEntryByJobAndDate(selectedJobId, dateIso)
+          : Promise.resolve(null),
+        selectedJobId ? scheduleRepo.listEntriesByJob(selectedJobId) : Promise.resolve([]),
+      ]);
+      if (!active) return;
+      setEntry(existingEntry);
+      setJobEntries(entriesForJob);
+    };
+    void syncSelection();
+    return () => {
+      active = false;
+    };
+  }, [runtime.executor, selectedJobId, dateIso]);
+
   const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
   const defaultPlannedThousandths = computeDailyWorkHoursThousandths(defaults) || 8000;
   const plannedThousandths = entry?.planned_hours_thousandths ?? defaultPlannedThousandths;
   const plannedStart = entry?.planned_start ?? defaults.morning_start;
   const plannedEnd = entry?.planned_end ?? (defaults.afternoon_end || defaults.morning_end);
+
+  const applyScheduleFormState = (st: ScheduleWidgetFormState) => {
+    setMode(st.mode);
+    setSelectedJobId(st.selectedJobId);
+    setDateIso(st.dateIso);
+    setStartDateIso(st.startDateIso);
+    setEndDateIso(st.endDateIso);
+    setDeltaThousandths(st.deltaThousandths);
+    setReason(st.reason);
+    setNotes(st.notes);
+    setAlsoLogInSiteLogs(st.alsoLogInSiteLogs);
+  };
+
+  useRegisterOverlayVoice({
+    enabled: !busy && !isSubmitting,
+    title: mode === "plan_range" ? "Dictar planificación" : "Dictar parte de jornada",
+    placeholder:
+      mode === "plan_range"
+        ? "Ej: Obra de Marta del 22 al 30 de este mes"
+        : "Ej: Salí a las 18:30 por falta de material",
+    examples: [
+      "Salí 1 hora y media tarde por falta de material",
+      "Hoy terminé a las 16:00 porque estaba todo listo",
+      "Planificar del 22 al 30 de este mes",
+    ],
+    buttonLabel: "Dictar parte / agenda",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: undoStack.length > 0,
+    onUndo: () => {
+      const prev = undoStack[undoStack.length - 1];
+      if (!prev) return;
+      setUndoStack((s) => s.slice(0, -1));
+      applyScheduleFormState(prev);
+      setVoiceChanges(["Último dictado deshecho"]);
+      setVoiceWarnings([]);
+      setVoiceDisambig(null);
+    },
+    disambiguation: voiceDisambig
+      ? {
+          prompt: voiceDisambig.prompt,
+          options: voiceDisambig.options,
+          onSelect: (id) => {
+            const snapshot: ScheduleWidgetFormState = {
+              mode,
+              selectedJobId,
+              dateIso,
+              startDateIso,
+              endDateIso,
+              deltaThousandths,
+              reason,
+              notes,
+              alsoLogInSiteLogs,
+            };
+            setUndoStack((s) => [...s.slice(-9), snapshot]);
+            setSelectedJobId(id);
+            const hit = jobs.find((j) => j.id === id);
+            setVoiceChanges([hit ? `Obra: ${hit.job_code} · ${hit.title}` : "Obra seleccionada"]);
+            setVoiceWarnings([]);
+            setVoiceDisambig(null);
+          },
+          onDismiss: () => setVoiceDisambig(null),
+        }
+      : null,
+    onTranscript: async (text) => {
+      const currentSnapshot: ScheduleWidgetFormState = {
+        mode,
+        selectedJobId,
+        dateIso,
+        startDateIso,
+        endDateIso,
+        deltaThousandths,
+        reason,
+        notes,
+        alsoLogInSiteLogs,
+      };
+      const res = await patchScheduleWidgetByVoice(currentSnapshot, plannedEnd, text, {
+        executor: runtime.executor,
+        inferenceAdapter: runtime.inferenceAdapter,
+      });
+      if (res.changed) {
+        setUndoStack((s) => [...s.slice(-9), currentSnapshot]);
+        applyScheduleFormState(res.nextState);
+        setVoiceChanges(res.appliedChanges);
+        setVoiceWarnings(res.warnings);
+      } else if (!res.disambiguation) {
+        setVoiceChanges([]);
+        setVoiceWarnings([
+          "No detecté cambios claros. Prueba: «Alargamos 1 hora por falta de material».",
+        ]);
+      }
+      setVoiceDisambig(res.disambiguation ?? null);
+    },
+  });
 
   const actualThousandths = Math.max(500, plannedThousandths + deltaThousandths);
   const deltaMinutes = Math.round((deltaThousandths / 1000) * 60);

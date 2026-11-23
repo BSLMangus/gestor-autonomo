@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  patchClientProfileByVoice,
+  type ClientProfileFormState,
+} from "../../../agent/voiceFormPatcher";
 import { ClientProfileCommitSchema } from "../../../core/contracts/schemas";
+import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
 import type { ActiveWidgetEnvelope } from "../../../core/contracts/types";
 import { ClientsRepository } from "../../../core/db/repositories/clientsRepo";
 import type { WidgetCommonProps } from "./widgetTypes";
@@ -18,6 +23,9 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
   const [notes, setNotes] = useState(payload.notes);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<ClientProfileFormState[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     setName(payload.name);
@@ -27,11 +35,69 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
     setEmail(payload.email);
     setNotes(payload.notes);
     setErrorMsg(null);
+    setUndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payloadKey]);
 
   const isEditing = payload.client_id !== null;
   const disabled = busy || isSubmitting;
+
+  const applyClientFormState = (st: ClientProfileFormState) => {
+    setName(st.name);
+    setPhone(st.phone);
+    setNif(st.nif);
+    setFiscalAddress(st.fiscalAddress);
+    setEmail(st.email);
+    setNotes(st.notes);
+  };
+
+  useRegisterOverlayVoice({
+    enabled: !disabled,
+    title: isEditing ? "Dictar cambios del cliente" : "Dictar datos del cliente",
+    placeholder: "Ej: Teléfono 611223344, NIF 12345678Z, calle Mayor 10",
+    examples: [
+      "Teléfono 611 22 33 44 y NIF 12345678Z",
+      "Domicilio fiscal calle Alcalá 45, Madrid",
+      "Correo laura arroba reformas punto es",
+    ],
+    buttonLabel: "Dictar cliente",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: undoStack.length > 0,
+    onUndo: () => {
+      const prev = undoStack[undoStack.length - 1];
+      if (!prev) return;
+      setUndoStack((s) => s.slice(0, -1));
+      applyClientFormState(prev);
+      setVoiceChanges(["Último dictado deshecho"]);
+      setVoiceWarnings([]);
+    },
+    onTranscript: async (text) => {
+      const snapshot: ClientProfileFormState = {
+        name,
+        phone,
+        nif,
+        fiscalAddress,
+        email,
+        notes,
+      };
+      const res = await patchClientProfileByVoice(snapshot, text, {
+        executor: runtime.executor,
+        inferenceAdapter: runtime.inferenceAdapter,
+      });
+      if (res.changed) {
+        setUndoStack((s) => [...s.slice(-9), snapshot]);
+        applyClientFormState(res.nextState);
+        setVoiceChanges(res.appliedChanges);
+        setVoiceWarnings(res.warnings);
+      } else {
+        setVoiceChanges([]);
+        setVoiceWarnings(["No detecté campos nuevos. Indica nombre, teléfono, NIF, dirección o email."]);
+      }
+    },
+  });
 
   const handleSave = async () => {
     setErrorMsg(null);

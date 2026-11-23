@@ -2,6 +2,12 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { useEffect, useMemo, useState } from "react";
 import {
+  patchInvoiceGate3ByVoice,
+  patchShareGate4ByVoice,
+} from "../../../agent/voiceFormPatcher";
+import { normalizeSpanishText } from "../../../core/text/spanishText";
+import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
+import {
   Gate3InvoiceCommitPayloadSchema,
   Gate4ShareCommitPayloadSchema,
 } from "../../../core/contracts/schemas";
@@ -47,11 +53,19 @@ export function JobLifecycleActionWidget({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [manualBusy, setManualBusy] = useState(false);
+  const [g3UndoStack, setG3UndoStack] = useState<Gate3InvoiceDraftPayload[]>([]);
+  const [g4UndoStack, setG4UndoStack] = useState<Gate4ShareDraftPayload[]>([]);
+  const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
+  const [voiceWarnings, setVoiceWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     setG3Draft(initialG3);
     setG4Draft(initialG4);
     setValidationError(null);
+    setG3UndoStack([]);
+    setG4UndoStack([]);
+    setVoiceChanges([]);
+    setVoiceWarnings([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialG3Json, initialG4Json]);
 
@@ -286,6 +300,144 @@ export function JobLifecycleActionWidget({
 
   const hasAdvance = invoicesForJob.some((i) => i.series_type === "ANT");
   const hasFinal = invoicesForJob.some((i) => i.series_type === "FAC");
+
+  useRegisterOverlayVoice({
+    enabled:
+      !isSubmitting &&
+      !manualBusy &&
+      (canActGate3 || canActGate4 || lp.mode === "overview" || lp.mode === "ready_to_share"),
+    title: canActGate3
+      ? "Dictar datos de factura"
+      : canActGate4
+        ? "Dictar datos de envío"
+        : "Acciones por voz en expediente",
+    placeholder: canActGate3
+      ? "Ej: NIF cliente 45891234R, domicilio calle Mayor 12, Madrid"
+      : canActGate4
+        ? "Ej: Enviar por WhatsApp al 655443322, añade al mensaje Un saludo"
+        : "Ej: Emitir factura final o compartir por WhatsApp",
+    examples: canActGate3
+      ? [
+          "NIF cliente 45891234R, domicilio Av. de la Libertad 4, Madrid",
+          "Vencimiento a 15 días",
+          "Añade en notas pago por transferencia bancaria",
+        ]
+      : canActGate4
+        ? [
+            "Por WhatsApp al 655 44 33 22",
+            "Añade al mensaje gracias por tu confianza",
+            "Compartir por otras apps",
+          ]
+        : [
+            "Facturar anticipo del 40 %",
+            "Emitir factura final",
+            "Compartir por WhatsApp",
+          ],
+    buttonLabel: canActGate3
+      ? "Dictar factura"
+      : canActGate4
+        ? "Dictar envío"
+        : "Dictar acción",
+    lastChanges: voiceChanges,
+    lastWarnings: voiceWarnings,
+    canUndo: canActGate3 ? g3UndoStack.length > 0 : canActGate4 ? g4UndoStack.length > 0 : false,
+    onUndo: () => {
+      if (canActGate3) {
+        const prev = g3UndoStack[g3UndoStack.length - 1];
+        if (!prev) return;
+        setG3UndoStack((s) => s.slice(0, -1));
+        setG3Draft(prev);
+        setVoiceChanges(["Último dictado deshecho"]);
+        setVoiceWarnings([]);
+      } else if (canActGate4) {
+        const prev = g4UndoStack[g4UndoStack.length - 1];
+        if (!prev) return;
+        setG4UndoStack((s) => s.slice(0, -1));
+        setG4Draft(prev);
+        setVoiceChanges(["Último dictado deshecho"]);
+        setVoiceWarnings([]);
+      }
+    },
+    onTranscript: async (text) => {
+      if (canActGate3 && g3Draft) {
+        const res = await patchInvoiceGate3ByVoice(g3Draft, text, {
+          executor: runtime.executor,
+          inferenceAdapter: runtime.inferenceAdapter,
+        });
+        if (res.changed) {
+          setG3UndoStack((s) => [...s.slice(-9), g3Draft]);
+          setG3Draft(res.nextState);
+          setVoiceChanges(res.appliedChanges);
+          setVoiceWarnings(res.warnings);
+        } else {
+          setVoiceChanges([]);
+          setVoiceWarnings([
+            "No detecté datos nuevos de factura. Prueba: «NIF cliente ..., domicilio ..., vencimiento a 15 días».",
+          ]);
+        }
+        return;
+      }
+
+      if (canActGate4 && g4Draft) {
+        const res = await patchShareGate4ByVoice(g4Draft, text, {
+          executor: runtime.executor,
+          inferenceAdapter: runtime.inferenceAdapter,
+        });
+        if (res.changed) {
+          setG4UndoStack((s) => [...s.slice(-9), g4Draft]);
+          setG4Draft(res.nextState);
+          setVoiceChanges(res.appliedChanges);
+          setVoiceWarnings(res.warnings);
+        }
+        return;
+      }
+
+      // Overview / ready_to_share -> atajos rápidos por voz
+      const norm = normalizeSpanishText(text);
+      if (/\b(aceptar|aceptado|aprobar)\b/.test(norm) && quote && (quote.status === "borrador" || quote.status === "enviado")) {
+        await handleAcceptQuote();
+        setVoiceChanges(["Presupuesto marcado como aceptado"]);
+        setVoiceWarnings([]);
+      } else if (/\b(anticipo|adelanto|40)\b/.test(norm) && lp.quote_id && !hasAdvance && !hasFinal) {
+        await onQuickAction({
+          id: "qa_req_advance",
+          label: "Facturar anticipo 40 %",
+          action_type: "request_advance_gate",
+          payload: {
+            target_ids: { job_id: lp.job_id, quote_id: lp.quote_id },
+            billing_sub_intent: "advance_40",
+          },
+        });
+      } else if (/\b(factura|facturar|emitir)\b/.test(norm) && lp.quote_id && !hasFinal) {
+        await onQuickAction({
+          id: "qa_req_final",
+          label: "Emitir factura final",
+          action_type: "request_invoice_gate",
+          payload: {
+            target_ids: { job_id: lp.job_id, quote_id: lp.quote_id },
+            billing_sub_intent: "final_invoice",
+          },
+        });
+      } else if (/\b(compartir|whatsapp|enviar|mandar)\b/.test(norm) && (lp.invoice_id || lp.quote_id)) {
+        await onQuickAction({
+          id: "qa_req_share",
+          label: "Compartir documento",
+          action_type: "request_share_gate",
+          payload: {
+            target_ids: {
+              job_id: lp.job_id,
+              ...(lp.invoice_id
+                ? { invoice_id: lp.invoice_id }
+                : { quote_id: lp.quote_id ?? undefined }),
+            },
+          },
+        });
+      } else {
+        setVoiceChanges([]);
+        setVoiceWarnings(["Di «anticipo 40 %», «emitir factura», «compartir» o «marcar aceptado»."]);
+      }
+    },
+  });
 
   return (
     <section

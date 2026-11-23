@@ -137,4 +137,45 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       return null;
     }
   }
+
+  async extractFormPatch<T>(params: {
+    formKind: string;
+    currentSnapshot: Record<string, unknown>;
+    transcript: string;
+    fieldSpec: string;
+    schema: z.ZodType<T>;
+  }): Promise<{ patch: T; engine_used: InferenceEngine } | null> {
+    if (!this.llmRunner || !params.transcript.trim()) {
+      return null;
+    }
+
+    const prompt = [
+      `Eres un extractor estricto JSON para el formulario "${params.formKind}" de Gestor Autónomo.`,
+      "Devuelve ÚNICAMENTE un objeto JSON válido con solo los campos que el usuario menciona o modifica en su dictado.",
+      "No incluyas campos no mencionados ni inventes valores.",
+      `Campos permitidos: ${params.fieldSpec}`,
+      `Estado actual: ${JSON.stringify(params.currentSnapshot)}`,
+      `Dictado del usuario: ${JSON.stringify(params.transcript.trim())}`,
+    ].join("\n");
+
+    try {
+      const runner = this.llmRunner;
+      const rawResponse = await Promise.race<string>([
+        runner(prompt),
+        new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error("LLM_TIMEOUT")), LLM_TIMEOUT_MS)
+        ),
+      ]);
+      const jsonMatch = /\{[\s\S]*\}/.exec(rawResponse);
+      if (!jsonMatch) return null;
+      const parsed = params.schema.safeParse(JSON.parse(jsonMatch[0]));
+      if (!parsed.success) return null;
+      return {
+        patch: parsed.data,
+        engine_used: "mediapipe_local_llm",
+      };
+    } catch {
+      return null;
+    }
+  }
 }

@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
+import {
+  patchNewJobByVoice,
+  type NewJobFormState,
+  type VoiceDisambiguationPayload,
+} from "../../agent/voiceFormPatcher";
 import type {
   ClientRow,
   JobRow,
@@ -9,6 +15,8 @@ import type {
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
+import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 import { JobDetailDrawer } from "../directory/JobDetailDrawer";
 
 interface JobsViewProps {
@@ -16,6 +24,8 @@ interface JobsViewProps {
   fileBridge: LocalFileBridge;
   refreshTick: number;
   initialFocusJobId?: string | null;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onOpenClient: (clientId: string) => void;
   onOpenQuote: (quoteId: string) => void;
@@ -38,6 +48,8 @@ export function JobsView({
   fileBridge,
   refreshTick,
   initialFocusJobId = null,
+  voiceAdapter,
+  inferenceAdapter,
   onStartJobQuote,
   onOpenClient,
   onOpenQuote,
@@ -63,6 +75,11 @@ export function JobsView({
   const [newEndDate, setNewEndDate] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newJobUndoStack, setNewJobUndoStack] = useState<NewJobFormState[]>([]);
+  const [newJobVoiceChanges, setNewJobVoiceChanges] = useState<string[]>([]);
+  const [newJobVoiceWarnings, setNewJobVoiceWarnings] = useState<string[]>([]);
+  const [newJobVoiceDisambig, setNewJobVoiceDisambig] =
+    useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
     if (initialFocusJobId) {
@@ -156,9 +173,91 @@ export function JobsView({
           onSubmit={(e) => void handleCreateJob(e)}
           className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] space-y-3 text-xs"
         >
-          <div className="text-[15px] font-semibold text-on-surface">
-            Abrir nuevo expediente de obra
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[15px] font-semibold text-on-surface">
+              Abrir nuevo expediente de obra
+            </div>
           </div>
+          <InlineVoiceFormTrigger
+            voiceAdapter={voiceAdapter}
+            registerBackHandler={registerBackHandler}
+            testId="new-job-voice-btn"
+            title="Dictar nueva obra"
+            placeholder="Ej: Título Reforma cocina, cliente Elena, calle Mayor 8, del 24 al 29"
+            examples={[
+              "Título Reforma baño, para Elena, del 24 al 29 de este mes",
+              "Dirección Av. de la Libertad 14, Madrid",
+            ]}
+            buttonLabel="Dictar obra"
+            disabled={busy}
+            lastChanges={newJobVoiceChanges}
+            lastWarnings={newJobVoiceWarnings}
+            canUndo={newJobUndoStack.length > 0}
+            onUndo={() => {
+              const prev = newJobUndoStack[newJobUndoStack.length - 1];
+              if (!prev) return;
+              setNewJobUndoStack((s) => s.slice(0, -1));
+              setNewTitle(prev.title);
+              setNewAddress(prev.address);
+              setNewClientId(prev.clientId);
+              setNewStartDate(prev.startDate);
+              setNewEndDate(prev.endDate);
+              setNewJobVoiceChanges(["Último dictado deshecho"]);
+              setNewJobVoiceWarnings([]);
+              setNewJobVoiceDisambig(null);
+            }}
+            disambiguation={
+              newJobVoiceDisambig
+                ? {
+                    prompt: newJobVoiceDisambig.prompt,
+                    options: newJobVoiceDisambig.options,
+                    onSelect: (id) => {
+                      const snap: NewJobFormState = {
+                        title: newTitle,
+                        address: newAddress,
+                        clientId: newClientId,
+                        startDate: newStartDate,
+                        endDate: newEndDate,
+                      };
+                      setNewJobUndoStack((s) => [...s.slice(-9), snap]);
+                      setNewClientId(id);
+                      const cl = clients.find((c) => c.id === id);
+                      setNewJobVoiceChanges([cl ? `Cliente: ${cl.name}` : "Cliente seleccionado"]);
+                      setNewJobVoiceWarnings([]);
+                      setNewJobVoiceDisambig(null);
+                    },
+                    onDismiss: () => setNewJobVoiceDisambig(null),
+                  }
+                : null
+            }
+            onTranscript={async (text) => {
+              const snap: NewJobFormState = {
+                title: newTitle,
+                address: newAddress,
+                clientId: newClientId,
+                startDate: newStartDate,
+                endDate: newEndDate,
+              };
+              const res = await patchNewJobByVoice(snap, text, {
+                executor,
+                inferenceAdapter,
+              });
+              if (res.changed) {
+                setNewJobUndoStack((s) => [...s.slice(-9), snap]);
+                setNewTitle(res.nextState.title);
+                setNewAddress(res.nextState.address);
+                setNewClientId(res.nextState.clientId);
+                setNewStartDate(res.nextState.startDate);
+                setNewEndDate(res.nextState.endDate);
+                setNewJobVoiceChanges(res.appliedChanges);
+                setNewJobVoiceWarnings(res.warnings);
+              } else if (!res.disambiguation) {
+                setNewJobVoiceChanges([]);
+                setNewJobVoiceWarnings(["No detecté datos nuevos de la obra."]);
+              }
+              setNewJobVoiceDisambig(res.disambiguation ?? null);
+            }}
+          />
           <input
             type="text"
             placeholder="Título de la obra *"
@@ -335,6 +434,8 @@ export function JobsView({
         jobId={selectedJobId}
         executor={executor}
         fileBridge={fileBridge}
+        voiceAdapter={voiceAdapter}
+        inferenceAdapter={inferenceAdapter}
         onClose={() => setSelectedJobId(null)}
         onOpenClient={(cid) => {
           setSelectedJobId(null);

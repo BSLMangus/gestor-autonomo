@@ -12,6 +12,7 @@ import type {
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { resizeLogoFileToDataUrl } from "../../core/files/logoImageHelper";
 import { getFiscalYearFromIso, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { OcrPort } from "../../core/ports/mediaPorts";
 import {
@@ -33,6 +34,7 @@ interface SettingsSheetProps {
   capacitorLlmAdapter: CapacitorLlmAdapter;
   memoryCoordinator: MemoryCoordinator;
   ocrPort: OcrPort;
+  voiceAdapter?: VoiceInputAdapter;
   refreshTick: number;
   activeSection: "general" | "personalizacion";
   activeAccount: LocalAccountRecord | null;
@@ -55,6 +57,7 @@ export function SettingsSheet({
   capacitorLlmAdapter,
   memoryCoordinator,
   ocrPort,
+  voiceAdapter,
   refreshTick,
   activeSection,
   activeAccount,
@@ -391,6 +394,9 @@ export function SettingsSheet({
           executor={executor}
           ocrPort={ocrPort}
           refreshTick={refreshTick}
+          voiceAdapter={voiceAdapter}
+          inferenceAdapter={inferenceAdapter}
+          registerBackHandler={registerBackHandler}
           onOpenDocumentImport={onOpenDocumentImport}
           onDataChanged={async () => {
             await loadSettings();

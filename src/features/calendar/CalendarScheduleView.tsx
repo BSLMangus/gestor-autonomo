@@ -8,6 +8,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
+import {
+  patchCalendarAppointmentByVoice,
+  type CalendarAppointmentFormState,
+  type VoiceDisambiguationPayload,
+} from "../../agent/voiceFormPatcher";
 import type {
   ActiveWidgetEnvelope,
   JobRow,
@@ -20,6 +26,8 @@ import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
+import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 
 type CalendarMode = "month" | "week" | "jobs";
 
@@ -27,6 +35,9 @@ interface CalendarScheduleViewProps {
   executor: SqliteExecutor;
   refreshTick: number;
   initialFocusDateIso?: string;
+  voiceAdapter?: VoiceInputAdapter;
+  inferenceAdapter?: LocalInferenceAdapterImpl;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onOpenScheduleWidget: (widget: Extract<ActiveWidgetEnvelope, { ui_widget_type: "ScheduleWorkLogWidget" }>) => void;
   onDataChanged: () => Promise<void>;
 }
@@ -131,6 +142,9 @@ export function CalendarScheduleView({
   executor,
   refreshTick,
   initialFocusDateIso,
+  voiceAdapter,
+  inferenceAdapter,
+  registerBackHandler,
   onOpenScheduleWidget,
   onDataChanged,
 }: CalendarScheduleViewProps) {
@@ -158,6 +172,11 @@ export function CalendarScheduleView({
   const [newNotes, setNewNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [apptUndoStack, setApptUndoStack] = useState<CalendarAppointmentFormState[]>([]);
+  const [apptVoiceChanges, setApptVoiceChanges] = useState<string[]>([]);
+  const [apptVoiceWarnings, setApptVoiceWarnings] = useState<string[]>([]);
+  const [apptVoiceDisambig, setApptVoiceDisambig] =
+    useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
     if (initialFocusDateIso) {
@@ -747,6 +766,87 @@ export function CalendarScheduleView({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            <InlineVoiceFormTrigger
+              voiceAdapter={voiceAdapter}
+              registerBackHandler={registerBackHandler}
+              testId="calendar-modal-voice-btn"
+              title="Dictar cita en agenda"
+              placeholder="Ej: Mañana de 9 a 13:30 en obra de Marta, visita medición"
+              examples={[
+                "Mañana de 9 a 13:30, visita medición",
+                "El viernes de 10:00 a 12:00 en obra de Juan",
+              ]}
+              buttonLabel="Dictar cita"
+              disabled={busy}
+              lastChanges={apptVoiceChanges}
+              lastWarnings={apptVoiceWarnings}
+              canUndo={apptUndoStack.length > 0}
+              onUndo={() => {
+                const prev = apptUndoStack[apptUndoStack.length - 1];
+                if (!prev) return;
+                setApptUndoStack((s) => s.slice(0, -1));
+                setNewJobId(prev.jobId);
+                setNewDate(prev.dateIso);
+                setNewStart(prev.start);
+                setNewEnd(prev.end);
+                setNewNotes(prev.notes);
+                setApptVoiceChanges(["Último dictado deshecho"]);
+                setApptVoiceWarnings([]);
+                setApptVoiceDisambig(null);
+              }}
+              disambiguation={
+                apptVoiceDisambig
+                  ? {
+                      prompt: apptVoiceDisambig.prompt,
+                      options: apptVoiceDisambig.options,
+                      onSelect: (id) => {
+                        const snap: CalendarAppointmentFormState = {
+                          jobId: newJobId,
+                          dateIso: newDate,
+                          start: newStart,
+                          end: newEnd,
+                          notes: newNotes,
+                        };
+                        setApptUndoStack((s) => [...s.slice(-9), snap]);
+                        setNewJobId(id);
+                        const hit = jobs.find((j) => j.id === id);
+                        setApptVoiceChanges([hit ? `Obra: ${hit.job_code}` : "Obra seleccionada"]);
+                        setApptVoiceWarnings([]);
+                        setApptVoiceDisambig(null);
+                      },
+                      onDismiss: () => setApptVoiceDisambig(null),
+                    }
+                  : null
+              }
+              onTranscript={async (text) => {
+                const snap: CalendarAppointmentFormState = {
+                  jobId: newJobId,
+                  dateIso: newDate,
+                  start: newStart,
+                  end: newEnd,
+                  notes: newNotes,
+                };
+                const res = await patchCalendarAppointmentByVoice(snap, text, {
+                  executor,
+                  inferenceAdapter,
+                });
+                if (res.changed) {
+                  setApptUndoStack((s) => [...s.slice(-9), snap]);
+                  setNewJobId(res.nextState.jobId);
+                  setNewDate(res.nextState.dateIso);
+                  setNewStart(res.nextState.start);
+                  setNewEnd(res.nextState.end);
+                  setNewNotes(res.nextState.notes);
+                  setApptVoiceChanges(res.appliedChanges);
+                  setApptVoiceWarnings(res.warnings);
+                } else if (!res.disambiguation) {
+                  setApptVoiceChanges([]);
+                  setApptVoiceWarnings(["No detecté fecha, hora ni nota en el dictado."]);
+                }
+                setApptVoiceDisambig(res.disambiguation ?? null);
+              }}
+            />
 
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-semibold text-on-surface">Obra</span>
