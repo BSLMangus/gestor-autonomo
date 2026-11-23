@@ -138,8 +138,11 @@ export function ClientProfileView({
     .reduce((acc, i) => acc + i.total_cents, 0);
 
   return (
-    <div data-testid="client-profile-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-4 text-xs bg-surface">
-      <div className="flex items-center justify-between gap-2">
+    <div
+      data-testid="client-profile-view"
+      className="flex flex-1 flex-col w-full max-w-full overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-4 text-xs bg-surface"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
         <button
           type="button"
           data-testid="back-to-clients-btn"
@@ -172,18 +175,20 @@ export function ClientProfileView({
 
       {/* Cabecera de datos fiscales */}
       <section className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-1.5">
-        <h2 className="text-base font-extrabold text-slate-900">{client.name}</h2>
-        <div className="text-slate-600">
+        <h2 className="min-w-0 text-base font-extrabold text-slate-900 break-words [overflow-wrap:anywhere]">
+          {client.name}
+        </h2>
+        <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
           <span className="font-semibold">NIF/CIF:</span> {client.nif || "No especificado"} ·{" "}
           <span className="font-semibold">Tel:</span> {client.phone || "No especificado"}
         </div>
         {client.fiscal_address && (
-          <div className="text-slate-600">
+          <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
             <span className="font-semibold">Dirección:</span> {client.fiscal_address}
           </div>
         )}
         {client.email && (
-          <div className="text-slate-600">
+          <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
             <span className="font-semibold">Email:</span> {client.email}
           </div>
         )}
@@ -224,7 +229,7 @@ export function ClientProfileView({
 
       {/* Obras asociadas */}
       <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
           <h3 className="text-sm font-extrabold text-slate-900">Obras asociadas ({jobs.length})</h3>
           <button
             type="button"
@@ -239,19 +244,19 @@ export function ClientProfileView({
         {showNewJobForm && (
           <form
             onSubmit={(e) => void handleCreateJobForClient(e)}
-            className="flex gap-1.5 rounded-xl border border-orange-200 bg-orange-50/70 p-2"
+            className="flex w-full min-w-0 gap-1.5 rounded-xl border border-orange-200 bg-orange-50/70 p-2"
           >
             <input
               type="text"
               value={newJobTitle}
               onChange={(e) => setNewJobTitle(e.target.value)}
               placeholder="Título de la obra (ej. Reforma baño)"
-              className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
             />
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+              className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
             >
               Crear
             </button>
@@ -281,13 +286,15 @@ export function ClientProfileView({
                     <div className="truncate text-[10px] text-slate-500">{job.address}</div>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void onStartJobQuote(job.id)}
-                  className="shrink-0 rounded-lg border border-orange-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-orange-800"
-                >
-                  + Presupuesto
-                </button>
+                {job.status !== "cancelado" && (
+                  <button
+                    type="button"
+                    onClick={() => void onStartJobQuote(job.id)}
+                    className="shrink-0 rounded-lg border border-orange-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-orange-800"
+                  >
+                    + Presupuesto
+                  </button>
+                )}
               </div>
             ))}
           </div>

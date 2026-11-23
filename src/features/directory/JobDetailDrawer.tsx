@@ -243,33 +243,37 @@ export function JobDetailDrawer({
                 </div>
                 {job.address && <div className="text-on-surface-variant">{job.address}</div>}
 
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    type="button"
-                    data-testid="job-detail-start-quote-btn"
-                    disabled={busy}
-                    onClick={() => void onStartJobQuote(job.id)}
-                    className="min-h-[44px] rounded-xl bg-primary hover:bg-terracotta px-3.5 font-semibold text-white cursor-pointer"
-                  >
-                    + Presupuesto en chat
-                  </button>
+                {(job.status !== "cancelado" || transitionOptions.length > 0) && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {job.status !== "cancelado" && (
+                      <button
+                        type="button"
+                        data-testid="job-detail-start-quote-btn"
+                        disabled={busy}
+                        onClick={() => void onStartJobQuote(job.id)}
+                        className="min-h-[44px] rounded-xl bg-primary hover:bg-terracotta px-3.5 font-semibold text-white cursor-pointer"
+                      >
+                        + Presupuesto en chat
+                      </button>
+                    )}
 
-                  {transitionOptions.map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void runAction(async () => {
-                          await new JobsRepository(executor).transitionStatus(job.id, st);
-                        })
-                      }
-                      className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-lowest px-3 font-semibold text-on-surface hover:border-terracotta cursor-pointer"
-                    >
-                      Pasar a {st}
-                    </button>
-                  ))}
-                </div>
+                    {transitionOptions.map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void runAction(async () => {
+                            await new JobsRepository(executor).transitionStatus(job.id, st);
+                          })
+                        }
+                        className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-lowest px-3 font-semibold text-on-surface hover:border-terracotta cursor-pointer"
+                      >
+                        Pasar a {st}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Planificación en Agenda y Calendario */}

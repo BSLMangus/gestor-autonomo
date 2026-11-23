@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Gate1QuoteCommitPayloadSchema,
 } from "../../../core/contracts/schemas";
@@ -16,6 +16,13 @@ import { SettingsRepository } from "../../../core/db/repositories/settingsRepo";
 import { computeQuoteTotals, formatCentsEs } from "../../../core/fiscal/fiscalEngine";
 import { formatPricingBreakdown } from "../../../core/pricing/pricingEngine";
 import { normalizeSpanishText } from "../../../core/text/spanishText";
+import {
+  centsToInitialPriceText,
+  eurInputToCents,
+  formatPriceInputOnBlur,
+  sanitizeDecimalPriceInput,
+  shouldClearPriceOnFocus,
+} from "./priceInputUtils";
 import type { WidgetCommonProps } from "./widgetTypes";
 
 type QuoteWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "QuoteBuilderWidget" }>;
@@ -33,17 +40,6 @@ function stripComputedTotals(payload: QuoteWidget["widget_payload"]): Gate1Quote
   return draft;
 }
 
-function centsToEurInput(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
-
-function eurInputToCents(raw: string): number {
-  const normalized = raw.replace(",", ".").trim();
-  const val = Number.parseFloat(normalized);
-  if (!Number.isFinite(val) || val < 0) return 0;
-  return Math.round(val * 100);
-}
-
 function thousandthsToQtyInput(t: number): string {
   return String(t / 1000);
 }
@@ -53,6 +49,67 @@ function qtyInputToThousandths(raw: string): number {
   const val = Number.parseFloat(normalized);
   if (!Number.isFinite(val) || val < 0) return 0;
   return Math.round(val * 1000);
+}
+
+function PriceInput({
+  valueCents,
+  disabled,
+  testId,
+  ariaLabel,
+  onChangeCents,
+}: {
+  valueCents: number;
+  disabled: boolean;
+  testId: string;
+  ariaLabel: string;
+  onChangeCents: (cents: number) => void;
+}) {
+  const [text, setText] = useState<string>(() => centsToInitialPriceText(valueCents));
+  const isFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (isFocusedRef.current) return;
+    if (valueCents === 0) {
+      if (eurInputToCents(text) !== 0) {
+        setText("");
+      }
+      return;
+    }
+    if (eurInputToCents(text) !== valueCents || text.trim() === "") {
+      setText((valueCents / 100).toFixed(2));
+    }
+  }, [valueCents, text]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      placeholder="0.00"
+      data-testid={testId}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      value={text}
+      onFocus={() => {
+        isFocusedRef.current = true;
+        if (shouldClearPriceOnFocus(text)) {
+          setText("");
+        }
+      }}
+      onChange={(e) => {
+        const cleaned = sanitizeDecimalPriceInput(e.target.value);
+        setText(cleaned);
+        onChangeCents(eurInputToCents(cleaned));
+      }}
+      onBlur={() => {
+        isFocusedRef.current = false;
+        const { display, cents } = formatPriceInputOnBlur(text);
+        setText(display);
+        onChangeCents(cents);
+      }}
+      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+    />
+  );
 }
 
 export function QuoteBuilderWidget({
@@ -579,20 +636,16 @@ export function QuoteBuilderWidget({
                   </div>
                   <div className="min-w-0">
                     <label className="block text-[10px] text-slate-500">Precio (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      data-testid={`quote-line-price-${idx}`}
-                      aria-label={`Precio euros partida ${idx + 1}`}
+                    <PriceInput
+                      valueCents={line.unit_price_cents}
                       disabled={!canAct || isSubmitting}
-                      value={centsToEurInput(line.unit_price_cents)}
-                      onChange={(e) =>
+                      testId={`quote-line-price-${idx}`}
+                      ariaLabel={`Precio euros partida ${idx + 1}`}
+                      onChangeCents={(cents) =>
                         updateLine(idx, {
-                          unit_price_cents: eurInputToCents(e.target.value),
+                          unit_price_cents: cents,
                         })
                       }
-                      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
                     />
                   </div>
                   <div className="min-w-0 text-right">

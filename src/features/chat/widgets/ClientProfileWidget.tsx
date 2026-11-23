@@ -82,7 +82,7 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
   return (
     <section
       data-testid="client-profile-widget"
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900 space-y-3"
+      className="w-full max-w-full overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900 space-y-3"
     >
       <div className="border-b border-slate-100 pb-2.5">
         <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900">

@@ -62,7 +62,7 @@ export function GenerativeWidgetOverlay(props: {
       role="dialog"
       aria-modal="true"
       aria-label={overlay.title}
-      className="fixed inset-0 z-50 flex flex-col bg-surface text-on-surface"
+      className="fixed inset-0 z-50 flex w-full max-w-full flex-col overflow-x-hidden bg-surface text-on-surface"
     >
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
         <div className="min-w-0">
@@ -95,7 +95,7 @@ export function GenerativeWidgetOverlay(props: {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 pb-8">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-4 py-4 pb-8">
         <div className="mx-auto w-full max-w-2xl">
           {overlay.kind === "document_import" ? (
             <DocumentImportReviewWidget

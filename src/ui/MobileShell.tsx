@@ -29,7 +29,7 @@ export function MobileShell({
   bottomComposer,
 }: MobileShellProps) {
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-md flex-col bg-surface text-on-surface sm:my-2 sm:h-[calc(100dvh-1rem)] sm:rounded-[28px] sm:border sm:border-outline-variant sm:shadow-[0_24px_64px_rgba(15,23,42,0.12)] overflow-hidden">
+    <div className="mx-auto flex h-dvh w-full max-w-full sm:max-w-md flex-col bg-surface text-on-surface sm:my-2 sm:h-[calc(100dvh-1rem)] sm:rounded-[28px] sm:border sm:border-outline-variant sm:shadow-[0_24px_64px_rgba(15,23,42,0.12)] overflow-hidden overflow-x-hidden">
       {/* Franja superior mínima segura para notch/status bar */}
       <header className="relative z-20 shrink-0 bg-surface pt-safe">
         <div className="flex h-11 items-center px-3 text-on-surface">
@@ -53,7 +53,7 @@ export function MobileShell({
       {banners && <div className="shrink-0">{banners}</div>}
 
       {/* Área central scrollable */}
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden bg-surface">
+      <main className="flex min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden overflow-x-hidden bg-surface">
         {children}
       </main>
 

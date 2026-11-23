@@ -473,7 +473,7 @@ export function QuoteDetailView({
             </>
           )}
 
-          {quote.status === "borrador" && (
+          {quote.status === "borrador" && job?.status !== "cancelado" && (
             <button
               type="button"
               data-testid="quote-detail-edit-btn"
