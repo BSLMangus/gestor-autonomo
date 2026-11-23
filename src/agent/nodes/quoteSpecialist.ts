@@ -4,6 +4,8 @@ import type {
   ActiveWidgetEnvelope,
   Gate1QuoteDraftPayload,
   PendingDisambiguation,
+  PendingSlotFill,
+  QuickAction,
   RagSnippet,
   ResolvedTarget,
 } from "../../core/contracts/types";
@@ -80,22 +82,34 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
       const actionChoice = resolvedTarget.action_choice;
 
       if (input?.action_type === "start_empty_quote") {
+        const presetClientId = input.target_ids?.client_id ?? null;
+        const presetClient = presetClientId ? await clientsRepo.getById(presetClientId) : null;
+        const presetNewClientName =
+          !presetClient && input.text.trim().length > 0 ? input.text.trim() : null;
         const emptyDraft: Gate1QuoteDraftPayload = {
           quote_id: null,
-          client_id: null,
+          client_id: presetClient?.id ?? null,
+          ...(presetNewClientName ? { new_client: { name: presetNewClientName } } : {}),
           job_id: null,
-          job_title: "",
+          job_title: presetClient
+            ? `Presupuesto trabajos ${presetClient.name}`
+            : presetNewClientName
+              ? `Trabajos para ${presetNewClientName}`
+              : "",
           vat_rate: defaultVatRate,
           notes: "",
           lines: [],
         };
         return {
           routed_intent: "quote_specialist",
+          pending_slot_fill: null,
           active_widget: buildQuoteEnvelope(emptyDraft),
           pending_gate: "gate_1_quote",
           messages: [
             new AIMessage(
-              "Constructor de presupuesto listo. Añade partidas, cliente y tipo de IVA."
+              presetClient
+                ? `Constructor de presupuesto listo para ${presetClient.name}. Añade las partidas.`
+                : "Constructor de presupuesto listo. Añade partidas, cliente y tipo de IVA."
             ),
           ],
           turn_trace: { append_node: "quote_specialist" },
@@ -211,6 +225,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
       // Flujo libre por voz/texto
       const snippets: RagSnippet[] = [];
       const clientQuery = (state.extracted_entities?.client_query as string | null | undefined) ?? null;
+      const jobTitleHint =
+        (state.extracted_entities?.job_title_hint as string | null | undefined) ?? null;
+      const slotFillAttempt = Number(state.extracted_entities?.slot_fill_attempt ?? 0);
       const vatRate =
         (state.extracted_entities?.vat_rate as number | undefined) ?? defaultVatRate;
       const parsedLines = (state.extracted_entities?.quote_lines as ParsedQuoteLine[] | undefined) ?? [];
@@ -218,7 +235,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
       let targetJobId: string | null =
         actionChoice === "create_annex_job"
           ? null
-          : resolvedTarget.job_id ?? input?.target_ids?.job_id ?? state.active_job_id;
+          : resolvedTarget.job_id ??
+            input?.target_ids?.job_id ??
+            (clientQuery || resolvedTarget.client_id ? null : state.active_job_id);
       const targetQuoteId: string | null =
         actionChoice === "create_annex_job" ? null : resolvedTarget.quote_id ?? null;
 
@@ -227,7 +246,8 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
         targetJobId &&
         actionChoice !== "create_annex_job" &&
         actionChoice !== "edit_existing_quote" &&
-        !clientQuery
+        !clientQuery &&
+        !resolvedTarget.client_id
       ) {
         const activeJob = await jobsRepo.getById(targetJobId);
         if (activeJob) {
@@ -425,13 +445,137 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
 
       const clientRow = clientId ? await clientsRepo.getById(clientId) : null;
       const existingJob = targetJobId ? await jobsRepo.getById(targetJobId) : null;
+
+      // Validación de completitud (Opción A): pedir datos faltantes si no hay partidas
+      const hasClientOrJob = Boolean(clientId || clientQuery || targetJobId);
+      const hasLines = draftLines.length > 0;
+
+      if (!hasClientOrJob && !hasLines) {
+        if (slotFillAttempt < 2) {
+          const pendingSlot: PendingSlotFill = {
+            target_intent: "quote_specialist",
+            missing_fields: ["client", "lines"],
+            collected_data: {
+              vat_rate: vatRate,
+              ...(jobTitleHint ? { job_title_hint: jobTitleHint } : {}),
+            },
+            original_text: input?.text ?? "",
+            attempts: slotFillAttempt,
+          };
+          const quickActions: QuickAction[] = [
+            {
+              id: "qa_open_empty_quote",
+              label: "Abrir presupuesto vacío",
+              action_type: "start_empty_quote",
+              payload: {},
+            },
+          ];
+          return {
+            routed_intent: "quote_specialist",
+            pending_slot_fill: pendingSlot,
+            active_widget: null,
+            pending_gate: null,
+            quick_actions: quickActions,
+            messages: [
+              new AIMessage(
+                [
+                  "Vale, para preparar el presupuesto me faltan estos datos:",
+                  "1) ¿Para qué cliente es?",
+                  "2) ¿Qué trabajos o partidas incluyo (y cantidad o precio si quieres)?",
+                  'Ejemplo: «Para Marta Ruiz: 1 plato de ducha y 10 m² de alicatado».',
+                ].join("\n")
+              ),
+            ],
+            turn_trace: { append_node: "quote_specialist" },
+          };
+        }
+
+        const quickActions: QuickAction[] = [
+          {
+            id: "qa_open_empty_quote",
+            label: "Abrir presupuesto vacío",
+            action_type: "start_empty_quote",
+            payload: {},
+          },
+        ];
+        return {
+          routed_intent: "quote_specialist",
+          pending_slot_fill: null,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: quickActions,
+          messages: [
+            new AIMessage(
+              "No he podido detectar el cliente ni las partidas del presupuesto. Puedes abrir el presupuesto vacío y rellenarlo a mano cuando quieras."
+            ),
+          ],
+          turn_trace: { append_node: "quote_specialist" },
+        };
+      }
+
+      if (hasClientOrJob && !hasLines && slotFillAttempt < 2) {
+        const targetLabel =
+          clientRow?.name ?? clientQuery ?? existingJob?.title ?? "el cliente";
+        const pendingSlot: PendingSlotFill = {
+          target_intent: "quote_specialist",
+          missing_fields: ["lines"],
+          collected_data: {
+            ...(clientId ? { client_id: clientId } : {}),
+            ...(clientQuery ? { client_query: clientQuery } : {}),
+            ...(targetJobId ? { job_id: targetJobId } : {}),
+            vat_rate: vatRate,
+            ...(jobTitleHint ? { job_title_hint: jobTitleHint } : {}),
+          },
+          original_text: input?.text ?? "",
+          attempts: slotFillAttempt,
+        };
+        const openManualAction: QuickAction = clientId
+          ? {
+              id: "qa_open_quote_with_client",
+              label: `Abrir borrador para ${targetLabel}`.slice(0, 80),
+              action_type: "start_empty_quote",
+              payload: { target_ids: { client_id: clientId } },
+            }
+          : clientQuery
+            ? {
+                id: "qa_open_quote_with_client",
+                label: `Abrir borrador para ${targetLabel}`.slice(0, 80),
+                action_type: "start_empty_quote",
+                payload: { text: clientQuery },
+              }
+            : {
+                id: "qa_open_empty_quote",
+                label: "Abrir presupuesto vacío",
+                action_type: "start_empty_quote",
+                payload: {},
+              };
+        return {
+          routed_intent: "quote_specialist",
+          pending_slot_fill: pendingSlot,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: [openManualAction],
+          messages: [
+            new AIMessage(
+              `Vale, presupuesto para ${targetLabel}. ¿Qué trabajos o partidas incluyo? (Ejemplo: «1 plato de ducha y 2 puntos de luz a 45 euros»).`
+            ),
+          ],
+          turn_trace: {
+            append_node: "quote_specialist",
+            rag_hit_count: Math.min(snippets.length, 5),
+          },
+        };
+      }
+
       const defaultTitle = existingJob
         ? existingJob.title
-        : clientRow
-          ? `Presupuesto trabajos ${clientRow.name}`
-          : clientQuery
-            ? `Trabajos para ${clientQuery}`
-            : "Nuevo presupuesto de obra";
+        : jobTitleHint
+          ? jobTitleHint
+          : clientRow
+            ? `Presupuesto trabajos ${clientRow.name}`
+            : clientQuery
+              ? `Trabajos para ${clientQuery}`
+              : "Nuevo presupuesto de obra";
 
       const draft: Gate1QuoteDraftPayload = {
         quote_id: null,
@@ -454,15 +598,20 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
         widget.ui_widget_type === "QuoteBuilderWidget"
           ? formatCentsEs(widget.widget_payload.total_cents)
           : "0,00 €";
+      const missingClientNote =
+        !clientRow && !clientQuery
+          ? " Solo falta seleccionar o crear el cliente antes de confirmar."
+          : "";
 
       return {
         routed_intent: "quote_specialist",
+        pending_slot_fill: null,
         rag_snippets: snippets.slice(0, 5),
         active_widget: widget,
         pending_gate: "gate_1_quote",
         messages: [
           new AIMessage(
-            `He preparado el borrador de presupuesto${clientRow ? ` para ${clientRow.name}` : ""} (${draftLines.length} líneas, IVA ${vatRate} %, total ${totalFormatted}). Revisa los precios y confirma para generar el PDF.`
+            `He preparado el borrador de presupuesto${clientRow ? ` para ${clientRow.name}` : ""} (${draftLines.length} líneas, IVA ${vatRate} %, total ${totalFormatted}). Revisa los precios y confirma para generar el PDF.${missingClientNote}`
           ),
         ],
         turn_trace: {

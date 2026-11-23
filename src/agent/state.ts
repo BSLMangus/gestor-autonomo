@@ -5,6 +5,7 @@ import type {
   InputPayload,
   PendingDisambiguation,
   PendingGate,
+  PendingSlotFill,
   QuickAction,
   RagSnippet,
   SpecialistRoute,
@@ -62,6 +63,10 @@ export const ObraLocalAnnotation = Annotation.Root({
     default: () => null,
   }),
   pending_disambiguation: Annotation<PendingDisambiguation | null>({
+    reducer: (_p, n) => n,
+    default: () => null,
+  }),
+  pending_slot_fill: Annotation<PendingSlotFill | null>({
     reducer: (_p, n) => n,
     default: () => null,
   }),

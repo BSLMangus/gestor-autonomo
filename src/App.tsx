@@ -608,11 +608,15 @@ export function App({ runtime }: { runtime: AppRuntime }) {
   const handleGlobalVoiceSubmit = async (text: string) => {
     setVoiceOverlayOpen(false);
     const cleanTitle = text.trim().slice(0, 48) || "Nota de voz";
+    const canContinueCurrentChat =
+      route.name === "chat" &&
+      Boolean(activeThreadIdRef.current) &&
+      activeThread?.status !== "interrupted";
     await runTurnAndOpenOverlay({
       text,
       action_type: "free_text_or_voice",
       media_kind: "voice_transcript",
-      forceNewThread: true,
+      forceNewThread: !canContinueCurrentChat,
       threadTitleIfNew: cleanTitle,
       navigateToChatIfNoWidget: true,
     });

@@ -731,7 +731,7 @@ export function OnboardingWizard({
                       Tu tarifario ({activeCatalogCount} partidas activas)
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
-                      Sube presupuestos/tarifas antiguos (PDF, imagen, CSV) o activa partidas habituales.
+                      Sube presupuestos o tarifas anteriores, o activa partidas habituales.
                     </p>
                   </div>
                 </div>
@@ -742,7 +742,7 @@ export function OnboardingWizard({
                 <span>
                   {importingDocs
                     ? "Analizando documentos offline..."
-                    : "Importar tarifario o presupuesto previo (PDF/CSV/Img)"}
+                    : "Importar tarifario o presupuesto anterior"}
                 </span>
                 <input
                   type="file"
@@ -822,13 +822,13 @@ export function OnboardingWizard({
               <div className="flex items-center gap-2">
                 <Upload className="h-4 w-4 text-on-primary-container" />
                 <h2 className="text-[14px] font-semibold text-on-surface">
-                  ¿Ya tienes una copia de seguridad (.json)?
+                  ¿Quieres recuperar una copia anterior?
                 </h2>
               </div>
               <input
                 type="password"
                 data-testid="onboarding-backup-password"
-                placeholder="Contraseña de la copia (si la cifraste)"
+                placeholder="Contraseña de la copia, si tiene"
                 value={backupPassword}
                 onChange={(e) => setBackupPassword(e.target.value)}
                 className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-xs"

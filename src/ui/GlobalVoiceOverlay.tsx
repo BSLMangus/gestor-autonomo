@@ -18,8 +18,8 @@ interface GlobalVoiceOverlayProps {
 }
 
 const VOICE_EXAMPLES = [
+  "¿Qué puedo hacer con la app?",
   "Planifica una obra del 22 al 30 de este mes",
-  "Hoy terminé 2 horas antes en la obra porque estaba todo listo",
   "Presupuesto para reforma de baño: 1 plato de ducha",
 ];
 

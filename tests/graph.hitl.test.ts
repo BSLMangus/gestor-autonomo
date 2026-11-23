@@ -290,11 +290,11 @@ describe("LangGraph StateGraph + CapacitorSqliteSaver + 4 HITL Gates (:memory:)"
     expect(qaRes.assistant_message?.content).toContain("223,85");
     expect(qaRes.assistant_message?.content).toContain("OBR-2026-003");
 
-    // 2. Desambiguación "Presupuesto para García" -> "Javier" -> Gate 1
+    // 2. Desambiguación "Presupuesto para García: 1 termo eléctrico 80L" -> "Javier" -> Gate 1
     const thrDisamb = await runner.createThread({ title: "Desambiguación" });
     const d1 = await runner.runTurn(thrDisamb.thread_id, {
       client_turn_id: "t_dis_1",
-      text: "Presupuesto para García",
+      text: "Presupuesto para García: 1 termo eléctrico 80L",
       action_type: "free_text_or_voice",
     });
     expect(d1.checkpoint_status).toBe("idle");

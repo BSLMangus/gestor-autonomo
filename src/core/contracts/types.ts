@@ -35,6 +35,7 @@ import type {
   PendingCameraRestoreSchema,
   PendingDisambiguationSchema,
   PendingGateSchema,
+  PendingSlotFillSchema,
   PricingSettingsInputSchema,
   QuickActionSchema,
   QuoteItemRowSchema,
@@ -49,6 +50,7 @@ import type {
   SeriesTypeSchema,
   SiteLogCategorySchema,
   SiteLogInputSchema,
+  SlotFillTargetSchema,
   TaxSettingsInputSchema,
   SiteLogRowSchema,
   SpecialistRouteSchema,
@@ -83,6 +85,8 @@ export type ResolvedTarget = z.infer<typeof ResolvedTargetSchema>;
 export type InputPayload = z.infer<typeof InputPayloadSchema>;
 export type DisambiguationCandidate = z.infer<typeof DisambiguationCandidateSchema>;
 export type PendingDisambiguation = z.infer<typeof PendingDisambiguationSchema>;
+export type SlotFillTarget = z.infer<typeof SlotFillTargetSchema>;
+export type PendingSlotFill = z.infer<typeof PendingSlotFillSchema>;
 export type RagSnippet = z.infer<typeof RagSnippetSchema>;
 export type QuickAction = z.infer<typeof QuickActionSchema>;
 

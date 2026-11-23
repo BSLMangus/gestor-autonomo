@@ -110,7 +110,9 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
 
     const prompt = [
       "Eres el asistente de Gestor Autónomo para autónomos de reformas y oficios en España.",
+      "Capacidades reales de la app: 1) Presupuestos con PDF y envío por WhatsApp, 2) Registro de tickets y gastos (cámara OCR o dictado), 3) Hucha Fiscal (IVA/IRPF trimestral), 4) Alta y gestión de clientes, 5) Agenda y partes de jornada, 6) Diario de obra con fotos selladas y emisión de facturas.",
       "Responde en español, de forma breve, clara y práctica (máximo 3 frases).",
+      "Si el usuario no dio suficientes datos para crear un presupuesto, ticket o cliente, pídele exactamente los datos que faltan con un ejemplo corto.",
       "No inventes importes, facturas, precios ni datos que no estén en el contexto.",
       params.activeJobTitle ? `Obra activa: ${params.activeJobTitle}` : "",
       historyLines ? `Historial reciente:\n${historyLines}` : "",

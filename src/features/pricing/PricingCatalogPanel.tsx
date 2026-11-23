@@ -602,7 +602,7 @@ export function PricingCatalogPanel({
               Importador IA de Tarifas y Presupuestos Previos
             </h3>
             <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
-              Sube PDFs antiguos, facturas, listados de precios (CSV/TXT) o imágenes. El motor offline extraerá partidas, precios, tarifa/hora e IVA para revisarlos antes de guardar.
+              Sube presupuestos antiguos, facturas, listados de precios o imágenes. El motor offline extraerá partidas, precios, tarifa/hora e IVA para revisarlos antes de guardar.
             </p>
           </div>
         </div>
@@ -612,7 +612,7 @@ export function PricingCatalogPanel({
           <span>
             {importingDocs
               ? "Analizando documentos offline..."
-              : "Seleccionar PDF, imagen o CSV/TXT"}
+              : "Importar tarifario o presupuesto anterior"}
           </span>
           <input
             type="file"

@@ -2,6 +2,8 @@ import { AIMessage } from "@langchain/core/messages";
 import type {
   ActiveWidgetEnvelope,
   PendingDisambiguation,
+  PendingSlotFill,
+  QuickAction,
   RagSnippet,
   ResolvedTarget,
 } from "../../core/contracts/types";
@@ -15,10 +17,57 @@ import { validateSpanishTaxId } from "../../core/fiscal/taxIdValidator";
 import {
   extractClientFieldsFromText,
   normalizeSpanishText,
+  type ConversationalKind,
+  type HelpTopic,
   type ParsedClientFields,
 } from "../inference/deterministicSpanishParser";
 import type { GraphDependencies } from "../ports";
 import type { ObraLocalGraphState, ObraLocalGraphUpdate } from "../state";
+
+function buildHelpReply(topic: HelpTopic | undefined): string {
+  switch (topic) {
+    case "quote":
+      return [
+        "Para crear un presupuesto dime el cliente y las partidas o trabajos (y el IVA si quieres cambiarlo).",
+        'Por ejemplo: «Presupuesto para Marta Ruiz: 1 plato de ducha y 10 m² de alicatado, IVA 10 %».',
+        "Si te falta algún dato te lo iré pidiendo paso a paso o podrás abrir el borrador para completarlo a mano.",
+      ].join("\n");
+    case "ticket":
+      return [
+        "Para registrar un gasto puedes hacer una foto al ticket con la cámara o dictármelo por voz.",
+        'Por ejemplo: «Apunta un gasto en Obramat de 85,50 euros».',
+      ].join("\n");
+    case "fiscal":
+      return [
+        "Con la Hucha Fiscal controlas tu IVA repercutido/soportado, la reserva de IRPF y el dinero disponible real.",
+        'Puedes decirme: «Enséñame la hucha fiscal» o «Hucha fiscal del 2026-T4».',
+      ].join("\n");
+    case "client":
+      return [
+        "Para dar de alta un cliente dime al menos su nombre, y si quieres su teléfono, NIF o dirección.",
+        'Por ejemplo: «Nuevo cliente Laura Méndez, teléfono 611223344».',
+      ].join("\n");
+    case "schedule":
+      return [
+        "Puedes planificar obras en el calendario y registrar partes diarios de horas.",
+        'Por ejemplo: «Planifica la obra de Marta del 22 al 30» o «Hoy terminé 2 horas antes porque estaba todo listo».',
+      ].join("\n");
+    case "sitelog":
+      return [
+        "En el diario de obra guardas notas de avance y fotos selladas con fecha, cliente y código de obra.",
+        'Por ejemplo: «Añade al diario de obra: fontanería empotrada terminada».',
+      ].join("\n");
+    default:
+      return [
+        "Soy tu asistente de Gestor Autónomo (100 % local y sin cobertura). Puedo ayudarte con:",
+        "• Presupuestos en PDF: dime cliente y trabajos («Presupuesto para Marta Ruiz: 1 plato de ducha»).",
+        "• Gastos y tickets: escanea un ticket o díctalo («Gasto en Obramat de 85 euros»).",
+        "• Hucha Fiscal y facturas: revisa IVA/IRPF, emite anticipos/facturas o consulta cobros pendientes.",
+        "• Clientes, agenda y diario de obra: da de alta clientes, planifica días o guarda notas y fotos.",
+        "Si dictas algo y faltan datos, te diré exactamente qué necesito para completarlo.",
+      ].join("\n");
+  }
+}
 
 export function createAssistantQaNode(deps: GraphDependencies) {
   const jobsRepo = new JobsRepository(deps.executor);
@@ -62,8 +111,105 @@ export function createAssistantQaNode(deps: GraphDependencies) {
       const norm = normalizeSpanishText(inputText);
       const resolvedTarget = (entities.resolved_target ?? {}) as ResolvedTarget;
       const snippets: RagSnippet[] = [];
+      const slotFillAttempt = Number(entities.slot_fill_attempt ?? 0);
 
-      // 0. Alta conversacional de cliente -> abre ClientProfileWidget editable
+      // 0a. Respuestas conversacionales (ayuda sobre la app, saludos, agradecimientos)
+      const conversationalKind = entities.conversational_kind as ConversationalKind | undefined;
+      if (conversationalKind === "capabilities_help") {
+        const helpTopic = entities.help_topic as HelpTopic | undefined;
+        return {
+          routed_intent: "assistant_qa_node",
+          pending_slot_fill: null,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: null,
+          messages: [new AIMessage(buildHelpReply(helpTopic))],
+          turn_trace: { append_node: "assistant_qa_node" },
+        };
+      }
+
+      if (conversationalKind === "greeting") {
+        let replyText =
+          "¡Hola! Soy tu asistente de Gestor Autónomo. ¿En qué te ayudo hoy? Puedes pedirme un presupuesto, registrar un gasto, dar de alta un cliente o preguntarme qué puedo hacer.";
+        let engineUsed: "deterministic_rule_engine" | "mediapipe_local_llm" =
+          "deterministic_rule_engine";
+        if (deps.inference.generateConversationalReply) {
+          const recentMessages = state.messages
+            .slice(-4)
+            .map((m) => ({
+              role: (m._getType() === "human" ? "user" : "assistant") as "user" | "assistant",
+              content: typeof m.content === "string" ? m.content : "",
+            }))
+            .filter((m) => m.content.trim().length > 0);
+          const llmReply = await deps.inference.generateConversationalReply({
+            text: inputText,
+            recentMessages,
+          });
+          if (llmReply?.reply) {
+            replyText = llmReply.reply;
+            engineUsed = "mediapipe_local_llm";
+          }
+        }
+        return {
+          routed_intent: "assistant_qa_node",
+          pending_slot_fill: null,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: null,
+          messages: [new AIMessage(replyText)],
+          turn_trace: {
+            append_node: "assistant_qa_node",
+            inference_engine: engineUsed,
+          },
+        };
+      }
+
+      if (conversationalKind === "gratitude") {
+        return {
+          routed_intent: "assistant_qa_node",
+          pending_slot_fill: null,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: null,
+          messages: [
+            new AIMessage(
+              "¡De nada! Cuando necesites otro presupuesto, gasto, factura o consulta, dímelo por voz o texto."
+            ),
+          ],
+          turn_trace: { append_node: "assistant_qa_node" },
+        };
+      }
+
+      if (entities.open_empty_client || state.input_payload?.action_type === "start_empty_client") {
+        const emptyClientWidget: ActiveWidgetEnvelope = {
+          ui_widget_type: "ClientProfileWidget",
+          widget_payload: {
+            client_id: null,
+            name: "",
+            phone: "",
+            nif: "",
+            fiscal_address: "",
+            email: "",
+            notes: "",
+            validation_hint: "Completa el nombre completo del cliente antes de confirmar.",
+          },
+        };
+        return {
+          routed_intent: "assistant_qa_node",
+          pending_slot_fill: null,
+          active_widget: emptyClientWidget,
+          pending_gate: null,
+          quick_actions: null,
+          messages: [
+            new AIMessage(
+              "Ficha de cliente lista. Introduce el nombre y los datos de contacto que tengas."
+            ),
+          ],
+          turn_trace: { append_node: "assistant_qa_node" },
+        };
+      }
+
+      // 0b. Alta conversacional de cliente -> si falta el nombre, pedirlo antes de abrir ficha vacía
       const clientDraftFromEntities =
         (entities.new_client_draft as ParsedClientFields | undefined) ??
         (typeof entities.client_onboarding_input === "string"
@@ -71,6 +217,41 @@ export function createAssistantQaNode(deps: GraphDependencies) {
           : undefined);
 
       if (clientDraftFromEntities) {
+        if (!clientDraftFromEntities.name && slotFillAttempt < 2) {
+          const hasPartialContact = Boolean(
+            clientDraftFromEntities.phone ||
+              clientDraftFromEntities.nif ||
+              clientDraftFromEntities.fiscal_address
+          );
+          const nextPendingSlot: PendingSlotFill = {
+            target_intent: "client_onboarding",
+            missing_fields: ["name"],
+            collected_data: { client: clientDraftFromEntities },
+            original_text: inputText,
+            attempts: slotFillAttempt,
+          };
+          const quickActions: QuickAction[] = [
+            {
+              id: "qa_open_empty_client",
+              label: "Abrir ficha vacía",
+              action_type: "start_empty_client",
+              payload: {},
+            },
+          ];
+          const prompt = hasPartialContact
+            ? "He recogido los datos de contacto, pero me falta el nombre completo del cliente. ¿Cómo se llama?"
+            : "Para dar de alta un cliente me falta su nombre completo (y opcionalmente teléfono, NIF o dirección).\nEjemplo: «Laura Méndez, teléfono 611223344».";
+          return {
+            routed_intent: "assistant_qa_node",
+            pending_slot_fill: nextPendingSlot,
+            active_widget: null,
+            pending_gate: null,
+            quick_actions: quickActions,
+            messages: [new AIMessage(prompt)],
+            turn_trace: { append_node: "assistant_qa_node" },
+          };
+        }
+
         const cleanedNif = (clientDraftFromEntities.nif ?? "").trim().toUpperCase();
         const hasInvalidNif = cleanedNif.length > 0 && !validateSpanishTaxId(cleanedNif);
         let validationHint: string | null = null;
@@ -96,6 +277,7 @@ export function createAssistantQaNode(deps: GraphDependencies) {
 
         return {
           routed_intent: "assistant_qa_node",
+          pending_slot_fill: null,
           active_widget: clientWidget,
           pending_gate: null,
           quick_actions: null,

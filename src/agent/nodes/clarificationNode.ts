@@ -35,20 +35,39 @@ export function createClarificationNode(deps?: GraphDependencies) {
       }
     }
 
-    const quickActions: QuickAction[] = (pending?.candidates ?? []).map((cand, idx) => ({
-      id: `qa_disamb_${idx}_${cand.id}`,
-      label: cand.label.slice(0, 80),
-      action_type: "resolve_disambiguation",
-      payload: {
-        ...(cand.action_choice ? { disambiguation_choice: cand.action_choice } : {}),
-        target_ids: {
-          ...(cand.job_id ? { job_id: cand.job_id } : {}),
-          ...(cand.client_id ? { client_id: cand.client_id } : {}),
-          ...(cand.quote_id ? { quote_id: cand.quote_id } : {}),
-          ...(cand.catalog_item_id ? { catalog_item_id: cand.catalog_item_id } : {}),
+    const isGenericFallback = Boolean(pending && pending.original_intent === null && !pending.raw_media_uri);
+    const quickActions: QuickAction[] = (pending?.candidates ?? []).map((cand, idx) => {
+      if (isGenericFallback && cand.id === "act_open_quote") {
+        return {
+          id: `qa_disamb_${idx}_${cand.id}`,
+          label: cand.label.slice(0, 80),
+          action_type: "start_empty_quote",
+          payload: {},
+        };
+      }
+      if (isGenericFallback && cand.id === "act_open_ticket") {
+        return {
+          id: `qa_disamb_${idx}_${cand.id}`,
+          label: cand.label.slice(0, 80),
+          action_type: "manual_ticket_entry",
+          payload: {},
+        };
+      }
+      return {
+        id: `qa_disamb_${idx}_${cand.id}`,
+        label: cand.label.slice(0, 80),
+        action_type: "resolve_disambiguation",
+        payload: {
+          ...(cand.action_choice ? { disambiguation_choice: cand.action_choice } : {}),
+          target_ids: {
+            ...(cand.job_id ? { job_id: cand.job_id } : {}),
+            ...(cand.client_id ? { client_id: cand.client_id } : {}),
+            ...(cand.quote_id ? { quote_id: cand.quote_id } : {}),
+            ...(cand.catalog_item_id ? { catalog_item_id: cand.catalog_item_id } : {}),
+          },
         },
-      },
-    }));
+      };
+    });
 
     return {
       routed_intent: "clarification_node",

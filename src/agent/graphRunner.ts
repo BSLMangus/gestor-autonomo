@@ -35,6 +35,8 @@ function describeUserTurn(input: InputPayload): string {
       return "[Nuevo presupuesto vacío]";
     case "start_job_quote":
       return "[Presupuesto de obra]";
+    case "start_empty_client":
+      return "[Nueva ficha de cliente]";
     case "request_advance_gate":
       return "[Solicitar anticipo 40 %]";
     case "request_invoice_gate":

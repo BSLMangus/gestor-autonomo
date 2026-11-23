@@ -4,6 +4,7 @@ import type {
   DisambiguationCandidate,
   InputPayload,
   PendingDisambiguation,
+  PendingSlotFill,
   ResolvedTarget,
   SpecialistRoute,
 } from "../../core/contracts/types";
@@ -13,8 +14,14 @@ import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import {
+  extractClientFieldsFromText,
+  extractSiteLogNoteFromText,
+  extractTicketFieldsFromText,
   isCancelUtterance,
   normalizeSpanishText,
+  parseQuoteLinesAndMeta,
+  parseQuoteSlotReply,
+  stripLeadingGreetingsAndFillers,
 } from "../inference/deterministicSpanishParser";
 import { getSeedOverride, type GraphDependencies } from "../ports";
 import type { ObraLocalGraphState, ObraLocalGraphUpdate } from "../state";
@@ -141,6 +148,7 @@ export function createIntentRouterNode(deps: GraphDependencies) {
     const baseReset = {
       active_job_id: activeJobId,
       active_quote_id: activeQuoteId,
+      pending_slot_fill: null as PendingSlotFill | null,
       rag_snippets: [],
       extracted_entities: null as Record<string, unknown> | null,
       active_widget: null,
@@ -248,12 +256,25 @@ export function createIntentRouterNode(deps: GraphDependencies) {
               ? "ocr_ticket_specialist"
               : "site_log_specialist";
         }
+        const reExtractedQuote =
+          nextRoute === "quote_specialist" && pending.original_text.trim().length > 0
+            ? parseQuoteLinesAndMeta(pending.original_text)
+            : null;
         return {
           ...baseReset,
           input_payload: restoredInput,
           pending_disambiguation: null,
           routed_intent: nextRoute,
-          extracted_entities: { resolved_target: resolvedTarget },
+          extracted_entities: {
+            resolved_target: resolvedTarget,
+            ...(reExtractedQuote
+              ? {
+                  job_title_hint: reExtractedQuote.job_title_hint,
+                  vat_rate: reExtractedQuote.vat_rate,
+                  quote_lines: reExtractedQuote.lines,
+                }
+              : {}),
+          },
           turn_trace: makeTrace(),
         };
       } else {
@@ -284,12 +305,25 @@ export function createIntentRouterNode(deps: GraphDependencies) {
                 ? "ocr_ticket_specialist"
                 : "site_log_specialist";
           }
+          const reExtractedQuote =
+            nextRoute === "quote_specialist" && pending.original_text.trim().length > 0
+              ? parseQuoteLinesAndMeta(pending.original_text)
+              : null;
           return {
             ...baseReset,
             input_payload: restoredInput,
             pending_disambiguation: null,
             routed_intent: nextRoute,
-            extracted_entities: { resolved_target: resolvedTarget },
+            extracted_entities: {
+              resolved_target: resolvedTarget,
+              ...(reExtractedQuote
+                ? {
+                    job_title_hint: reExtractedQuote.job_title_hint,
+                    vat_rate: reExtractedQuote.vat_rate,
+                    quote_lines: reExtractedQuote.lines,
+                  }
+                : {}),
+            },
             turn_trace: makeTrace(),
           };
         }
@@ -337,6 +371,219 @@ export function createIntentRouterNode(deps: GraphDependencies) {
           },
           turn_trace: makeTrace(),
         };
+      }
+    }
+
+    // --- PRIORIDAD 1b: Completado guiado de datos faltantes (slot-filling) ---
+    let pendingSlotFill: PendingSlotFill | null = state.pending_slot_fill;
+    if (pendingSlotFill !== null) {
+      if (input.action_type !== "free_text_or_voice") {
+        pendingSlotFill = null;
+      } else if (input.raw_media_uri != null) {
+        if (pendingSlotFill.target_intent === "ocr_ticket_specialist") {
+          const prevJobId =
+            typeof pendingSlotFill.collected_data.job_id === "string"
+              ? pendingSlotFill.collected_data.job_id
+              : undefined;
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "ocr_ticket_specialist",
+            extracted_entities: prevJobId ? { resolved_target: { job_id: prevJobId } } : {},
+            turn_trace: makeTrace(),
+          };
+        }
+        if (pendingSlotFill.target_intent === "site_log_specialist") {
+          const prevJobId =
+            typeof pendingSlotFill.collected_data.job_id === "string"
+              ? pendingSlotFill.collected_data.job_id
+              : undefined;
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "site_log_specialist",
+            extracted_entities: {
+              ...(prevJobId ? { resolved_target: { job_id: prevJobId } } : {}),
+              site_log_category: pendingSlotFill.collected_data.category ?? "nota",
+              note_text: extractSiteLogNoteFromText(input.text),
+            },
+            turn_trace: makeTrace(),
+          };
+        }
+        pendingSlotFill = null;
+      } else if (isCancelUtterance(input.text)) {
+        return {
+          ...baseReset,
+          pending_disambiguation: null,
+          pending_slot_fill: null,
+          routed_intent: "assistant_qa_node",
+          extracted_entities: { cancelled_disambiguation: true },
+          turn_trace: makeTrace(),
+        };
+      } else {
+        const topicCheck = await deps.inference.classifyAndExtract({
+          text: input.text,
+          activeJobId,
+          activeQuoteId,
+          pendingDisambiguation: null,
+          catalogCandidates: [],
+        });
+
+        const isCapabilitiesOrGratitude =
+          topicCheck.entities.conversational_kind === "capabilities_help" ||
+          topicCheck.entities.conversational_kind === "gratitude";
+        const isUnrelatedQa =
+          topicCheck.intent === "assistant_qa_node" &&
+          pendingSlotFill.target_intent !== "client_onboarding" &&
+          topicCheck.entities.conversational_kind !== "greeting" &&
+          topicCheck.confidence >= 0.85;
+        const isDistinctSpecialist =
+          topicCheck.intent !== "clarification_node" &&
+          topicCheck.intent !== "assistant_qa_node" &&
+          topicCheck.intent !== pendingSlotFill.target_intent &&
+          topicCheck.confidence >= 0.85;
+
+        if (isCapabilitiesOrGratitude || isUnrelatedQa || isDistinctSpecialist) {
+          if (
+            topicCheck.intent === "clarification_node" &&
+            topicCheck.entities.conversational_kind === "gratitude"
+          ) {
+            return {
+              ...baseReset,
+              pending_disambiguation: null,
+              pending_slot_fill: null,
+              routed_intent: "assistant_qa_node",
+              extracted_entities: topicCheck.entities,
+              turn_trace: makeTrace(topicCheck.engine_used),
+            };
+          }
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: topicCheck.intent,
+            extracted_entities: topicCheck.entities,
+            turn_trace: makeTrace(topicCheck.engine_used),
+          };
+        }
+
+        const nextAttempt = pendingSlotFill.attempts + 1;
+        const collected = pendingSlotFill.collected_data ?? {};
+
+        if (pendingSlotFill.target_intent === "quote_specialist") {
+          const merged = parseQuoteSlotReply(input.text, pendingSlotFill.missing_fields, collected);
+          const prevClientId =
+            typeof collected.client_id === "string" ? collected.client_id : undefined;
+          const prevJobId = typeof collected.job_id === "string" ? collected.job_id : undefined;
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "quote_specialist",
+            extracted_entities: {
+              client_query: merged.client_query,
+              job_title_hint: merged.job_title_hint,
+              vat_rate: merged.vat_rate,
+              quote_lines: merged.quote_lines,
+              slot_fill_attempt: nextAttempt,
+              ...(prevClientId || prevJobId
+                ? {
+                    resolved_target: {
+                      ...(prevClientId ? { client_id: prevClientId } : {}),
+                      ...(prevJobId ? { job_id: prevJobId } : {}),
+                    },
+                  }
+                : {}),
+            },
+            turn_trace: makeTrace(),
+          };
+        }
+
+        if (pendingSlotFill.target_intent === "ocr_ticket_specialist") {
+          const fresh = extractTicketFieldsFromText(input.text);
+          const prevTicket = (collected.ticket ?? {}) as Record<string, unknown>;
+          const mergedTicket = {
+            ...fresh,
+            supplier_name:
+              fresh.supplier_name ??
+              (typeof prevTicket.supplier_name === "string" ? prevTicket.supplier_name : null),
+            supplier_nif:
+              fresh.supplier_nif ??
+              (typeof prevTicket.supplier_nif === "string" ? prevTicket.supplier_nif : null),
+            base_cents:
+              fresh.base_cents ??
+              (typeof prevTicket.base_cents === "number" ? prevTicket.base_cents : null),
+            vat_cents:
+              fresh.vat_cents ??
+              (typeof prevTicket.vat_cents === "number" ? prevTicket.vat_cents : null),
+            total_cents:
+              fresh.total_cents ??
+              (typeof prevTicket.total_cents === "number" ? prevTicket.total_cents : null),
+            vat_rate: fresh.vat_rate ?? prevTicket.vat_rate,
+          };
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "ocr_ticket_specialist",
+            extracted_entities: {
+              ticket: mergedTicket,
+              slot_fill_attempt: nextAttempt,
+            },
+            turn_trace: makeTrace(),
+          };
+        }
+
+        if (pendingSlotFill.target_intent === "client_onboarding") {
+          const freshClient = extractClientFieldsFromText(input.text);
+          const prevClient = (collected.client ?? {}) as Record<string, unknown>;
+          const mergedClient = {
+            name:
+              freshClient.name ??
+              (typeof prevClient.name === "string" ? prevClient.name : null),
+            phone:
+              freshClient.phone ??
+              (typeof prevClient.phone === "string" ? prevClient.phone : null),
+            nif:
+              freshClient.nif ??
+              (typeof prevClient.nif === "string" ? prevClient.nif : null),
+            fiscal_address:
+              freshClient.fiscal_address ??
+              (typeof prevClient.fiscal_address === "string" ? prevClient.fiscal_address : null),
+          };
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "assistant_qa_node",
+            extracted_entities: {
+              new_client_draft: mergedClient,
+              slot_fill_attempt: nextAttempt,
+            },
+            turn_trace: makeTrace(),
+          };
+        }
+
+        if (pendingSlotFill.target_intent === "site_log_specialist") {
+          const cleanedNote =
+            extractSiteLogNoteFromText(input.text) || stripLeadingGreetingsAndFillers(input.text);
+          const prevJobId = typeof collected.job_id === "string" ? collected.job_id : undefined;
+          return {
+            ...baseReset,
+            pending_disambiguation: null,
+            pending_slot_fill: null,
+            routed_intent: "site_log_specialist",
+            extracted_entities: {
+              ...(prevJobId ? { resolved_target: { job_id: prevJobId } } : {}),
+              site_log_category: collected.category ?? "nota",
+              note_text: cleanedNote,
+              slot_fill_attempt: nextAttempt,
+            },
+            turn_trace: makeTrace(),
+          };
+        }
       }
     }
 
@@ -409,6 +656,15 @@ export function createIntentRouterNode(deps: GraphDependencies) {
           ...baseReset,
           pending_disambiguation: null,
           routed_intent: "quote_specialist",
+          turn_trace: makeTrace(),
+        };
+      }
+      if (input.action_type === "start_empty_client") {
+        return {
+          ...baseReset,
+          pending_disambiguation: null,
+          routed_intent: "assistant_qa_node",
+          extracted_entities: { open_empty_client: true },
           turn_trace: makeTrace(),
         };
       }
@@ -496,12 +752,26 @@ export function createIntentRouterNode(deps: GraphDependencies) {
       catalogCandidates: [],
     });
 
+    if (
+      inferred.intent === "clarification_node" &&
+      (inferred.entities.conversational_kind === "greeting" ||
+        inferred.entities.conversational_kind === "gratitude")
+    ) {
+      return {
+        ...baseReset,
+        pending_disambiguation: null,
+        routed_intent: "assistant_qa_node",
+        extracted_entities: inferred.entities,
+        turn_trace: makeTrace(inferred.engine_used),
+      };
+    }
+
     if (inferred.intent === "clarification_node") {
       const clarifPending: PendingDisambiguation = {
         original_intent: null,
         original_text: input.text,
         prompt:
-          "No he podido identificar con seguridad la acción. Elige qué quieres hacer o indícalo con más detalle:",
+          "No he terminado de entender qué necesitas. Puedes pedirme un presupuesto, apuntar un gasto, consultar tu hucha fiscal o preguntarme qué puedo hacer.",
         candidates: [
           {
             entity_type: "intent_action",

@@ -49,6 +49,7 @@ export const ActionTypeSchema = z.enum([
   "manual_ticket_entry",
   "start_empty_quote",
   "start_job_quote",
+  "start_empty_client",
   "request_invoice_gate",
   "request_advance_gate",
   "request_share_gate",
@@ -225,6 +226,21 @@ export const PendingDisambiguationSchema = z.object({
   preserved_target: ResolvedTargetSchema.optional(),
   prompt: z.string().min(1).max(400),
   candidates: z.array(DisambiguationCandidateSchema).min(0).max(5),
+  attempts: z.number().int().min(0).max(2).default(0),
+});
+
+export const SlotFillTargetSchema = z.enum([
+  "quote_specialist",
+  "ocr_ticket_specialist",
+  "client_onboarding",
+  "site_log_specialist",
+]);
+
+export const PendingSlotFillSchema = z.object({
+  target_intent: SlotFillTargetSchema,
+  missing_fields: z.array(z.string().min(1)).min(1),
+  collected_data: z.record(z.string(), z.unknown()).default({}),
+  original_text: z.string().max(4000),
   attempts: z.number().int().min(0).max(2).default(0),
 });
 

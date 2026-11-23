@@ -4,11 +4,16 @@ import type {
   ActiveWidgetEnvelope,
   ErrorCode,
   Gate2TicketDraftPayload,
+  PendingSlotFill,
+  QuickAction,
 } from "../../core/contracts/types";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { deriveFiscalQuarter, getLocalTodayIso, isValidIsoDate } from "../../core/fiscal/dateQuarter";
 import { computeInverseVat21, formatCentsEs } from "../../core/fiscal/fiscalEngine";
-import { extractTicketFieldsFromText } from "../inference/deterministicSpanishParser";
+import {
+  extractTicketFieldsFromText,
+  type ParsedTicketFields,
+} from "../inference/deterministicSpanishParser";
 import { getSeedOverride, type GraphDependencies } from "../ports";
 import type { ObraLocalGraphState, ObraLocalGraphUpdate } from "../state";
 
@@ -176,7 +181,61 @@ export function createOcrTicketSpecialistNode(deps: GraphDependencies) {
           : "OCR_ENGINE_ERROR";
       }
     } else if (input?.text && input.text.trim().length > 0) {
-      const parsed = extractTicketFieldsFromText(input.text);
+      const preParsed = state.extracted_entities?.ticket as ParsedTicketFields | undefined;
+      const parsed = preParsed ?? extractTicketFieldsFromText(input.text);
+      const slotFillAttempt = Number(state.extracted_entities?.slot_fill_attempt ?? 0);
+      const hasSupplier = Boolean(parsed.supplier_name);
+      const hasAmount = Boolean(
+        (parsed.total_cents ?? 0) > 0 ||
+          ((parsed.base_cents ?? 0) > 0 && (parsed.vat_cents ?? 0) >= 0)
+      );
+
+      if (input.action_type === "free_text_or_voice" && (!hasSupplier || !hasAmount) && slotFillAttempt < 2) {
+        const missingFields: string[] = [];
+        if (!hasSupplier) missingFields.push("supplier");
+        if (!hasAmount) missingFields.push("amount");
+
+        const pendingSlot: PendingSlotFill = {
+          target_intent: "ocr_ticket_specialist",
+          missing_fields: missingFields,
+          collected_data: {
+            ticket: parsed,
+            ...(job?.id ? { job_id: job.id } : {}),
+          },
+          original_text: input.text,
+          attempts: slotFillAttempt,
+        };
+        const quickActions: QuickAction[] = [
+          {
+            id: "qa_open_manual_ticket",
+            label: "Abrir formulario manual",
+            action_type: "manual_ticket_entry",
+            payload: {},
+          },
+        ];
+
+        let prompt: string;
+        if (!hasSupplier && !hasAmount) {
+          prompt =
+            "Para registrar el gasto me faltan el proveedor y el importe total (o puedes hacer una foto al ticket).\nEjemplo: «Obramat, 85,50 euros».";
+        } else if (!hasAmount) {
+          prompt = `Vale, gasto en ${parsed.supplier_name}. ¿Cuál es el importe total del ticket?`;
+        } else {
+          const amountLabel = formatCentsEs(parsed.total_cents ?? (parsed.base_cents ?? 0) + (parsed.vat_cents ?? 0));
+          prompt = `Vale, gasto de ${amountLabel}. ¿De qué proveedor o tienda es el ticket?`;
+        }
+
+        return {
+          routed_intent: "ocr_ticket_specialist",
+          pending_slot_fill: pendingSlot,
+          active_widget: null,
+          pending_gate: null,
+          quick_actions: quickActions,
+          messages: [new AIMessage(prompt)],
+          turn_trace: { append_node: "ocr_ticket_specialist" },
+        };
+      }
+
       supplierName = parsed.supplier_name ?? "Proveedor sin identificar";
       supplierNif = parsed.supplier_nif ?? "";
       issueDateIso = parsed.issue_date_iso;
@@ -225,6 +284,7 @@ export function createOcrTicketSpecialistNode(deps: GraphDependencies) {
 
     return {
       routed_intent: "ocr_ticket_specialist",
+      pending_slot_fill: null,
       active_widget: {
         ui_widget_type: "TicketOcrValidatorWidget",
         widget_payload: {

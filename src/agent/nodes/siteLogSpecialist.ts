@@ -1,6 +1,7 @@
 import { AIMessage } from "@langchain/core/messages";
 import type {
   ActiveWidgetEnvelope,
+  PendingSlotFill,
   ResolvedTarget,
   SiteLogCategory,
 } from "../../core/contracts/types";
@@ -46,6 +47,41 @@ export function createSiteLogSpecialistNode(deps: GraphDependencies) {
       const nextActiveJobId = job ? job.id : state.active_job_id;
       const nextActiveQuoteId =
         job && job.id !== state.active_job_id ? null : state.active_quote_id;
+      const slotFillAttempt = Number(state.extracted_entities?.slot_fill_attempt ?? 0);
+
+      if (
+        input?.action_type === "free_text_or_voice" &&
+        !input.raw_media_uri &&
+        noteText.trim().length === 0 &&
+        slotFillAttempt < 2
+      ) {
+        const pendingSlot: PendingSlotFill = {
+          target_intent: "site_log_specialist",
+          missing_fields: ["note_or_photo"],
+          collected_data: {
+            ...(job?.id ? { job_id: job.id } : {}),
+            category,
+          },
+          original_text: input.text,
+          attempts: slotFillAttempt,
+        };
+        return {
+          routed_intent: "site_log_specialist",
+          pending_slot_fill: pendingSlot,
+          active_job_id: nextActiveJobId,
+          active_quote_id: nextActiveQuoteId,
+          active_widget: null,
+          pending_gate: null,
+          messages: [
+            new AIMessage(
+              job
+                ? `Vale, ¿qué nota quieres añadir al diario de ${job.job_code} (${job.title})? También puedes enviar una fotografía con la cámara.`
+                : "Vale, dime qué nota quieres guardar en el diario de obra (o envía una foto con la cámara)."
+            ),
+          ],
+          turn_trace: { append_node: "site_log_specialist" },
+        };
+      }
 
       const widget: ActiveWidgetEnvelope = {
         ui_widget_type: "SiteLogStampWidget",
@@ -68,6 +104,7 @@ export function createSiteLogSpecialistNode(deps: GraphDependencies) {
 
       return {
         routed_intent: "site_log_specialist",
+        pending_slot_fill: null,
         active_job_id: nextActiveJobId,
         active_quote_id: nextActiveQuoteId,
         active_widget: widget,

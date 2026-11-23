@@ -76,13 +76,22 @@ export function ChatTimelineView({
           </p>
         </article>
       ) : (
-        messages.map((msg) => {
+        messages.map((msg, msgIdx) => {
           const isUser = msg.role === "user";
+          const isLatestMessage = msgIdx === messages.length - 1;
           const isThisActiveGate =
             activeGateId !== null && msg.id === lastMatchingWidgetMsgId;
-          const disambiguationActions = (msg.quick_actions_json ?? []).filter(
-            (qa) => qa.action_type === "resolve_disambiguation"
-          );
+          const contextualActions = (msg.quick_actions_json ?? []).filter((qa) => {
+            if (qa.action_type === "resolve_disambiguation") return true;
+            if (!isLatestMessage || isUser) return false;
+            return (
+              qa.action_type === "start_empty_quote" ||
+              qa.action_type === "manual_ticket_entry" ||
+              qa.action_type === "start_empty_client" ||
+              qa.action_type === "open_fiscal_piggybank" ||
+              qa.action_type === "open_schedule_log"
+            );
+          });
           const widgetMeta = msg.widget_json
             ? getOverlayMetaForWidget(msg.widget_json)
             : null;
@@ -130,10 +139,10 @@ export function ChatTimelineView({
                   </div>
                 )}
 
-                {/* Solo chips de desambiguación (nunca sugerencias genéricas persistentes) */}
-                {disambiguationActions.length > 0 && (
+                {/* Chips de desambiguación y acciones contextuales del último turno */}
+                {contextualActions.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {disambiguationActions.map((qa) => (
+                    {contextualActions.map((qa) => (
                       <button
                         key={qa.id}
                         type="button"

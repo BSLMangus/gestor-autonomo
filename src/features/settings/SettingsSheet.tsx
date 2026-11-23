@@ -289,7 +289,7 @@ export function SettingsSheet({
       setStatusMsg(
         envelope.encrypted
           ? "Copia cifrada AES-256-GCM exportada localmente."
-          : "Copia JSON exportada localmente."
+          : "Copia de seguridad exportada localmente."
       );
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
