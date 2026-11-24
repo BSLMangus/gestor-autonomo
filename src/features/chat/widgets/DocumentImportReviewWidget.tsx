@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { TEXT_LIMITS } from "../../../core/contracts/textLimits";
 import type {
   CatalogCategory,
   CatalogPricingMode,
@@ -13,6 +14,7 @@ import {
   formatPricingBreakdown,
 } from "../../../core/pricing/pricingEngine";
 import { commitImportedCatalogAndConfig } from "../../pricing/documentImportPipeline";
+import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 
 const CATEGORIES: CatalogCategory[] = [
   "Fontanería",
@@ -342,12 +344,15 @@ export function DocumentImportReviewWidget(props: {
                   />
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex gap-1.5 items-center">
-                      <input
-                        type="text"
+                      <ZoomableTextField
+                        as="input"
+                        multiline={false}
+                        maxLength={TEXT_LIMITS.DESCRIPTION}
+                        zoomLabel={`Descripción de la partida ${idx + 1}`}
                         aria-label={`Descripción extraída ${idx + 1}`}
                         disabled={busy}
                         value={item.description}
-                        onChange={(e) => updateItem(idx, { description: e.target.value })}
+                        onValueChange={(next) => updateItem(idx, { description: next })}
                         placeholder="Descripción de la partida *"
                         className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold"
                       />

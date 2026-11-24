@@ -156,6 +156,89 @@ export function splitSqlStatements(sql: string): string[] {
   return statements;
 }
 
+async function rebuildLegacyQuotesTable(
+  executor: SqliteExecutor,
+  quoteCols: Array<{ name: string; notnull: number }>
+): Promise<void> {
+  const hasValidity = quoteCols.some((c) => c.name === "validity_days");
+  const hasMethods = quoteCols.some((c) => c.name === "payment_methods_json");
+  const hasSchedule = quoteCols.some((c) => c.name === "payment_schedule_json");
+  const validityExpr = hasValidity ? "validity_days" : "NULL";
+  const methodsExpr = hasMethods ? "COALESCE(payment_methods_json, '[]')" : "'[]'";
+  const scheduleExpr = hasSchedule ? "COALESCE(payment_schedule_json, '[]')" : "'[]'";
+
+  await executor.run("PRAGMA foreign_keys = OFF;");
+  const fkState = await executor.query<{ foreign_keys: number }>("PRAGMA foreign_keys;");
+  if (fkState[0] && Number(fkState[0].foreign_keys) !== 0) {
+    await executor.run("PRAGMA foreign_keys = ON;");
+    throw new Error("SQLITE_QUERY_ERROR: No se pudo desactivar foreign_keys para migrar quotes");
+  }
+
+  try {
+    await executor.inTransaction(async (tx) => {
+      await tx.run(`DROP TABLE IF EXISTS quotes_migrated;`);
+      await tx.run(
+        `CREATE TABLE quotes_migrated (
+          id TEXT PRIMARY KEY,
+          quote_code TEXT NOT NULL UNIQUE,
+          job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE RESTRICT,
+          client_id TEXT REFERENCES clients(id) ON DELETE RESTRICT,
+          client_name_snapshot TEXT NOT NULL DEFAULT '',
+          client_nif_snapshot TEXT NOT NULL DEFAULT '',
+          client_address_snapshot TEXT NOT NULL DEFAULT '',
+          client_phone_snapshot TEXT NOT NULL DEFAULT '',
+          vat_rate REAL NOT NULL CHECK (vat_rate >= 0 AND vat_rate <= 100),
+          subtotal_cents INTEGER NOT NULL CHECK (subtotal_cents >= 0),
+          vat_cents INTEGER NOT NULL CHECK (vat_cents >= 0),
+          total_cents INTEGER NOT NULL CHECK (total_cents >= 0 AND total_cents = subtotal_cents + vat_cents),
+          status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'enviado', 'aceptado', 'rechazado')),
+          validity_days INTEGER CHECK (validity_days IS NULL OR (validity_days BETWEEN 1 AND 365)),
+          payment_methods_json TEXT NOT NULL DEFAULT '[]',
+          payment_schedule_json TEXT NOT NULL DEFAULT '[]',
+          notes TEXT NOT NULL DEFAULT '',
+          pdf_uri TEXT,
+          sent_at_iso TEXT CHECK (sent_at_iso IS NULL OR sent_at_iso GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+          created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+          updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
+        );`
+      );
+      await tx.run(
+        `INSERT INTO quotes_migrated (
+          id, quote_code, job_id, client_id, client_name_snapshot, client_nif_snapshot,
+          client_address_snapshot, client_phone_snapshot, vat_rate, subtotal_cents,
+          vat_cents, total_cents, status, validity_days, payment_methods_json,
+          payment_schedule_json, notes, pdf_uri, sent_at_iso, created_at_ms, updated_at_ms
+        ) SELECT
+          id, quote_code, job_id, client_id,
+          COALESCE(client_name_snapshot, ''),
+          COALESCE(client_nif_snapshot, ''),
+          COALESCE(client_address_snapshot, ''),
+          COALESCE(client_phone_snapshot, ''),
+          vat_rate, subtotal_cents, vat_cents, total_cents, status,
+          ${validityExpr}, ${methodsExpr}, ${scheduleExpr},
+          COALESCE(notes, ''), pdf_uri, sent_at_iso, created_at_ms, updated_at_ms
+        FROM quotes;`
+      );
+      await tx.run(`DROP TABLE quotes;`);
+      await tx.run(`ALTER TABLE quotes_migrated RENAME TO quotes;`);
+      await tx.run(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_quotes_one_active_per_job ON quotes(job_id) WHERE status != 'rechazado';`
+      );
+      await tx.run(
+        `CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status, updated_at_ms DESC);`
+      );
+      const fkViolations = await tx.query<Record<string, unknown>>(`PRAGMA foreign_key_check;`);
+      if (fkViolations.length > 0) {
+        throw new Error(
+          `SQLITE_QUERY_ERROR: Violación FK tras migrar quotes (${JSON.stringify(fkViolations[0])})`
+        );
+      }
+    });
+  } finally {
+    await executor.run("PRAGMA foreign_keys = ON;");
+  }
+}
+
 export async function initializeSchema(executor: SqliteExecutor): Promise<void> {
   await executor.run("PRAGMA foreign_keys = ON;");
   const statements = splitSqlStatements(schemaSql);
@@ -194,6 +277,31 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
         `ALTER TABLE app_settings ADD COLUMN active_account_id TEXT REFERENCES local_accounts(id) ON DELETE SET NULL;`
       );
     }
+    if (!cols.some((c) => c.name === "expand_long_text_inputs")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN expand_long_text_inputs INTEGER NOT NULL DEFAULT 1 CHECK (expand_long_text_inputs IN (0, 1));`
+      );
+    }
+    if (!cols.some((c) => c.name === "default_quote_validity_days")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN default_quote_validity_days INTEGER NOT NULL DEFAULT 30 CHECK (default_quote_validity_days BETWEEN 1 AND 365);`
+      );
+    }
+    if (!cols.some((c) => c.name === "default_payment_methods_json")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN default_payment_methods_json TEXT NOT NULL DEFAULT '["transferencia"]';`
+      );
+    }
+    if (!cols.some((c) => c.name === "default_payment_schedule_json")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN default_payment_schedule_json TEXT NOT NULL DEFAULT '[]';`
+      );
+    }
+    if (!cols.some((c) => c.name === "active_tax_models_json")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN active_tax_models_json TEXT NOT NULL DEFAULT '["303","130","390","347","100"]';`
+      );
+    }
   }
 
   const catalogCols = await executor.query<{ name: string }>(`PRAGMA table_info(catalog_items)`);
@@ -222,6 +330,32 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
     }
     if (!jobCols.some((c) => c.name === "end_date_iso")) {
       await executor.run(`ALTER TABLE jobs ADD COLUMN end_date_iso TEXT;`);
+    }
+  }
+
+  const quoteCols = await executor.query<{ name: string; notnull: number }>(
+    `PRAGMA table_info(quotes)`
+  );
+  if (quoteCols.length > 0) {
+    const clientCol = quoteCols.find((c) => c.name === "client_id");
+    if (clientCol && Number(clientCol.notnull) === 1) {
+      await rebuildLegacyQuotesTable(executor, quoteCols);
+    } else {
+      if (!quoteCols.some((c) => c.name === "validity_days")) {
+        await executor.run(
+          `ALTER TABLE quotes ADD COLUMN validity_days INTEGER CHECK (validity_days IS NULL OR (validity_days BETWEEN 1 AND 365));`
+        );
+      }
+      if (!quoteCols.some((c) => c.name === "payment_methods_json")) {
+        await executor.run(
+          `ALTER TABLE quotes ADD COLUMN payment_methods_json TEXT NOT NULL DEFAULT '[]';`
+        );
+      }
+      if (!quoteCols.some((c) => c.name === "payment_schedule_json")) {
+        await executor.run(
+          `ALTER TABLE quotes ADD COLUMN payment_schedule_json TEXT NOT NULL DEFAULT '[]';`
+        );
+      }
     }
   }
 }

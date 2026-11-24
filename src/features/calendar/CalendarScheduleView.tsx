@@ -1,10 +1,15 @@
 import {
+  Ban,
   CalendarPlus,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Landmark,
   MapPin,
   Plus,
+  RotateCcw,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -14,27 +19,62 @@ import {
   type CalendarAppointmentFormState,
   type VoiceDisambiguationPayload,
 } from "../../agent/voiceFormPatcher";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   JobRow,
   JobScheduleDeviationSummary,
   ScheduleEntryRow,
   SqliteExecutor,
+  TaxModelCode,
+  TaxObligationStateRow,
+  TaxObligationStatus,
+  WorkScheduleDefaults,
 } from "../../core/contracts/types";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
-import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
+import {
+  computeDailyWorkHoursThousandths,
+  minutesToHHMM,
+  parseHHMMToMinutes,
+  ScheduleRepository,
+} from "../../core/db/repositories/scheduleRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
+import { TaxCalendarRepository } from "../../core/db/repositories/taxCalendarRepo";
 import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import {
+  DEFAULT_ACTIVE_TAX_MODELS,
+  TAX_MODEL_CATALOG,
+  getTaxMilestonesByMonth,
+  listObligationsAroundYear,
+  type TaxCalendarDayMilestone,
+  type TaxObligationInstance,
+} from "../../core/fiscal/taxCalendarEngine";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
+import type { CalendarRouteTab } from "../../core/navigation/routes";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
+import { TaxAlertsBanner } from "../fiscal/TaxAlertsBanner";
+import { SubDayDurationPicker } from "./SubDayDurationPicker";
 
-type CalendarMode = "month" | "week" | "jobs";
+const FALLBACK_DEFAULTS: WorkScheduleDefaults = {
+  work_days: [1, 2, 3, 4, 5],
+  morning_start: "08:00",
+  morning_end: "14:00",
+  afternoon_start: "15:00",
+  afternoon_end: "17:00",
+  auto_apply_to_jobs: true,
+};
+
+type CalendarMode = CalendarRouteTab;
 
 interface CalendarScheduleViewProps {
   executor: SqliteExecutor;
   refreshTick: number;
   initialFocusDateIso?: string;
+  initialTab?: CalendarRouteTab;
+  todayIso?: string;
   voiceAdapter?: VoiceInputAdapter;
   inferenceAdapter?: LocalInferenceAdapterImpl;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
@@ -142,20 +182,31 @@ export function CalendarScheduleView({
   executor,
   refreshTick,
   initialFocusDateIso,
+  initialTab,
+  todayIso: todayIsoProp,
   voiceAdapter,
   inferenceAdapter,
   registerBackHandler,
   onOpenScheduleWidget,
   onDataChanged,
 }: CalendarScheduleViewProps) {
-  const todayIso = getLocalTodayIso();
-  const initialDate = initialFocusDateIso ?? todayIso;
+  const effectiveTodayIso = todayIsoProp ?? getLocalTodayIso();
+  const initialDate = initialFocusDateIso ?? effectiveTodayIso;
   const [initY, initM] = initialDate.split("-").map(Number);
 
-  const [viewMode, setViewMode] = useState<CalendarMode>("month");
+  const [viewMode, setViewMode] = useState<CalendarMode>(initialTab ?? "month");
   const [year, setYear] = useState<number>(initY || 2026);
   const [monthIndex, setMonthIndex] = useState<number>((initM || 11) - 1);
   const [selectedDateIso, setSelectedDateIso] = useState<string>(initialDate);
+  const [haciendaYear, setHaciendaYear] = useState<number>(
+    initY || Number(effectiveTodayIso.slice(0, 4)) || 2026
+  );
+  const [haciendaFilter, setHaciendaFilter] = useState<"all" | "pendiente" | "presentado">("all");
+  const [activeTaxModels, setActiveTaxModels] = useState<TaxModelCode[]>(DEFAULT_ACTIVE_TAX_MODELS);
+  const [taxStatesMap, setTaxStatesMap] = useState<Map<string, TaxObligationStateRow>>(
+    () => new Map()
+  );
+  const [taxBusyKey, setTaxBusyKey] = useState<string | null>(null);
 
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [entries, setEntries] = useState<ScheduleEntryRow[]>([]);
@@ -165,11 +216,21 @@ export function CalendarScheduleView({
   >([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [scheduleDefaults, setScheduleDefaults] =
+    useState<WorkScheduleDefaults>(FALLBACK_DEFAULTS);
+  const [newModalMode, setNewModalMode] = useState<"same_day" | "multi_day">("same_day");
   const [newJobId, setNewJobId] = useState("");
+  const [quickCreateJob, setQuickCreateJob] = useState(false);
+  const [quickJobTitle, setQuickJobTitle] = useState("");
   const [newDate, setNewDate] = useState(initialDate);
+  const [newEndDate, setNewEndDate] = useState(initialDate);
   const [newStart, setNewStart] = useState("08:00");
-  const [newEnd, setNewEnd] = useState("17:00");
+  const [newEnd, setNewEnd] = useState("10:00");
+  const [newDurationThousandths, setNewDurationThousandths] = useState(2000);
   const [newNotes, setNewNotes] = useState("");
+  const [deleteEntryTarget, setDeleteEntryTarget] = useState<ScheduleEntryRow | null>(null);
+  const [deleteEntryBusy, setDeleteEntryBusy] = useState(false);
+  const [deleteEntryError, setDeleteEntryError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [apptUndoStack, setApptUndoStack] = useState<CalendarAppointmentFormState[]>([]);
@@ -179,12 +240,19 @@ export function CalendarScheduleView({
     useState<VoiceDisambiguationPayload | null>(null);
 
   useEffect(() => {
+    if (initialTab) {
+      setViewMode(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
     if (initialFocusDateIso) {
       setSelectedDateIso(initialFocusDateIso);
       const [y, m] = initialFocusDateIso.split("-").map(Number);
       if (y && m) {
         setYear(y);
         setMonthIndex(m - 1);
+        setHaciendaYear(y);
       }
     }
   }, [initialFocusDateIso]);
@@ -193,12 +261,14 @@ export function CalendarScheduleView({
     const jobsRepo = new JobsRepository(executor);
     const scheduleRepo = new ScheduleRepository(executor);
     const settingsRepo = new SettingsRepository(executor);
+    const taxRepo = new TaxCalendarRepository(executor);
 
-    const [allJobs, allEntries, settings, defaults] = await Promise.all([
+    const [allJobs, allEntries, settings, defaults, loadedTaxStates] = await Promise.all([
       jobsRepo.listAll(),
       scheduleRepo.listAllEntries(),
       settingsRepo.getAppSettings(),
       scheduleRepo.getWorkScheduleDefaults(),
+      taxRepo.listAllStates(),
     ]);
 
     const activeJobs = allJobs.filter((j) => j.status !== "cancelado");
@@ -216,11 +286,17 @@ export function CalendarScheduleView({
     setJobs(activeJobs);
     setEntries(allEntries);
     setHourlyRateCents(settings.hourly_rate_cents);
+    setActiveTaxModels(settings.active_tax_models);
+    setTaxStatesMap(loadedTaxStates);
     setJobSummaries(summaries);
-    setNewStart(defaults.morning_start);
-    setNewEnd(defaults.afternoon_end || defaults.morning_end);
-    if (!newJobId && activeJobs[0]) {
-      setNewJobId(activeJobs[0].id);
+    setScheduleDefaults(defaults);
+    if (!showAddModal) {
+      setNewStart(defaults.morning_start);
+      setNewEnd(defaults.afternoon_end || defaults.morning_end);
+      setNewDurationThousandths(computeDailyWorkHoursThousandths(defaults) || 8000);
+      if (!newJobId && activeJobs[0]) {
+        setNewJobId(activeJobs[0].id);
+      }
     }
   };
 
@@ -259,6 +335,76 @@ export function CalendarScheduleView({
     return jobs.find((j) => j.start_date_iso && j.end_date_iso) ?? null;
   }, [primaryDayJob, jobs]);
 
+  const taxMilestonesByDate = useMemo(() => {
+    const combined = new Map<string, TaxCalendarDayMilestone[]>();
+    const seenMonths = new Set<string>();
+    const candidateIsos = displayedCells.map((c) => c.dateIso);
+    if (selectedDateIso) {
+      candidateIsos.push(selectedDateIso);
+    }
+    for (const iso of candidateIsos) {
+      const ym = iso.slice(0, 7);
+      if (seenMonths.has(ym)) continue;
+      seenMonths.add(ym);
+      const [cy, cm] = ym.split("-").map(Number);
+      if (!cy || !cm) continue;
+      const monthMap = getTaxMilestonesByMonth(cy, cm - 1, activeTaxModels, taxStatesMap);
+      for (const [mIso, list] of monthMap.entries()) {
+        const existing = combined.get(mIso);
+        if (existing) {
+          existing.push(...list);
+        } else {
+          combined.set(mIso, [...list]);
+        }
+      }
+    }
+    return combined;
+  }, [displayedCells, selectedDateIso, activeTaxModels, taxStatesMap]);
+
+  const selectedTaxMilestones = taxMilestonesByDate.get(selectedDateIso) ?? [];
+
+  const haciendaObligations = useMemo(() => {
+    const all = listObligationsAroundYear(haciendaYear, activeTaxModels, taxStatesMap);
+    const forYear = all.filter((ob) => ob.endDateIso.startsWith(`${haciendaYear}-`));
+    if (haciendaFilter === "pendiente") {
+      return forYear.filter((ob) => ob.status === "pendiente");
+    }
+    if (haciendaFilter === "presentado") {
+      return forYear.filter((ob) => ob.status === "presentado");
+    }
+    return forYear;
+  }, [haciendaYear, activeTaxModels, taxStatesMap, haciendaFilter]);
+
+  const handleSetObligationStatus = async (
+    ob: TaxObligationInstance,
+    status: TaxObligationStatus
+  ) => {
+    setTaxBusyKey(ob.obligationKey);
+    try {
+      await new TaxCalendarRepository(executor).setObligationStatus({
+        obligation_key: ob.obligationKey,
+        model_code: ob.modelCode,
+        fiscal_year: ob.fiscalYear,
+        period_code: ob.periodCode,
+        status,
+        presented_at_iso: status === "presentado" ? effectiveTodayIso : null,
+      });
+      await loadCalendar();
+      await onDataChanged();
+    } finally {
+      setTaxBusyKey(null);
+    }
+  };
+
+  const handleToggleTaxModel = async (code: TaxModelCode) => {
+    const next = activeTaxModels.includes(code)
+      ? activeTaxModels.filter((c) => c !== code)
+      : [...activeTaxModels, code];
+    await new SettingsRepository(executor).updateActiveTaxModels(next);
+    await loadCalendar();
+    await onDataChanged();
+  };
+
   const changeMonth = (delta: number) => {
     const dt = new Date(year, monthIndex + delta, 1);
     setYear(dt.getFullYear());
@@ -269,17 +415,58 @@ export function CalendarScheduleView({
     e.preventDefault();
     if (!newDate) return;
     setErrorMsg(null);
+    if (quickCreateJob && !quickJobTitle.trim()) {
+      setErrorMsg("Escribe el título de la nueva obra.");
+      return;
+    }
+    if (newModalMode === "same_day") {
+      if (parseHHMMToMinutes(newEnd) <= parseHHMMToMinutes(newStart)) {
+        setErrorMsg("La hora de salida debe ser posterior a la hora de entrada.");
+        return;
+      }
+    } else {
+      if (!newEndDate || newEndDate < newDate) {
+        setErrorMsg("La fecha fin debe ser igual o posterior a la fecha de inicio.");
+        return;
+      }
+      if (!quickCreateJob && !newJobId) {
+        setErrorMsg("Selecciona una obra existente o activa '+ Crear obra rápida' para varios días.");
+        return;
+      }
+    }
+
     setBusy(true);
     try {
-      await new ScheduleRepository(executor).createSingleEntry({
-        job_id: newJobId || null,
-        date_iso: newDate,
-        planned_start: newStart,
-        planned_end: newEnd,
-        notes: newNotes,
-      });
+      const jobsRepo = new JobsRepository(executor);
+      const scheduleRepo = new ScheduleRepository(executor);
+      let targetJobId: string | null = newJobId || null;
+
+      if (quickCreateJob) {
+        const createdJob = await jobsRepo.createDirectJob({
+          title: quickJobTitle.trim(),
+          start_date_iso: newDate,
+          end_date_iso: newModalMode === "multi_day" ? newEndDate : newDate,
+        });
+        targetJobId = createdJob.id;
+      }
+
+      if (newModalMode === "same_day") {
+        await scheduleRepo.createSingleEntry({
+          job_id: targetJobId,
+          date_iso: newDate,
+          planned_start: newStart,
+          planned_end: newEnd,
+          planned_hours_thousandths: newDurationThousandths,
+          notes: newNotes,
+        });
+      } else if (targetJobId) {
+        await scheduleRepo.generateEntriesForJobDateRange(targetJobId, newDate, newEndDate);
+      }
+
       setSelectedDateIso(newDate);
       setNewNotes("");
+      setQuickCreateJob(false);
+      setQuickJobTitle("");
       setShowAddModal(false);
       await loadCalendar();
       await onDataChanged();
@@ -287,6 +474,39 @@ export function CalendarScheduleView({
       setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openAddModal = (dateIso: string) => {
+    setErrorMsg(null);
+    setNewModalMode("same_day");
+    setNewDate(dateIso);
+    setNewEndDate(dateIso);
+    setNewStart(scheduleDefaults.morning_start);
+    const twoHoursLaterMin = Math.min(
+      23 * 60 + 59,
+      parseHHMMToMinutes(scheduleDefaults.morning_start) + 120
+    );
+    setNewEnd(minutesToHHMM(twoHoursLaterMin));
+    setNewDurationThousandths(2000);
+    setQuickCreateJob(false);
+    setQuickJobTitle("");
+    setShowAddModal(true);
+  };
+
+  const handleConfirmDeleteEntry = async () => {
+    if (!deleteEntryTarget) return;
+    setDeleteEntryError(null);
+    setDeleteEntryBusy(true);
+    try {
+      await new ScheduleRepository(executor).deleteEntry(deleteEntryTarget.id);
+      setDeleteEntryTarget(null);
+      await loadCalendar();
+      await onDataChanged();
+    } catch (err) {
+      setDeleteEntryError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteEntryBusy(false);
     }
   };
 
@@ -298,35 +518,48 @@ export function CalendarScheduleView({
       {/* Cabecera del módulo: Mes y + Añadir cita */}
       <section className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => changeMonth(-1)}
-              aria-label="Mes anterior"
-              className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
-            >
-              <ChevronLeft className="w-[18px] h-[18px]" />
-            </button>
-            <h2 className="text-[17px] font-semibold text-on-surface px-1 min-w-[138px] text-center">
-              {MONTH_NAMES_ES[monthIndex]} {year}
-            </h2>
-            <button
-              type="button"
-              onClick={() => changeMonth(1)}
-              aria-label="Mes siguiente"
-              className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
-            >
-              <ChevronRight className="w-[18px] h-[18px]" />
-            </button>
-          </div>
+          {viewMode === "hacienda" ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900">
+                <Landmark className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-[16px] font-semibold text-on-surface truncate">
+                  Calendario Fiscal AEAT
+                </h2>
+                <p className="text-[11px] text-on-surface-variant truncate">
+                  {activeTaxModels.length} modelos activos · Territorio Común
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => changeMonth(-1)}
+                aria-label="Mes anterior"
+                className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
+              >
+                <ChevronLeft className="w-[18px] h-[18px]" />
+              </button>
+              <h2 className="text-[17px] font-semibold text-on-surface px-1 min-w-[138px] text-center">
+                {MONTH_NAMES_ES[monthIndex]} {year}
+              </h2>
+              <button
+                type="button"
+                onClick={() => changeMonth(1)}
+                aria-label="Mes siguiente"
+                className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
+              >
+                <ChevronRight className="w-[18px] h-[18px]" />
+              </button>
+            </div>
+          )}
 
           <button
             type="button"
             data-testid="calendar-add-appointment-btn"
-            onClick={() => {
-              setNewDate(selectedDateIso);
-              setShowAddModal(true);
-            }}
+            onClick={() => openAddModal(selectedDateIso)}
             className="min-h-[42px] px-3.5 rounded-full bg-secondary text-on-secondary font-semibold text-[12px] inline-flex items-center gap-1 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -334,18 +567,20 @@ export function CalendarScheduleView({
           </button>
         </div>
 
-        {/* Toggle Mes | Semana | Lista obras */}
-        <div className="grid grid-cols-3 gap-1 bg-surface-container-lowest border border-outline-variant rounded-full p-1">
+        {/* Toggle Mes | Semana | Lista obras | Hacienda */}
+        <div className="grid grid-cols-4 gap-1 bg-surface-container-lowest border border-outline-variant rounded-full p-1">
           {(
             [
               { id: "month", label: "Mes" },
               { id: "week", label: "Semana" },
-              { id: "jobs", label: "Lista obras" },
+              { id: "jobs", label: "Obras" },
+              { id: "hacienda", label: "Hacienda" },
             ] as const
           ).map((tab) => (
             <button
               key={tab.id}
               type="button"
+              data-testid={tab.id === "hacienda" ? "calendar-tab-hacienda" : `calendar-tab-${tab.id}`}
               onClick={() => setViewMode(tab.id)}
               aria-pressed={viewMode === tab.id}
               className={`min-h-[38px] rounded-full font-semibold text-[12px] cursor-pointer transition-colors ${
@@ -370,7 +605,7 @@ export function CalendarScheduleView({
       )}
 
       {/* Vista de Calendario Visual (Mes o Semana) */}
-      {viewMode !== "jobs" ? (
+      {(viewMode === "month" || viewMode === "week") && (
         <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-2">
           <div className="grid grid-cols-7 text-center pb-1 border-b border-outline-variant">
             {["L", "M", "X", "J", "V", "S", "D"].map((d, idx) => (
@@ -388,6 +623,7 @@ export function CalendarScheduleView({
           <div className="grid grid-cols-7 gap-y-1 text-center">
             {displayedCells.map((cell) => {
               const dayEntries = entriesByDate.get(cell.dateIso) ?? [];
+              const dayMilestones = taxMilestonesByDate.get(cell.dateIso) ?? [];
               const isSelected = cell.dateIso === selectedDateIso;
               const inHighlightRange =
                 highlightedJob?.start_date_iso &&
@@ -406,6 +642,21 @@ export function CalendarScheduleView({
                     : dayEntries.length > 0
                       ? "bg-terracotta"
                       : "";
+
+              const allTaxDone =
+                dayMilestones.length > 0 &&
+                dayMilestones.every(
+                  (m) =>
+                    m.obligation.status === "presentado" || m.obligation.status === "no_aplica"
+                );
+              const taxDotColor =
+                dayMilestones.length === 0
+                  ? ""
+                  : allTaxDone
+                    ? "bg-emerald-600"
+                    : dayMilestones.some((m) => m.milestoneKind === "end")
+                      ? "bg-rose-600"
+                      : "bg-amber-500";
 
               return (
                 <button
@@ -428,15 +679,34 @@ export function CalendarScheduleView({
                   <span className="font-mono text-[12px] font-semibold tabular-nums">
                     {cell.day}
                   </span>
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      statusDotColor
-                        ? isSelected
-                          ? "bg-white"
-                          : statusDotColor
-                        : "opacity-0"
-                    }`}
-                  />
+                  <div className="flex items-center justify-center gap-0.5 min-h-[10px]">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        statusDotColor
+                          ? isSelected
+                            ? "bg-white"
+                            : statusDotColor
+                          : "opacity-0"
+                      }`}
+                    />
+                    {dayEntries.length > 1 && (
+                      <span
+                        className={`text-[9px] font-mono font-bold leading-none ${
+                          isSelected ? "text-white" : "text-on-surface-variant"
+                        }`}
+                      >
+                        ×{dayEntries.length}
+                      </span>
+                    )}
+                    {taxDotColor && (
+                      <span
+                        aria-label="Hito fiscal AEAT"
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isSelected ? "bg-amber-200" : taxDotColor
+                        }`}
+                      />
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -452,7 +722,7 @@ export function CalendarScheduleView({
                 </span>
               </div>
             )}
-            <div className="flex items-center justify-between pt-0.5 px-0.5">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5 px-0.5">
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-free" />
                 <span className="text-[11px] font-semibold text-on-surface-variant">En hora</span>
@@ -469,10 +739,18 @@ export function CalendarScheduleView({
                   Antes de hora
                 </span>
               </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-rose-600" />
+                <span className="text-[11px] font-semibold text-on-surface-variant">
+                  Hacienda
+                </span>
+              </div>
             </div>
           </div>
         </section>
-      ) : (
+      )}
+
+      {viewMode === "jobs" && (
         /* Vista Lista de obras con fechas */
         <section className="flex flex-col gap-2.5">
           {jobs.filter((j) => j.start_date_iso).length === 0 ? (
@@ -483,7 +761,16 @@ export function CalendarScheduleView({
             jobs
               .filter((j) => j.start_date_iso)
               .map((job) => {
-                const count = entries.filter((e) => e.job_id === job.id).length;
+                const jobEntriesForJob = entries.filter((e) => e.job_id === job.id);
+                const distinctDays = new Set(jobEntriesForJob.map((e) => e.date_iso)).size;
+                const totalPlannedThousandths = jobEntriesForJob.reduce(
+                  (acc, e) => acc + e.planned_hours_thousandths,
+                  0
+                );
+                const isSubDayJob =
+                  distinctDays <= 1 &&
+                  (!job.end_date_iso || job.start_date_iso === job.end_date_iso) &&
+                  jobEntriesForJob.length >= 1;
                 return (
                   <button
                     key={job.id}
@@ -508,7 +795,9 @@ export function CalendarScheduleView({
                       )}
                     </div>
                     <span className="font-mono text-[12px] font-semibold text-on-surface bg-surface-container-lowest px-2.5 py-1 rounded-full border border-outline-variant shrink-0">
-                      {count} días
+                      {isSubDayJob
+                        ? formatHoursFromThousandths(totalPlannedThousandths)
+                        : `${distinctDays} días`}
                     </span>
                   </button>
                 );
@@ -517,90 +806,403 @@ export function CalendarScheduleView({
         </section>
       )}
 
+      {viewMode === "hacienda" && (
+        <section className="flex flex-col gap-3" data-testid="calendar-hacienda-view">
+          <TaxAlertsBanner
+            executor={executor}
+            refreshTick={refreshTick}
+            todayIso={effectiveTodayIso}
+            maxVisible={6}
+            onTaxStateChanged={async () => {
+              await loadCalendar();
+              await onDataChanged();
+            }}
+          />
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-950">
+            Fechas orientativas para <strong>Territorio Común (AEAT)</strong>; festivos autonómicos
+            o locales pueden trasladar vencimientos al siguiente día hábil.
+          </div>
+
+          {/* Control anual y filtros */}
+          <div className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Año anterior"
+                  onClick={() => setHaciendaYear((y) => y - 1)}
+                  className="w-9 h-9 rounded-full border border-outline-variant bg-white inline-flex items-center justify-center text-slate-700 hover:border-terracotta cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="font-mono text-sm font-bold px-2 tabular-nums">
+                  {haciendaYear}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Año siguiente"
+                  onClick={() => setHaciendaYear((y) => y + 1)}
+                  className="w-9 h-9 rounded-full border border-outline-variant bg-white inline-flex items-center justify-center text-slate-700 hover:border-terracotta cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 rounded-full bg-surface-container p-0.5">
+                {(
+                  [
+                    { id: "all", label: "Todos" },
+                    { id: "pendiente", label: "Pendientes" },
+                    { id: "presentado", label: "Presentados" },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setHaciendaFilter(f.id)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold cursor-pointer ${
+                      haciendaFilter === f.id
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-on-surface-variant"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-700">
+                  Modelos activos ({activeTaxModels.length}/13)
+                </span>
+                <span className="text-[10px] text-slate-500">Pulsa para activar/desactivar</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {TAX_MODEL_CATALOG.map((m) => {
+                  const active = activeTaxModels.includes(m.code);
+                  return (
+                    <button
+                      key={m.code}
+                      type="button"
+                      onClick={() => void handleToggleTaxModel(m.code)}
+                      aria-pressed={active}
+                      title={m.title}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-bold cursor-pointer transition-colors ${
+                        active
+                          ? "border-amber-500 bg-amber-100 text-amber-950"
+                          : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                      }`}
+                    >
+                      Mod. {m.code}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Lista cronológica de obligaciones */}
+          {haciendaObligations.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-outline-variant bg-surface-container-lowest p-5 text-center text-[13px] text-on-surface-variant">
+              No hay obligaciones fiscales para mostrar con los filtros actuales.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {haciendaObligations.map((ob) => {
+                const isBusy = taxBusyKey === ob.obligationKey;
+                const isPresented = ob.status === "presentado";
+                const isNotApplicable = ob.status === "no_aplica";
+                const isOverdue = ob.status === "pendiente" && ob.endDateIso < effectiveTodayIso;
+                const isOpenNow =
+                  ob.status === "pendiente" &&
+                  effectiveTodayIso >= ob.startDateIso &&
+                  effectiveTodayIso <= ob.endDateIso;
+
+                return (
+                  <div
+                    key={ob.obligationKey}
+                    data-testid={`tax-obligation-${ob.obligationKey}`}
+                    className={`rounded-[18px] border p-3.5 shadow-xs ${
+                      isPresented
+                        ? "border-emerald-200 bg-emerald-50/40"
+                        : isNotApplicable
+                          ? "border-slate-200 bg-slate-50/70 opacity-75"
+                          : isOverdue
+                            ? "border-rose-300 bg-rose-50/70"
+                            : isOpenNow
+                              ? "border-amber-300 bg-amber-50/60"
+                              : "border-outline-variant bg-surface-container-lowest"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[10px] font-bold text-white">
+                            {ob.meta.shortLabel}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                            {ob.periodLabel}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            {ob.meta.category}
+                          </span>
+                        </div>
+                        <h4 className="mt-1 text-[13px] font-bold text-slate-900">
+                          {ob.meta.title}
+                        </h4>
+                        <p className="mt-0.5 font-mono text-[11px] text-slate-700">
+                          {ob.isSingleDueDate
+                            ? `Vencimiento único: ${ob.endDateIso}`
+                            : `Plazo: ${ob.startDateIso} → ${ob.endDateIso}`}
+                          {ob.endDateIso !== ob.nominalEndDateIso
+                            ? ` (trasladado desde ${ob.nominalEndDateIso})`
+                            : ""}
+                        </p>
+                        {ob.debitCutoffIso && (
+                          <p className="mt-0.5 text-[11px] font-semibold text-amber-800">
+                            Domiciliación bancaria hasta {ob.debitCutoffIso}
+                          </p>
+                        )}
+                      </div>
+
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                          isPresented
+                            ? "bg-emerald-600 text-white"
+                            : isNotApplicable
+                              ? "bg-slate-400 text-white"
+                              : isOverdue
+                                ? "bg-rose-600 text-white"
+                                : isOpenNow
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-slate-200 text-slate-800"
+                        }`}
+                      >
+                        {isPresented
+                          ? "Presentado"
+                          : isNotApplicable
+                            ? "No aplica"
+                            : isOverdue
+                              ? "Vencido"
+                              : isOpenNow
+                                ? "En plazo"
+                                : "Pendiente"}
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-black/5 pt-2">
+                      <button
+                        type="button"
+                        disabled={isBusy || ob.status === "presentado"}
+                        onClick={() => void handleSetObligationStatus(ob, "presentado")}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-45 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Presentado
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy || ob.status === "pendiente"}
+                        onClick={() => void handleSetObligationStatus(ob, "pendiente")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-45 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Pendiente
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy || ob.status === "no_aplica"}
+                        onClick={() => void handleSetObligationStatus(ob, "no_aplica")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-45 cursor-pointer"
+                      >
+                        <Ban className="w-3 h-3" />
+                        No aplica
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Tarjeta de Agenda del Día Seleccionado */}
+      {viewMode !== "hacienda" && (
       <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col min-w-0">
             <span className="text-[12px] font-semibold text-on-primary-container">
               {formatFullDayLabelEs(selectedDateIso)}
-              {selectedDateIso === todayIso ? " · Hoy" : ""}
+              {selectedDateIso === effectiveTodayIso ? " · Hoy" : ""}
             </span>
             <h3 className="text-[17px] font-semibold text-on-surface truncate">
-              {primaryDayJob?.title ??
-                (primaryDayEntry ? "Cita de agenda" : "Día libre sin obra asignada")}
+              {selectedEntries.length > 1
+                ? `${selectedEntries.length} trabajos / citas hoy`
+                : primaryDayJob?.title ??
+                  (primaryDayEntry ? "Cita de agenda" : "Día libre sin obra asignada")}
             </h3>
           </div>
-          {primaryDayJob && (
+          {selectedEntries.length <= 1 && primaryDayJob && (
             <span className="font-mono text-[11px] text-on-surface-variant bg-surface-container px-2 py-1 rounded-lg tabular-nums shrink-0">
               {primaryDayJob.job_code}
             </span>
           )}
         </div>
 
-        {primaryDayEntry ? (
-          <>
-            <div className="flex flex-col gap-2 bg-surface-container-low rounded-2xl p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-on-surface-variant" />
-                  <span className="font-mono text-[15px] font-semibold text-on-surface tabular-nums">
-                    {primaryDayEntry.planned_start} –{" "}
-                    {primaryDayEntry.actual_end ?? primaryDayEntry.planned_end}
-                  </span>
-                </div>
-                <span
-                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-                    primaryDayEntry.status === "alargado"
-                      ? "bg-warning-container text-on-warning-container"
-                      : primaryDayEntry.status === "antes"
-                        ? "bg-info-container text-on-info-container"
-                        : "bg-success-container text-on-success-container"
-                  }`}
-                >
-                  {primaryDayEntry.actual_hours_thousandths !== null
-                    ? `${formatHoursFromThousandths(primaryDayEntry.actual_hours_thousandths)} reales`
-                    : `${formatHoursFromThousandths(primaryDayEntry.planned_hours_thousandths)} previstas`}
-                </span>
-              </div>
-
-              {primaryDayJob?.address && (
-                <div className="flex items-center gap-1.5 min-w-0 pt-1">
-                  <MapPin className="w-4 h-4 text-on-surface-variant shrink-0" />
-                  <span className="text-[13px] text-on-surface-variant truncate">
-                    {primaryDayJob.address}
-                  </span>
-                </div>
-              )}
-
-              {primaryDayEntry.notes && (
-                <p className="text-[12px] text-on-surface-variant pt-1 border-t border-outline-variant/60">
-                  {primaryDayEntry.notes}
-                </p>
-              )}
+        {selectedTaxMilestones.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/75 p-2.5 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-amber-950">
+              <Landmark className="w-3.5 h-3.5 text-amber-700" />
+              <span>Hitos Hacienda AEAT este día</span>
             </div>
+            {selectedTaxMilestones.map((m) => (
+              <div
+                key={`${m.obligation.obligationKey}_${m.milestoneKind}`}
+                className="flex items-center justify-between gap-2 rounded-xl bg-white/90 px-2.5 py-1.5 border border-amber-200/70"
+              >
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-slate-900">
+                    {m.obligation.meta.shortLabel} ({m.obligation.periodLabel})
+                  </span>
+                  <span className="block text-[11px] text-slate-600">
+                    {m.milestoneKind === "start"
+                      ? "Apertura de plazo de presentación"
+                      : m.milestoneKind === "debit"
+                        ? "Fin domiciliación bancaria"
+                        : "Último día de presentación"}
+                  </span>
+                </div>
+                {m.obligation.status === "pendiente" ? (
+                  <button
+                    type="button"
+                    disabled={taxBusyKey === m.obligation.obligationKey}
+                    onClick={() => void handleSetObligationStatus(m.obligation, "presentado")}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-700 cursor-pointer"
+                  >
+                    Presentado
+                  </button>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    {m.obligation.status === "presentado" ? "Presentado" : "No aplica"}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedEntries.length > 0 ? (
+          <div className="flex flex-col gap-2.5">
+            {selectedEntries.map((dayEntry, idx) => {
+              const entryJob = dayEntry.job_id ? jobsById.get(dayEntry.job_id) ?? null : null;
+              return (
+                <div
+                  key={dayEntry.id}
+                  data-testid={`calendar-day-entry-${dayEntry.id}`}
+                  className="flex flex-col gap-2 bg-surface-container-low rounded-2xl p-3 border border-outline-variant/60"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[13px] font-semibold text-on-surface truncate">
+                          {entryJob?.title ?? "Cita rápida / visita"}
+                        </span>
+                        {entryJob && (
+                          <span className="font-mono text-[10px] text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded-md">
+                            {entryJob.job_code}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-on-surface-variant" />
+                        <span className="font-mono text-[14px] font-semibold text-on-surface tabular-nums">
+                          {dayEntry.planned_start} – {dayEntry.actual_end ?? dayEntry.planned_end}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                          dayEntry.status === "alargado"
+                            ? "bg-warning-container text-on-warning-container"
+                            : dayEntry.status === "antes"
+                              ? "bg-info-container text-on-info-container"
+                              : "bg-success-container text-on-success-container"
+                        }`}
+                      >
+                        {dayEntry.actual_hours_thousandths !== null
+                          ? `${formatHoursFromThousandths(dayEntry.actual_hours_thousandths)} reales`
+                          : `${formatHoursFromThousandths(dayEntry.planned_hours_thousandths)} previstas`}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Eliminar cita del calendario"
+                        data-testid={`calendar-delete-entry-${dayEntry.id}`}
+                        onClick={() => {
+                          setDeleteEntryError(null);
+                          setDeleteEntryTarget(dayEntry);
+                        }}
+                        className="w-8 h-8 rounded-full border border-outline-variant bg-surface-container-lowest text-rose-700 hover:bg-rose-50 inline-flex items-center justify-center cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {entryJob?.address && (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <MapPin className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
+                      <span className="text-[12px] text-on-surface-variant truncate">
+                        {entryJob.address}
+                      </span>
+                    </div>
+                  )}
+
+                  {dayEntry.notes && (
+                    <p className="text-[12px] text-on-surface-variant pt-1 border-t border-outline-variant/60">
+                      {dayEntry.notes}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    data-testid={idx === 0 ? "calendar-log-workday-btn" : `calendar-log-workday-btn-${idx}`}
+                    onClick={() =>
+                      onOpenScheduleWidget({
+                        ui_widget_type: "ScheduleWorkLogWidget",
+                        widget_payload: {
+                          mode: "daily_log",
+                          entry_id: dayEntry.id,
+                          job_id: dayEntry.job_id,
+                          date_iso: selectedDateIso,
+                          suggested_reason: dayEntry.deviation_reason,
+                          suggested_notes: dayEntry.notes,
+                        },
+                      })
+                    }
+                    className="min-h-[42px] w-full px-3 rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[13px] flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                  >
+                    <CalendarPlus className="w-4 h-4" />
+                    <span>Registrar salida / Ajustar horas</span>
+                  </button>
+                </div>
+              );
+            })}
 
             <button
               type="button"
-              data-testid="calendar-log-workday-btn"
-              onClick={() =>
-                onOpenScheduleWidget({
-                  ui_widget_type: "ScheduleWorkLogWidget",
-                  widget_payload: {
-                    mode: "daily_log",
-                    entry_id: primaryDayEntry.id,
-                    job_id: primaryDayEntry.job_id,
-                    date_iso: selectedDateIso,
-                    suggested_reason: primaryDayEntry.deviation_reason,
-                    suggested_notes: primaryDayEntry.notes,
-                  },
-                })
-              }
-              className="min-h-[48px] w-full px-4 rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[14px] flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              data-testid="calendar-add-another-btn"
+              onClick={() => openAddModal(selectedDateIso)}
+              className="min-h-[42px] w-full rounded-xl border border-dashed border-outline-variant text-xs font-semibold text-on-surface hover:border-terracotta flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <CalendarPlus className="w-[18px] h-[18px]" />
-              <span>Registrar salida / Ajustar horas de hoy</span>
+              <Plus className="w-4 h-4" />
+              <span>Añadir otro trabajo / visita este día</span>
             </button>
-          </>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-[13px] text-on-surface-variant">
@@ -609,14 +1211,11 @@ export function CalendarScheduleView({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setNewDate(selectedDateIso);
-                  setShowAddModal(true);
-                }}
+                onClick={() => openAddModal(selectedDateIso)}
                 className="min-h-[46px] rounded-xl bg-secondary text-white font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>Asignar obra</span>
+                <span>Cita / trabajo</span>
               </button>
               <button
                 type="button"
@@ -642,6 +1241,7 @@ export function CalendarScheduleView({
           </div>
         )}
       </section>
+      )}
 
       {/* Gráfica Visual de Desviación de Plazos y Horas */}
       <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3.5">
@@ -754,10 +1354,10 @@ export function CalendarScheduleView({
         <div className="fixed inset-0 z-50 bg-secondary/45 flex items-end sm:items-center justify-center p-4">
           <form
             onSubmit={(e) => void handleSaveAppointment(e)}
-            className="w-full max-w-[380px] bg-surface-container-lowest rounded-[24px] p-5 border border-outline-variant shadow-2xl flex flex-col gap-3.5"
+            className="w-full max-w-[380px] max-h-[88vh] overflow-y-auto bg-surface-container-lowest rounded-[24px] p-5 border border-outline-variant shadow-2xl flex flex-col gap-3.5"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-[16px] font-semibold text-on-surface">Añadir cita en agenda</h3>
+              <h3 className="text-[16px] font-semibold text-on-surface">Añadir cita o trabajo</h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
@@ -766,6 +1366,42 @@ export function CalendarScheduleView({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            <div className="grid grid-cols-2 gap-1 bg-surface-container-low border border-outline-variant rounded-full p-1">
+              <button
+                type="button"
+                data-testid="calendar-modal-mode-sameday"
+                onClick={() => setNewModalMode("same_day")}
+                className={`min-h-[34px] rounded-full text-[11px] font-semibold cursor-pointer ${
+                  newModalMode === "same_day"
+                    ? "bg-secondary text-on-secondary"
+                    : "text-on-surface-variant"
+                }`}
+              >
+                Mismo día / horas
+              </button>
+              <button
+                type="button"
+                data-testid="calendar-modal-mode-multiday"
+                onClick={() => setNewModalMode("multi_day")}
+                className={`min-h-[34px] rounded-full text-[11px] font-semibold cursor-pointer ${
+                  newModalMode === "multi_day"
+                    ? "bg-secondary text-on-secondary"
+                    : "text-on-surface-variant"
+                }`}
+              >
+                Varios días
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div
+                role="alert"
+                className="rounded-xl border border-coral-alert/30 bg-error-container px-3 py-2 text-[12px] font-semibold text-on-error-container"
+              >
+                {errorMsg}
+              </div>
+            )}
 
             <InlineVoiceFormTrigger
               voiceAdapter={voiceAdapter}
@@ -848,66 +1484,126 @@ export function CalendarScheduleView({
               }}
             />
 
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-semibold text-on-surface">Obra</span>
-              <select
-                value={newJobId}
-                onChange={(e) => setNewJobId(e.target.value)}
-                className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
-              >
-                <option value="">Sin obra específica</option>
-                {jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.job_code} · {j.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-semibold text-on-surface">Fecha</span>
-              <input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 font-mono text-[13px]"
-              />
-            </label>
-
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] font-semibold text-on-surface">Entrada</span>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-on-surface">Obra</span>
+                <button
+                  type="button"
+                  data-testid="calendar-quick-job-toggle"
+                  onClick={() => setQuickCreateJob((v) => !v)}
+                  className="text-[11px] font-semibold text-on-primary-container underline cursor-pointer"
+                >
+                  {quickCreateJob ? "Elegir obra existente" : "+ Crear obra rápida"}
+                </button>
+              </div>
+              {quickCreateJob ? (
                 <input
-                  type="time"
-                  value={newStart}
-                  onChange={(e) => setNewStart(e.target.value)}
-                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 font-mono text-[13px]"
+                  type="text"
+                  data-testid="calendar-quick-job-title"
+                  maxLength={TEXT_LIMITS.TITLE}
+                  value={quickJobTitle}
+                  onChange={(e) => setQuickJobTitle(e.target.value)}
+                  placeholder="Título del trabajo rápido (ej. Cambio de grifo)"
+                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
                 />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] font-semibold text-on-surface">Salida</span>
-                <input
-                  type="time"
-                  value={newEnd}
-                  onChange={(e) => setNewEnd(e.target.value)}
-                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 font-mono text-[13px]"
-                />
-              </label>
+              ) : (
+                <select
+                  value={newJobId}
+                  onChange={(e) => setNewJobId(e.target.value)}
+                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
+                >
+                  <option value="">Sin obra específica (visita puntual)</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.job_code} · {j.title}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-semibold text-on-surface">Nota rápida</span>
-              <input
-                type="text"
+            {newModalMode === "same_day" ? (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] font-semibold text-on-surface">Fecha</span>
+                  <input
+                    type="date"
+                    data-testid="calendar-modal-date-input"
+                    value={newDate}
+                    onChange={(e) => {
+                      setNewDate(e.target.value);
+                      setNewEndDate(e.target.value);
+                    }}
+                    className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 font-mono text-[13px]"
+                  />
+                </label>
+
+                <SubDayDurationPicker
+                  startTime={newStart}
+                  endTime={newEnd}
+                  defaults={scheduleDefaults}
+                  disabled={busy}
+                  onChange={(next) => {
+                    setNewStart(next.startTime);
+                    setNewEnd(next.endTime);
+                    setNewDurationThousandths(next.hoursThousandths);
+                  }}
+                />
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[12px] font-semibold text-on-surface">Inicio</span>
+                    <input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setNewDate(next);
+                        if (!newEndDate || newEndDate < next) {
+                          setNewEndDate(next);
+                        }
+                      }}
+                      className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-2.5 font-mono text-[13px]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[12px] font-semibold text-on-surface">Fin</span>
+                    <input
+                      type="date"
+                      value={newEndDate}
+                      onChange={(e) => setNewEndDate(e.target.value)}
+                      className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-2.5 font-mono text-[13px]"
+                    />
+                  </label>
+                </div>
+                <div className="rounded-xl border border-outline-variant bg-terracotta-soft px-3 py-2 text-[11px] font-medium text-on-primary-container">
+                  Se generarán las jornadas laborables según tu horario habitual ({scheduleDefaults.morning_start}–{scheduleDefaults.afternoon_end || scheduleDefaults.morning_end}).
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="cal-new-notes" className="text-[12px] font-semibold text-on-surface">
+                Nota rápida
+              </label>
+              <ZoomableTextField
+                id="cal-new-notes"
+                as="input"
+                multiline={false}
+                maxLength={TEXT_LIMITS.NOTES}
+                zoomLabel="Nota de la cita"
                 value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
+                onValueChange={setNewNotes}
                 placeholder="Ej. Visita medición o entrega de llaves"
                 className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
               />
-            </label>
+            </div>
 
             <button
               type="submit"
+              data-testid="calendar-modal-submit-btn"
               disabled={busy}
               className="min-h-[48px] rounded-xl bg-primary text-white font-semibold text-[14px] disabled:opacity-50 cursor-pointer"
             >
@@ -916,6 +1612,26 @@ export function CalendarScheduleView({
           </form>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteEntryTarget)}
+        title="Eliminar cita del calendario"
+        description={
+          deleteEntryTarget
+            ? `¿Seguro que quieres quitar del calendario la cita del ${deleteEntryTarget.date_iso} (${deleteEntryTarget.planned_start}–${deleteEntryTarget.planned_end})?`
+            : ""
+        }
+        confirmLabel="Eliminar cita"
+        busy={deleteEntryBusy}
+        errorMsg={deleteEntryError}
+        onCancel={() => {
+          if (!deleteEntryBusy) {
+            setDeleteEntryTarget(null);
+            setDeleteEntryError(null);
+          }
+        }}
+        onConfirm={() => void handleConfirmDeleteEntry()}
+      />
     </div>
   );
 }

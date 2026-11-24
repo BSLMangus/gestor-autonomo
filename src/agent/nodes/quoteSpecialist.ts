@@ -1,5 +1,6 @@
 import { AIMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { TEXT_LIMITS, truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   Gate1QuoteDraftPayload,
@@ -14,7 +15,12 @@ import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
-import { computeQuoteTotals, formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import {
+  computeQuoteTotals,
+  formatCentsEs,
+  parseQuotePaymentMethodsJson,
+  parseQuotePaymentScheduleJson,
+} from "../../core/fiscal/fiscalEngine";
 import {
   normalizeSpanishText,
   type ParsedQuoteLine,
@@ -97,6 +103,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
               ? `Trabajos para ${presetNewClientName}`
               : "",
           vat_rate: defaultVatRate,
+          validity_days: appSettings.default_quote_validity_days,
+          payment_methods: appSettings.default_payment_methods,
+          payment_schedule: appSettings.default_payment_schedule,
           notes: "",
           lines: [],
         };
@@ -109,7 +118,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             new AIMessage(
               presetClient
                 ? `Constructor de presupuesto listo para ${presetClient.name}. Añade las partidas.`
-                : "Constructor de presupuesto listo. Añade partidas, cliente y tipo de IVA."
+                : "Constructor de presupuesto listo. Añade partidas, IVA y cliente si lo necesitas."
             ),
           ],
           turn_trace: { append_node: "quote_specialist" },
@@ -133,6 +142,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             job_id: job.id,
             job_title: job.title,
             vat_rate: defaultVatRate,
+            validity_days: appSettings.default_quote_validity_days,
+            payment_methods: appSettings.default_payment_methods,
+            payment_schedule: appSettings.default_payment_schedule,
             notes: "",
             lines: [],
           };
@@ -159,6 +171,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             job_id: job.id,
             job_title: job.title,
             vat_rate: existingQuote.vat_rate,
+            validity_days: existingQuote.validity_days ?? appSettings.default_quote_validity_days,
+            payment_methods: parseQuotePaymentMethodsJson(existingQuote.payment_methods_json),
+            payment_schedule: parseQuotePaymentScheduleJson(existingQuote.payment_schedule_json),
             notes: existingQuote.notes,
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
@@ -208,7 +223,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
               action_type: "resolve_disambiguation",
               payload: {
                 disambiguation_choice: "create_annex_job",
-                target_ids: { client_id: existingQuote.client_id },
+                target_ids: existingQuote.client_id ? { client_id: existingQuote.client_id } : {},
               },
             },
           ],
@@ -262,7 +277,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
                 preserved_target: {
                   job_id: activeJob.id,
                   quote_id: existingQuote.id,
-                  client_id: existingQuote.client_id,
+                  ...(existingQuote.client_id ? { client_id: existingQuote.client_id } : {}),
                 },
                 prompt: `La obra ${activeJob.job_code} ya tiene el presupuesto ${existingQuote.quote_code} (${existingQuote.status}). ¿Qué deseas hacer?`,
                 candidates: [
@@ -274,7 +289,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
                           label: `Editar borrador ${existingQuote.quote_code}`,
                           job_id: activeJob.id,
                           quote_id: existingQuote.id,
-                          client_id: existingQuote.client_id,
+                          ...(existingQuote.client_id ? { client_id: existingQuote.client_id } : {}),
                           action_choice: "edit_existing_quote" as const,
                         },
                       ]
@@ -283,7 +298,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
                     entity_type: "intent_action",
                     id: "cand_annex_job",
                     label: "Crear obra anexa nueva",
-                    client_id: existingQuote.client_id,
+                    ...(existingQuote.client_id ? { client_id: existingQuote.client_id } : {}),
                     action_choice: "create_annex_job",
                   },
                   {
@@ -318,8 +333,11 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           snippets.push({
             source_table: "clients",
             record_id: m.id,
-            title: m.name,
-            snippet_text: m.phone ? `Tel ${m.phone}` : m.fiscal_address || "Cliente registrado",
+            title: truncateText(m.name, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            snippet_text: truncateText(
+              m.phone ? `Tel ${m.phone}` : m.fiscal_address || "Cliente registrado",
+              TEXT_LIMITS.RAG_SNIPPET
+            ),
             bm25_score: m.bm25_score,
           });
         }
@@ -340,12 +358,15 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
               original_intent: "quote_specialist",
               original_text: input?.text ?? "",
               preserved_target: resolvedTarget,
-              prompt: `He encontrado ${matches.length} clientes coincidentes con "${clientQuery}". ¿Para cuál es el presupuesto?`,
+              prompt: truncateText(
+                `He encontrado ${matches.length} clientes coincidentes con "${clientQuery}". ¿Para cuál es el presupuesto?`,
+                400
+              ),
               candidates: matches.slice(0, 5).map((m) => ({
                 entity_type: "client",
                 id: m.id,
-                label: m.name,
-                subtitle: m.phone || m.fiscal_address || undefined,
+                label: truncateText(m.name, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+                subtitle: m.phone || m.fiscal_address ? truncateText(m.phone || m.fiscal_address, 200) : undefined,
                 client_id: m.id,
               })),
               attempts: 0,
@@ -383,6 +404,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             job_id: q.job_id,
             job_title: j?.title ?? "Obra en borrador",
             vat_rate: q.vat_rate,
+            validity_days: q.validity_days ?? appSettings.default_quote_validity_days,
+            payment_methods: parseQuotePaymentMethodsJson(q.payment_methods_json),
+            payment_schedule: parseQuotePaymentScheduleJson(q.payment_schedule_json),
             notes: q.notes,
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
@@ -414,8 +438,11 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           snippets.push({
             source_table: "catalog_items",
             record_id: top.id,
-            title: top.description,
-            snippet_text: `${top.category} · ${formatCentsEs(top.unit_price_cents)}/${top.unit}`,
+            title: truncateText(top.description, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            snippet_text: truncateText(
+              `${top.category} · ${formatCentsEs(top.unit_price_cents)}/${top.unit}`,
+              TEXT_LIMITS.RAG_SNIPPET
+            ),
             bm25_score: top.bm25_score,
           });
           const unitPrice = line.explicit_price_cents ?? top.unit_price_cents;
@@ -586,6 +613,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
         job_id: targetJobId,
         job_title: defaultTitle,
         vat_rate: vatRate,
+        validity_days: appSettings.default_quote_validity_days,
+        payment_methods: appSettings.default_payment_methods,
+        payment_schedule: appSettings.default_payment_schedule,
         notes:
           vatRate === 10
             ? "IVA 10 % sujeto a requisitos de reforma en vivienda."
@@ -600,7 +630,7 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           : "0,00 €";
       const missingClientNote =
         !clientRow && !clientQuery
-          ? " Solo falta seleccionar o crear el cliente antes de confirmar."
+          ? " Puedes confirmar sin datos de cliente o añadirlo si lo tienes."
           : "";
 
       return {

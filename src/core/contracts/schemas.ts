@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { deriveFiscalQuarter, isValidIsoDate } from "../fiscal/dateQuarter";
 import { validateSpanishTaxId } from "../fiscal/taxIdValidator";
+import { TEXT_LIMITS } from "./textLimits";
 
 export const JobStatusSchema = z.enum(["pendiente", "en_curso", "finalizado", "cancelado"]);
 export const QuoteStatusSchema = z.enum(["borrador", "enviado", "aceptado", "rechazado"]);
@@ -18,6 +19,46 @@ export const CatalogCategorySchema = z.enum([
 ]);
 export const CatalogPricingModeSchema = z.enum(["fixed", "hourly_plus_materials"]);
 export const QuoteVatRateSchema = z.number().min(0).max(100);
+export const QuoteValidityDaysSchema = z.number().int().min(1).max(365);
+export const QuotePaymentMethodSchema = z.enum(["transferencia", "efectivo", "bizum", "tarjeta"]);
+export const QuotePaymentInstallmentSchema = z.object({
+  label: z
+    .string()
+    .trim()
+    .min(1, "La etiqueta del pago es obligatoria")
+    .max(TEXT_LIMITS.PAYMENT_LABEL),
+  percentage: z.number().min(0.01, "Cada pago debe ser mayor que 0 %").max(100),
+});
+export const QuotePaymentScheduleSchema = z
+  .array(QuotePaymentInstallmentSchema)
+  .max(4, "Máximo 4 pagos fraccionados")
+  .superRefine((items, ctx) => {
+    if (items.length === 0) return;
+    const totalBps = items.reduce((acc, item) => acc + Math.round(item.percentage * 100), 0);
+    if (Math.abs(totalBps - 10_000) > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Los porcentajes del fraccionamiento deben sumar 100 %",
+      });
+    }
+  });
+
+export const TaxModelCodeSchema = z.enum([
+  "303",
+  "130",
+  "131",
+  "111",
+  "115",
+  "349",
+  "309",
+  "390",
+  "190",
+  "180",
+  "347",
+  "100",
+  "102",
+]);
+export const TaxObligationStatusSchema = z.enum(["pendiente", "presentado", "no_aplica"]);
 export const TicketVatRateSchema = z.union([
   z.literal(0),
   z.literal(4),
@@ -146,8 +187,8 @@ export const ScheduleEntryRowSchema = z.object({
   actual_end: TimeHHMMSchema.nullable(),
   actual_hours_thousandths: z.number().int().nonnegative().nullable(),
   status: ScheduleStatusSchema,
-  deviation_reason: z.string().max(240),
-  notes: z.string().max(1000),
+  deviation_reason: z.string().max(TEXT_LIMITS.DEVIATION_REASON),
+  notes: z.string().max(TEXT_LIMITS.NOTES),
   created_at_ms: z.number().int().nonnegative(),
   updated_at_ms: z.number().int().nonnegative(),
 });
@@ -157,8 +198,8 @@ export const DailyWorkLogInputSchema = z.object({
   actual_end: TimeHHMMSchema,
   actual_hours_thousandths: z.number().int().min(0).max(24_000),
   status: ScheduleStatusSchema,
-  deviation_reason: z.string().trim().max(240).default(""),
-  notes: z.string().trim().max(1000).default(""),
+  deviation_reason: z.string().trim().max(TEXT_LIMITS.DEVIATION_REASON).default(""),
+  notes: z.string().trim().max(TEXT_LIMITS.NOTES).default(""),
   also_log_in_site_logs: z.boolean().default(false),
 });
 
@@ -183,7 +224,7 @@ export const ResolvedTargetSchema = z.object({
 
 export const InputPayloadSchema = z.object({
   client_turn_id: z.string().min(1),
-  text: z.string().max(4000).default(""),
+  text: z.string().max(TEXT_LIMITS.CHAT_INPUT).default(""),
   action_type: ActionTypeSchema.default("free_text_or_voice"),
   session_context: z
     .object({
@@ -210,7 +251,7 @@ export const InputPayloadSchema = z.object({
 export const DisambiguationCandidateSchema = z.object({
   entity_type: z.enum(["job", "client", "quote", "catalog_item", "intent_action"]),
   id: z.string().min(1),
-  label: z.string().min(1).max(160),
+  label: z.string().min(1).max(TEXT_LIMITS.DISAMBIGUATION_LABEL),
   subtitle: z.string().max(200).optional(),
   job_id: z.string().min(1).optional(),
   quote_id: z.string().min(1).optional(),
@@ -221,7 +262,7 @@ export const DisambiguationCandidateSchema = z.object({
 
 export const PendingDisambiguationSchema = z.object({
   original_intent: SpecialistRouteSchema.nullable(),
-  original_text: z.string().max(4000),
+  original_text: z.string().max(TEXT_LIMITS.CHAT_INPUT),
   raw_media_uri: z.string().max(1024).optional(),
   preserved_target: ResolvedTargetSchema.optional(),
   prompt: z.string().min(1).max(400),
@@ -240,15 +281,15 @@ export const PendingSlotFillSchema = z.object({
   target_intent: SlotFillTargetSchema,
   missing_fields: z.array(z.string().min(1)).min(1),
   collected_data: z.record(z.string(), z.unknown()).default({}),
-  original_text: z.string().max(4000),
+  original_text: z.string().max(TEXT_LIMITS.CHAT_INPUT),
   attempts: z.number().int().min(0).max(2).default(0),
 });
 
 export const RagSnippetSchema = z.object({
   source_table: z.enum(["catalog_items", "clients", "jobs"]),
   record_id: z.string().min(1),
-  title: z.string().min(1).max(160),
-  snippet_text: z.string().max(240),
+  title: z.string().min(1).max(TEXT_LIMITS.DISAMBIGUATION_LABEL),
+  snippet_text: z.string().max(TEXT_LIMITS.RAG_SNIPPET),
   bm25_score: z.number(),
   metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
@@ -263,7 +304,7 @@ export const QuickActionSchema = z.object({
 // --- DRAFT SCHEMAS (Widget y proposed_payload) ---
 export const Gate1QuoteLineDraftSchema = z.object({
   catalog_item_id: z.string().min(1).nullable(),
-  description: z.string().max(240),
+  description: z.string().max(TEXT_LIMITS.DESCRIPTION),
   category: CatalogCategorySchema.default("General"),
   unit: z.string().min(1).max(24).default("ud"),
   quantity_thousandths: z.number().int().nonnegative().max(10_000_000),
@@ -277,22 +318,33 @@ export const Gate1QuoteDraftPayloadSchema = z.object({
   client_id: z.string().min(1).nullable(),
   new_client: z
     .object({
-      name: z.string().max(160),
-      phone: z.string().max(32).optional(),
-      nif: z.string().max(24).optional(),
-      fiscal_address: z.string().max(240).optional(),
+      name: z.string().max(TEXT_LIMITS.NAME),
+      phone: z.string().max(TEXT_LIMITS.PHONE).optional(),
+      nif: z.string().max(TEXT_LIMITS.TAX_ID).optional(),
+      fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
     })
     .optional(),
   job_id: z.string().min(1).nullable(),
-  job_title: z.string().max(180),
+  job_title: z.string().max(TEXT_LIMITS.TITLE),
   vat_rate: QuoteVatRateSchema,
-  notes: z.string().max(1000).default(""),
+  validity_days: QuoteValidityDaysSchema.nullable().optional(),
+  payment_methods: z.array(QuotePaymentMethodSchema).max(4).optional(),
+  payment_schedule: z
+    .array(
+      z.object({
+        label: z.string().max(TEXT_LIMITS.PAYMENT_LABEL),
+        percentage: z.number().min(0).max(100),
+      })
+    )
+    .max(4)
+    .optional(),
+  notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
   lines: z.array(Gate1QuoteLineDraftSchema).min(0),
 });
 
 export const Gate2TicketDraftPayloadSchema = z.object({
-  supplier_name: z.string().max(160).default(""),
-  supplier_nif: z.string().max(24).default(""),
+  supplier_name: z.string().max(TEXT_LIMITS.NAME).default(""),
+  supplier_nif: z.string().max(TEXT_LIMITS.TAX_ID).default(""),
   issue_date_iso: IsoDateSchema,
   quarter: FiscalQuarterSchema,
   base_cents: z.number().int().nonnegative().max(100_000_000),
@@ -311,47 +363,50 @@ export const Gate3InvoiceDraftPayloadSchema = z.object({
   job_id: z.string().min(1),
   issued_at_iso: IsoDateSchema,
   due_at_iso: IsoDateSchema,
-  emitter_name: z.string().max(160).default(""),
-  emitter_nif: z.string().max(24).default(""),
-  emitter_fiscal_address: z.string().max(240).default(""),
+  emitter_name: z.string().max(TEXT_LIMITS.NAME).default(""),
+  emitter_nif: z.string().max(TEXT_LIMITS.TAX_ID).default(""),
+  emitter_fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).default(""),
   client_id: z.string().min(1),
-  client_nif: z.string().max(24).default(""),
-  client_fiscal_address: z.string().max(240).default(""),
-  notes: z.string().max(1000).default(""),
+  client_nif: z.string().max(TEXT_LIMITS.TAX_ID).default(""),
+  client_fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).default(""),
+  notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
 });
 
 export const Gate4ShareDraftPayloadSchema = z.object({
   document_kind: z.enum(["quote", "invoice"]),
   document_id: z.string().min(1),
   channel: z.enum(["whatsapp", "share_sheet"]),
-  recipient_phone: z.string().max(32).default(""),
-  message_text: z.string().max(2000),
+  recipient_phone: z.string().max(TEXT_LIMITS.PHONE).default(""),
+  message_text: z.string().max(TEXT_LIMITS.SHARE_MESSAGE),
 });
 
 // --- COMMIT SCHEMAS ESTRICTOS ---
 export const Gate1QuoteLineCommitSchema = Gate1QuoteLineDraftSchema.extend({
-  description: z.string().trim().min(1).max(240),
+  description: z.string().trim().min(1).max(TEXT_LIMITS.DESCRIPTION),
   quantity_thousandths: z.number().int().positive().max(10_000_000),
   unit_price_cents: z.number().int().positive().max(100_000_000),
 });
 
 export const Gate1QuoteCommitPayloadSchema = Gate1QuoteDraftPayloadSchema.extend({
-  job_title: z.string().trim().min(1).max(180),
+  job_title: z.string().trim().max(TEXT_LIMITS.TITLE).default(""),
+  validity_days: QuoteValidityDaysSchema.nullable().optional(),
+  payment_methods: z.array(QuotePaymentMethodSchema).max(4).optional(),
+  payment_schedule: QuotePaymentScheduleSchema.optional(),
   new_client: z
     .object({
-      name: z.string().trim().min(1).max(160),
-      phone: z.string().max(32).optional(),
+      name: z.string().trim().min(1).max(TEXT_LIMITS.NAME),
+      phone: z.string().max(TEXT_LIMITS.PHONE).optional(),
       nif: z.union([z.literal(""), SpanishTaxIdSchema]).optional(),
-      fiscal_address: z.string().max(240).optional(),
+      fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
     })
     .optional(),
   lines: z.array(Gate1QuoteLineCommitSchema).min(1),
-}).refine((p) => (p.client_id !== null) !== (p.new_client !== undefined), {
-  message: "Debe indicar exactamente client_id existente o new_client (XOR)",
+}).refine((p) => !(p.client_id !== null && p.new_client !== undefined), {
+  message: "No puedes indicar client_id existente y new_client a la vez",
 });
 
 export const Gate2TicketCommitPayloadSchema = Gate2TicketDraftPayloadSchema.extend({
-  supplier_name: z.string().trim().min(1).max(160),
+  supplier_name: z.string().trim().min(1).max(TEXT_LIMITS.NAME),
   supplier_nif: z.union([z.literal(""), SpanishTaxIdSchema]).default(""),
   total_cents: z.number().int().positive().max(100_000_000),
 }).superRefine((t, ctx) => {
@@ -367,18 +422,18 @@ export const Gate2TicketCommitPayloadSchema = Gate2TicketDraftPayloadSchema.exte
 });
 
 export const Gate3InvoiceCommitPayloadSchema = Gate3InvoiceDraftPayloadSchema.extend({
-  emitter_name: z.string().trim().min(1).max(160),
+  emitter_name: z.string().trim().min(1).max(TEXT_LIMITS.NAME),
   emitter_nif: SpanishTaxIdSchema,
-  emitter_fiscal_address: z.string().trim().min(5).max(240),
+  emitter_fiscal_address: z.string().trim().min(5).max(TEXT_LIMITS.ADDRESS),
   client_nif: SpanishTaxIdSchema,
-  client_fiscal_address: z.string().trim().min(5).max(240),
+  client_fiscal_address: z.string().trim().min(5).max(TEXT_LIMITS.ADDRESS),
 }).refine((inv) => inv.due_at_iso >= inv.issued_at_iso, {
   message: "due_at_iso no puede ser anterior a issued_at_iso",
 });
 
 export const Gate4ShareCommitPayloadSchema = Gate4ShareDraftPayloadSchema.extend({
   recipient_phone: z.union([z.literal(""), E164PhoneSchema]).default(""),
-  message_text: z.string().trim().min(1).max(2000),
+  message_text: z.string().trim().min(1).max(TEXT_LIMITS.SHARE_MESSAGE),
 }).refine((s) => s.channel !== "whatsapp" || s.recipient_phone.length > 0, {
   message: "El canal WhatsApp exige teléfono destino válido",
 });
@@ -443,7 +498,7 @@ export const ActiveWidgetEnvelopeSchema = z.discriminatedUnion("ui_widget_type",
     widget_payload: z.object({
       candidate_job_id: z.string().min(1).nullable(),
       category: SiteLogCategorySchema,
-      note_text: z.string().max(1000),
+      note_text: z.string().max(TEXT_LIMITS.NOTES),
       raw_media_uri: z.string().nullable(),
       stamp_preview_meta: z.object({
         job_code: z.string().nullable(),
@@ -456,12 +511,12 @@ export const ActiveWidgetEnvelopeSchema = z.discriminatedUnion("ui_widget_type",
     ui_widget_type: z.literal("ClientProfileWidget"),
     widget_payload: z.object({
       client_id: z.string().min(1).nullable(),
-      name: z.string().max(160),
-      phone: z.string().max(32).default(""),
-      nif: z.string().max(24).default(""),
-      fiscal_address: z.string().max(240).default(""),
-      email: z.string().max(160).default(""),
-      notes: z.string().max(1000).default(""),
+      name: z.string().max(TEXT_LIMITS.NAME),
+      phone: z.string().max(TEXT_LIMITS.PHONE).default(""),
+      nif: z.string().max(TEXT_LIMITS.TAX_ID).default(""),
+      fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).default(""),
+      email: z.string().max(TEXT_LIMITS.EMAIL).default(""),
+      notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
       validation_hint: z.string().max(300).nullable().optional(),
     }),
   }),
@@ -475,20 +530,20 @@ export const ActiveWidgetEnvelopeSchema = z.discriminatedUnion("ui_widget_type",
       start_date_iso: IsoDateSchema.nullable().optional(),
       end_date_iso: IsoDateSchema.nullable().optional(),
       suggested_delta_thousandths: z.number().int().nullable().optional(),
-      suggested_reason: z.string().max(240).default(""),
-      suggested_notes: z.string().max(1000).default(""),
+      suggested_reason: z.string().max(TEXT_LIMITS.DEVIATION_REASON).default(""),
+      suggested_notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
     }),
   }),
 ]);
 
 export const ClientProfileCommitSchema = z.object({
   client_id: z.string().min(1).nullable().optional(),
-  name: z.string().trim().min(1, "El nombre del cliente es obligatorio").max(160),
-  phone: z.string().trim().max(32).default(""),
+  name: z.string().trim().min(1, "El nombre del cliente es obligatorio").max(TEXT_LIMITS.NAME),
+  phone: z.string().trim().max(TEXT_LIMITS.PHONE).default(""),
   nif: z.union([z.literal(""), SpanishTaxIdSchema]).default(""),
-  fiscal_address: z.string().trim().max(240).default(""),
-  email: z.string().trim().max(160).default(""),
-  notes: z.string().trim().max(1000).default(""),
+  fiscal_address: z.string().trim().max(TEXT_LIMITS.ADDRESS).default(""),
+  email: z.string().trim().max(TEXT_LIMITS.EMAIL).default(""),
+  notes: z.string().trim().max(TEXT_LIMITS.NOTES).default(""),
 });
 
 // --- HUMAN DECISION (Command({ resume })) ---
@@ -573,15 +628,21 @@ export const PricingSettingsInputSchema = z.object({
   hourly_rate_cents: z.number().int().min(100).max(1_000_000),
 });
 
+export const QuoteDefaultsInputSchema = z.object({
+  default_quote_validity_days: QuoteValidityDaysSchema,
+  default_payment_methods: z.array(QuotePaymentMethodSchema).max(4),
+  default_payment_schedule: QuotePaymentScheduleSchema,
+});
+
 export const EmitterProfileInputSchema = z.object({
-  emitter_name: z.string().trim().max(160),
+  emitter_name: z.string().trim().max(TEXT_LIMITS.NAME),
   emitter_nif: z
     .string()
     .trim()
     .toUpperCase()
     .refine((v) => v === "" || validateSpanishTaxId(v), "NIF/NIE/CIF inválido según dígito de control"),
-  emitter_fiscal_address: z.string().trim().max(240),
-  emitter_phone: z.string().trim().max(32),
+  emitter_fiscal_address: z.string().trim().max(TEXT_LIMITS.ADDRESS),
+  emitter_phone: z.string().trim().max(TEXT_LIMITS.PHONE),
   emitter_iban: z
     .string()
     .trim()
@@ -636,12 +697,12 @@ export const SiteLogInputSchema = z
     job_id: z.string().min(1).nullable(),
     new_job: z
       .object({
-        title: z.string().trim().min(1).max(180),
-        address: z.string().max(240).optional().default(""),
+        title: z.string().trim().min(1).max(TEXT_LIMITS.TITLE),
+        address: z.string().max(TEXT_LIMITS.ADDRESS).optional().default(""),
       })
       .optional(),
     category: SiteLogCategorySchema,
-    note_text: z.string().max(1000).default(""),
+    note_text: z.string().max(TEXT_LIMITS.NOTES).default(""),
     raw_media_uri: z.string().min(1).max(1024).nullable(),
   })
   .superRefine((val, ctx) => {
@@ -713,8 +774,8 @@ export const QuoteRowSchema = z.object({
   id: z.string().min(1),
   quote_code: z.string().min(1),
   job_id: z.string().min(1),
-  client_id: z.string().min(1),
-  client_name_snapshot: z.string().trim().min(1),
+  client_id: z.string().min(1).nullable(),
+  client_name_snapshot: z.string(),
   client_nif_snapshot: z.string(),
   client_address_snapshot: z.string(),
   client_phone_snapshot: z.string(),
@@ -723,6 +784,9 @@ export const QuoteRowSchema = z.object({
   vat_cents: z.number().int().nonnegative(),
   total_cents: z.number().int().nonnegative(),
   status: QuoteStatusSchema,
+  validity_days: QuoteValidityDaysSchema.nullable().optional().default(null),
+  payment_methods_json: z.string().optional().default("[]"),
+  payment_schedule_json: z.string().optional().default("[]"),
   notes: z.string(),
   pdf_uri: z.string().nullable(),
   sent_at_iso: IsoDateSchema.nullable(),
@@ -818,10 +882,28 @@ export const FeedbackCorrectionRowSchema = z.object({
   created_at_ms: z.number().int().nonnegative(),
 });
 
+export const TaxObligationStateRowSchema = z.object({
+  obligation_key: z.string().min(1),
+  model_code: TaxModelCodeSchema,
+  fiscal_year: z.number().int().min(2020).max(2100),
+  period_code: z.string().min(1),
+  status: TaxObligationStatusSchema,
+  presented_at_iso: IsoDateSchema.nullable(),
+  notes: z.string(),
+  updated_at_ms: z.number().int().nonnegative(),
+});
+
+export const TaxAlertDismissalRowSchema = z.object({
+  alert_key: z.string().min(1),
+  dismissed_at_ms: z.number().int().nonnegative(),
+});
+
 export const SymmetricBackupPlaintextSchema = z.object({
   app_settings_emitter: EmitterProfileInputSchema,
   app_settings_tax: TaxSettingsInputSchema.optional(),
   app_settings_pricing: PricingSettingsInputSchema.optional(),
+  app_settings_quote_defaults: QuoteDefaultsInputSchema.optional(),
+  app_settings_tax_models: z.array(TaxModelCodeSchema).optional(),
   work_schedule_defaults: WorkScheduleDefaultsSchema.optional(),
   sequences: z.array(SequenceRowSchema),
   clients: z.array(ClientRowSchema),
@@ -834,6 +916,8 @@ export const SymmetricBackupPlaintextSchema = z.object({
   site_logs: z.array(SiteLogRowSchema),
   feedback_corrections: z.array(FeedbackCorrectionRowSchema),
   schedule_entries: z.array(ScheduleEntryRowSchema).optional(),
+  tax_obligation_states: z.array(TaxObligationStateRowSchema).optional(),
+  tax_alert_dismissals: z.array(TaxAlertDismissalRowSchema).optional(),
 });
 
 export const SymmetricBackupEnvelopeSchema = z.discriminatedUnion("encrypted", [

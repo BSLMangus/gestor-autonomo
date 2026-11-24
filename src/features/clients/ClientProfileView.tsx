@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ClientRow,
   InvoiceRow,
@@ -248,6 +249,7 @@ export function ClientProfileView({
           >
             <input
               type="text"
+              maxLength={TEXT_LIMITS.TITLE}
               value={newJobTitle}
               onChange={(e) => setNewJobTitle(e.target.value)}
               placeholder="Título de la obra (ej. Reforma baño)"

@@ -11,12 +11,16 @@ import type {
   JobStatus,
   QuoteRow,
   SiteLogRecord,
+  WorkScheduleDefaults,
 } from "../../core/contracts/types";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { InvoicesRepository } from "../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
-import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
+import {
+  computeDailyWorkHoursThousandths,
+  ScheduleRepository,
+} from "../../core/db/repositories/scheduleRepo";
 import { SiteLogsRepository } from "../../core/db/repositories/siteLogsRepo";
 import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
@@ -25,6 +29,16 @@ import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { LocalFileBridge, SqliteExecutor } from "../../core/contracts/types";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
+import { SubDayDurationPicker } from "../calendar/SubDayDurationPicker";
+
+const FALLBACK_SCHEDULE_DEFAULTS: WorkScheduleDefaults = {
+  work_days: [1, 2, 3, 4, 5],
+  morning_start: "08:00",
+  morning_end: "14:00",
+  afternoon_start: "15:00",
+  afternoon_end: "17:00",
+  auto_apply_to_jobs: true,
+};
 
 interface JobDetailDrawerProps {
   jobId: string | null;
@@ -113,6 +127,11 @@ export function JobDetailDrawer({
   const [scheduleSummary, setScheduleSummary] = useState<JobScheduleDeviationSummary | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [scheduleDefaults, setScheduleDefaults] =
+    useState<WorkScheduleDefaults>(FALLBACK_SCHEDULE_DEFAULTS);
+  const [planStartTime, setPlanStartTime] = useState(FALLBACK_SCHEDULE_DEFAULTS.morning_start);
+  const [planEndTime, setPlanEndTime] = useState(FALLBACK_SCHEDULE_DEFAULTS.afternoon_end);
+  const [planHoursThousandths, setPlanHoursThousandths] = useState<number>(8000);
   const [datesUndoStack, setDatesUndoStack] = useState<Array<{ start: string; end: string }>>([]);
   const [datesVoiceChanges, setDatesVoiceChanges] = useState<string[]>([]);
   const [datesVoiceWarnings, setDatesVoiceWarnings] = useState<string[]>([]);
@@ -138,13 +157,15 @@ export function JobDetailDrawer({
     setEditStartDate(j.start_date_iso ?? "");
     setEditEndDate(j.end_date_iso ?? "");
 
-    const [cl, qList, iList, tRes, slList, schedSum] = await Promise.all([
+    const [cl, qList, iList, tRes, slList, schedSum, defaults, jobEntries] = await Promise.all([
       j.client_id ? clientsRepo.getById(j.client_id) : Promise.resolve(null),
       quotesRepo.listByJobId(j.id),
       invoicesRepo.listByJobId(j.id),
       ticketsRepo.listByQuarterOrJob({ jobId: j.id, limit: 50, offset: 0 }),
       siteLogsRepo.listByJobId(j.id),
       scheduleRepo.getJobScheduleDeviationSummary(j.id),
+      scheduleRepo.getWorkScheduleDefaults(),
+      scheduleRepo.listEntriesByJob(j.id),
     ]);
     setClient(cl);
     setQuotes(qList);
@@ -152,6 +173,16 @@ export function JobDetailDrawer({
     setTickets(tRes.items);
     setSiteLogs(slList);
     setScheduleSummary(schedSum);
+    setScheduleDefaults(defaults);
+    if (jobEntries.length === 1 && j.start_date_iso && j.start_date_iso === (j.end_date_iso ?? j.start_date_iso)) {
+      setPlanStartTime(jobEntries[0]!.planned_start);
+      setPlanEndTime(jobEntries[0]!.planned_end);
+      setPlanHoursThousandths(jobEntries[0]!.planned_hours_thousandths);
+    } else {
+      setPlanStartTime(defaults.morning_start);
+      setPlanEndTime(defaults.afternoon_end || defaults.morning_end);
+      setPlanHoursThousandths(computeDailyWorkHoursThousandths(defaults) || 8000);
+    }
   };
 
   useEffect(() => {
@@ -382,7 +413,13 @@ export function JobDetailDrawer({
                       type="date"
                       data-testid="job-detail-start-date"
                       value={editStartDate}
-                      onChange={(e) => setEditStartDate(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setEditStartDate(next);
+                        if (!editEndDate || editEndDate === editStartDate || (next && editEndDate < next)) {
+                          setEditEndDate(next);
+                        }
+                      }}
                       className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
                     />
                   </label>
@@ -397,6 +434,22 @@ export function JobDetailDrawer({
                     />
                   </label>
                 </div>
+
+                {editStartDate && (!editEndDate || editStartDate === editEndDate) && (
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low/60 p-3">
+                    <SubDayDurationPicker
+                      startTime={planStartTime}
+                      endTime={planEndTime}
+                      defaults={scheduleDefaults}
+                      disabled={busy}
+                      onChange={(next) => {
+                        setPlanStartTime(next.startTime);
+                        setPlanEndTime(next.endTime);
+                        setPlanHoursThousandths(next.hoursThousandths);
+                      }}
+                    />
+                  </div>
+                )}
 
                 {scheduleSummary && scheduleSummary.logged_days > 0 && (
                   <div className="rounded-xl bg-surface-container-low px-3 py-2 flex items-center justify-between text-[11px]">
@@ -418,15 +471,31 @@ export function JobDetailDrawer({
                 <button
                   type="button"
                   data-testid="job-detail-plan-calendar-btn"
-                  disabled={busy || !editStartDate || !editEndDate}
+                  disabled={busy || !editStartDate}
                   onClick={() =>
                     void runAction(async () => {
                       setScheduleSavedMsg(null);
+                      const effectiveEnd = editEndDate || editStartDate;
+                      const isSameDay = editStartDate === effectiveEnd;
                       const entries = await new ScheduleRepository(
                         executor
-                      ).generateEntriesForJobDateRange(job.id, editStartDate, editEndDate);
+                      ).generateEntriesForJobDateRange(
+                        job.id,
+                        editStartDate,
+                        effectiveEnd,
+                        isSameDay
+                          ? {
+                              plannedStart: planStartTime,
+                              plannedEnd: planEndTime,
+                              plannedHoursThousandths: planHoursThousandths,
+                              replaceSingleDayHours: true,
+                            }
+                          : undefined
+                      );
                       setScheduleSavedMsg(
-                        `Agenda actualizada: ${entries.length} día(s) planificado(s) según horario habitual.`
+                        isSameDay
+                          ? `Agenda actualizada (${(planHoursThousandths / 1000).toFixed(1).replace(/\.0$/, "").replace(".", ",")} h el ${editStartDate}).`
+                          : `Agenda actualizada: ${entries.length} día(s) planificado(s) según horario habitual.`
                       );
                     })
                   }

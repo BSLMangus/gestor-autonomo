@@ -1,5 +1,6 @@
 import { deriveFiscalQuarter, getLocalTodayIso, isValidIsoDate } from "../../fiscal/dateQuarter";
 import type { PdfInvoiceDocumentInput, PdfPort } from "../../ports/mediaPorts";
+import { deriveInvoiceAdvancePercent } from "../../fiscal/fiscalEngine";
 import type {
   InvoiceRow,
   JobRow,
@@ -145,6 +146,7 @@ export class InvoicesRepository {
       kind: "invoice",
       invoiceNumber: invoice.invoice_number,
       invoiceKind: invoice.kind,
+      advancePercent: deriveInvoiceAdvancePercent(invoice, quote),
       issuedAtIso: invoice.issued_at_iso,
       dueAtIso: invoice.due_at_iso,
       emitter: {

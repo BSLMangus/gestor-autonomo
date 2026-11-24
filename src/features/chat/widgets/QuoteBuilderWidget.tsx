@@ -7,9 +7,12 @@ import {
 import {
   Gate1QuoteCommitPayloadSchema,
 } from "../../../core/contracts/schemas";
+import { TEXT_LIMITS } from "../../../core/contracts/textLimits";
 import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
+import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 import type {
   ActiveWidgetEnvelope,
+  AppSettingsRecord,
   CatalogCategory,
   CatalogItemRow,
   ClientRow,
@@ -29,6 +32,10 @@ import {
   sanitizeDecimalPriceInput,
   shouldClearPriceOnFocus,
 } from "./priceInputUtils";
+import {
+  isScheduleSumValid,
+  QuotePaymentValidityEditor,
+} from "../../quotes/QuotePaymentValidityEditor";
 import type { WidgetCommonProps } from "./widgetTypes";
 
 type QuoteWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "QuoteBuilderWidget" }>;
@@ -137,10 +144,19 @@ export function QuoteBuilderWidget({
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItemRow[]>([]);
   const [hourlyRateCents, setHourlyRateCents] = useState(3800);
+  const [defaultSettings, setDefaultSettings] = useState<AppSettingsRecord | null>(null);
   const [showCatalogPicker, setShowCatalogPicker] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [catalogFilter, setCatalogFilter] = useState("");
   const [useNewClient, setUseNewClient] = useState<boolean>(
     Boolean(initialDraft.new_client && !initialDraft.client_id)
+  );
+  const [clientSelectorMode, setClientSelectorMode] = useState<"none" | "existing" | "new">(
+    initialDraft.new_client && !initialDraft.client_id
+      ? "new"
+      : initialDraft.client_id
+        ? "existing"
+        : "none"
   );
   const [validationError, setValidationError] = useState<string | null>(null);
   const [voiceUndoStack, setVoiceUndoStack] = useState<QuoteBuilderFormState[]>([]);
@@ -150,7 +166,9 @@ export function QuoteBuilderWidget({
 
   useEffect(() => {
     setDraft(initialDraft);
-    setUseNewClient(Boolean(initialDraft.new_client && !initialDraft.client_id));
+    const nextNew = Boolean(initialDraft.new_client && !initialDraft.client_id);
+    setUseNewClient(nextNew);
+    setClientSelectorMode(nextNew ? "new" : initialDraft.client_id ? "existing" : "none");
     setValidationError(null);
     setShowCatalogPicker(false);
     setCatalogFilter("");
@@ -173,6 +191,7 @@ export function QuoteBuilderWidget({
         setClients(clRes.items);
         setCatalogItems(catRes.items);
         setHourlyRateCents(settingsRes.hourly_rate_cents);
+        setDefaultSettings(settingsRes);
       })
       .catch(() => {
         // ignore secondary load error
@@ -203,6 +222,7 @@ export function QuoteBuilderWidget({
       setVoiceUndoStack((s) => s.slice(0, -1));
       setDraft(prev.draft);
       setUseNewClient(prev.useNewClient);
+      setClientSelectorMode(prev.useNewClient ? "new" : prev.draft.client_id ? "existing" : "none");
       setVoiceChanges(["Último dictado deshecho"]);
       setVoiceWarnings([]);
       setVoiceDisambig(null);
@@ -216,6 +236,7 @@ export function QuoteBuilderWidget({
             setVoiceUndoStack((s) => [...s.slice(-9), snapshot]);
             const cl = clients.find((c) => c.id === id);
             setUseNewClient(false);
+            setClientSelectorMode("existing");
             setDraft((prev) => ({
               ...prev,
               client_id: id,
@@ -243,6 +264,9 @@ export function QuoteBuilderWidget({
         setVoiceUndoStack((s) => [...s.slice(-9), snapshot]);
         setDraft(res.nextState.draft);
         setUseNewClient(res.nextState.useNewClient);
+        setClientSelectorMode(
+          res.nextState.useNewClient ? "new" : res.nextState.draft.client_id ? "existing" : "none"
+        );
         setVoiceChanges(res.appliedChanges);
         setVoiceWarnings(res.warnings);
       } else if (!res.disambiguation) {
@@ -330,9 +354,26 @@ export function QuoteBuilderWidget({
     );
   }, [catalogItems, catalogFilter]);
 
+  const effectiveValidityDays =
+    draft.validity_days ?? defaultSettings?.default_quote_validity_days ?? 30;
+  const effectivePaymentMethods =
+    draft.payment_methods ?? defaultSettings?.default_payment_methods ?? ["transferencia"];
+  const effectivePaymentSchedule =
+    draft.payment_schedule ?? defaultSettings?.default_payment_schedule ?? [];
+
   const handleConfirm = async () => {
     setValidationError(null);
-    const parsed = Gate1QuoteCommitPayloadSchema.safeParse(draft);
+    if (!isScheduleSumValid(effectivePaymentSchedule)) {
+      setValidationError("Los porcentajes de forma de cobro deben sumar exactamente 100 %.");
+      return;
+    }
+    const candidatePayload = {
+      ...draft,
+      validity_days: effectiveValidityDays,
+      payment_methods: effectivePaymentMethods,
+      payment_schedule: effectivePaymentSchedule,
+    };
+    const parsed = Gate1QuoteCommitPayloadSchema.safeParse(candidatePayload);
     if (!parsed.success) {
       setValidationError(
         parsed.error.issues.map((iss) => iss.message).join(" · ")
@@ -391,7 +432,7 @@ export function QuoteBuilderWidget({
       <div className="mt-3 space-y-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700" htmlFor="qb-job-title">
-            Título de la obra
+            Título de la obra (opcional)
           </label>
           <input
             id="qb-job-title"
@@ -400,24 +441,42 @@ export function QuoteBuilderWidget({
             disabled={!canAct || isSubmitting}
             value={draft.job_title}
             onChange={(e) => setDraft((p) => ({ ...p, job_title: e.target.value }))}
-            placeholder="Ej: Cambio termo eléctrico 80L"
+            placeholder="Opcional — se usará la primera partida"
             className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
           />
         </div>
 
         <div className="rounded-xl bg-slate-50 p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-700">Cliente</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-700">Cliente (opcional)</span>
             {canAct && (
-              <div className="flex gap-1.5 text-xs">
+              <div className="flex gap-1 text-[11px]">
                 <button
                   type="button"
+                  data-testid="quote-client-mode-none"
                   onClick={() => {
+                    setClientSelectorMode("none");
+                    setUseNewClient(false);
+                    setDraft((p) => ({ ...p, client_id: null, new_client: undefined }));
+                  }}
+                  className={`rounded-lg px-2 py-1 font-medium ${
+                    clientSelectorMode === "none"
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-700 border border-slate-200"
+                  }`}
+                >
+                  Sin cliente
+                </button>
+                <button
+                  type="button"
+                  data-testid="quote-client-mode-existing"
+                  onClick={() => {
+                    setClientSelectorMode("existing");
                     setUseNewClient(false);
                     setDraft((p) => ({ ...p, new_client: undefined }));
                   }}
-                  className={`rounded-lg px-2.5 py-1 font-medium ${
-                    !useNewClient
+                  className={`rounded-lg px-2 py-1 font-medium ${
+                    clientSelectorMode === "existing"
                       ? "bg-slate-900 text-white"
                       : "bg-white text-slate-700 border border-slate-200"
                   }`}
@@ -426,7 +485,9 @@ export function QuoteBuilderWidget({
                 </button>
                 <button
                   type="button"
+                  data-testid="quote-client-mode-new"
                   onClick={() => {
+                    setClientSelectorMode("new");
                     setUseNewClient(true);
                     setDraft((p) => ({
                       ...p,
@@ -434,8 +495,8 @@ export function QuoteBuilderWidget({
                       new_client: p.new_client ?? { name: "", phone: "", nif: "", fiscal_address: "" },
                     }));
                   }}
-                  className={`rounded-lg px-2.5 py-1 font-medium ${
-                    useNewClient
+                  className={`rounded-lg px-2 py-1 font-medium ${
+                    clientSelectorMode === "new"
                       ? "bg-slate-900 text-white"
                       : "bg-white text-slate-700 border border-slate-200"
                   }`}
@@ -446,19 +507,24 @@ export function QuoteBuilderWidget({
             )}
           </div>
 
-          {!useNewClient ? (
+          {clientSelectorMode === "none" ? (
+            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white/80 px-2.5 py-2 text-[11px] text-slate-600">
+              Presupuesto simplificado sin datos de cliente (podrás asignar uno más tarde para facturar).
+            </div>
+          ) : clientSelectorMode === "existing" ? (
             <select
               aria-label="Seleccionar cliente existente"
               data-testid="quote-client-select"
               disabled={!canAct || isSubmitting}
               value={draft.client_id ?? ""}
-              onChange={(e) =>
+              onChange={(e) => {
+                const nextId = e.target.value || null;
                 setDraft((p) => ({
                   ...p,
-                  client_id: e.target.value || null,
+                  client_id: nextId,
                   new_client: undefined,
-                }))
-              }
+                }));
+              }}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
             >
               <option value="">-- Seleccionar cliente --</option>
@@ -512,18 +578,21 @@ export function QuoteBuilderWidget({
                 }
                 className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               />
-              <input
-                type="text"
+              <ZoomableTextField
+                as="input"
+                multiline={false}
+                zoomLabel="Domicilio fiscal del cliente"
+                maxLength={TEXT_LIMITS.ADDRESS}
                 disabled={!canAct || isSubmitting}
                 placeholder="Domicilio fiscal"
                 value={draft.new_client?.fiscal_address ?? ""}
-                onChange={(e) =>
+                onValueChange={(next) =>
                   setDraft((p) => ({
                     ...p,
                     client_id: null,
                     new_client: {
                       ...(p.new_client ?? { name: "" }),
-                      fiscal_address: e.target.value,
+                      fiscal_address: next,
                     },
                   }))
                 }
@@ -669,12 +738,16 @@ export function QuoteBuilderWidget({
                 className="w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 space-y-2"
               >
                 <div className="flex min-w-0 gap-2 items-start">
-                  <textarea
+                  <ZoomableTextField
+                    as="textarea"
+                    multiline
                     rows={2}
+                    maxLength={TEXT_LIMITS.DESCRIPTION}
+                    zoomLabel={`Descripción de la partida ${idx + 1}`}
                     aria-label={`Descripción partida ${idx + 1}`}
                     disabled={!canAct || isSubmitting}
                     value={line.description}
-                    onChange={(e) => updateLine(idx, { description: e.target.value })}
+                    onValueChange={(next) => updateLine(idx, { description: next })}
                     placeholder="Descripción de trabajo o material"
                     className="min-w-0 flex-1 resize-none rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium break-words"
                   />
@@ -792,16 +865,63 @@ export function QuoteBuilderWidget({
           </div>
         </div>
 
+        {/* Validez y condiciones de pago */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+          <button
+            type="button"
+            data-testid="quote-toggle-payment-validity-btn"
+            onClick={() => setShowPaymentOptions((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 text-left text-xs font-bold text-slate-800 cursor-pointer"
+          >
+            <span>
+              Validez ({effectiveValidityDays} d) y forma de cobro
+              {effectivePaymentSchedule.length > 0
+                ? ` (${effectivePaymentSchedule.length} ${effectivePaymentSchedule.length === 1 ? "pago" : "pagos"})`
+                : ""}
+            </span>
+            <span className="text-[11px] font-semibold text-orange-700">
+              {showPaymentOptions ? "Ocultar" : "Editar"}
+            </span>
+          </button>
+
+          {showPaymentOptions && (
+            <div className="mt-3 pt-2.5 border-t border-slate-200">
+              <QuotePaymentValidityEditor
+                validityDays={effectiveValidityDays}
+                onChangeValidityDays={(days) =>
+                  setDraft((p) => ({ ...p, validity_days: days }))
+                }
+                paymentMethods={effectivePaymentMethods}
+                onChangePaymentMethods={(methods) =>
+                  setDraft((p) => ({ ...p, payment_methods: methods }))
+                }
+                paymentSchedule={effectivePaymentSchedule}
+                onChangePaymentSchedule={(schedule) =>
+                  setDraft((p) => ({ ...p, payment_schedule: schedule }))
+                }
+                emitterIban={defaultSettings?.emitter_iban ?? ""}
+                totalCentsForPreview={totals.totalCents}
+                disabled={!canAct || isSubmitting}
+                testIdPrefix="qb-pv"
+              />
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="block text-xs font-semibold text-slate-700" htmlFor="qb-notes">
             Notas
           </label>
-          <textarea
+          <ZoomableTextField
             id="qb-notes"
+            as="textarea"
+            multiline
             rows={2}
+            maxLength={TEXT_LIMITS.NOTES}
+            zoomLabel="Notas del presupuesto"
             disabled={!canAct || isSubmitting}
             value={draft.notes}
-            onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
+            onValueChange={(next) => setDraft((p) => ({ ...p, notes: next }))}
             className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs disabled:bg-slate-50"
           />
         </div>

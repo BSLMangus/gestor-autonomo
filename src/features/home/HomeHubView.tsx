@@ -30,11 +30,14 @@ import { TracesRepository } from "../../core/db/repositories/tracesRepo";
 import { addDaysIso, deriveFiscalQuarter, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import { computePiggyBank, formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { AppRoute } from "../../core/navigation/routes";
+import { TaxAlertsBanner } from "../fiscal/TaxAlertsBanner";
 
 interface HomeHubViewProps {
   executor: SqliteExecutor;
   refreshTick: number;
+  todayIso?: string;
   onNavigate: (route: AppRoute) => void;
+  onTaxStateChanged?: () => void | Promise<void>;
 }
 
 interface HomeMetrics {
@@ -69,7 +72,13 @@ function getInitials(name: string): string {
   return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
-export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewProps) {
+export function HomeHubView({
+  executor,
+  refreshTick,
+  todayIso,
+  onNavigate,
+  onTaxStateChanged,
+}: HomeHubViewProps) {
   const [metrics, setMetrics] = useState<HomeMetrics | null>(null);
 
   useEffect(() => {
@@ -116,9 +125,12 @@ export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewPr
         irpfRate: settings.irpf_reserve_rate,
       });
 
-      const todayEntry = weekEntries.find((e) => e.date_iso === todayIso);
+      const todayEntries = weekEntries.filter((e) => e.date_iso === todayIso);
+      const primaryTodayEntry = todayEntries[0];
       const activeJob =
-        (todayEntry?.job_id ? jobs.find((j) => j.id === todayEntry.job_id) : undefined) ??
+        (primaryTodayEntry?.job_id
+          ? jobs.find((j) => j.id === primaryTodayEntry.job_id)
+          : undefined) ??
         jobs.find((j) => j.status === "en_curso") ??
         jobs[0];
 
@@ -146,6 +158,15 @@ export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewPr
         Math.round((weekLoggedHours / Math.max(0.1, weekPlannedHours)) * 100)
       );
 
+      const todayHoursTotalThousandths = todayEntries.reduce(
+        (s, e) => s + (e.actual_hours_thousandths ?? e.planned_hours_thousandths),
+        0
+      );
+      const todayHoursFmt = (todayHoursTotalThousandths / 1000)
+        .toFixed(1)
+        .replace(/\.0$/, "")
+        .replace(".", ",");
+
       if (!active) return;
       setMetrics({
         emitterName: settings.emitter_name.trim(),
@@ -168,10 +189,18 @@ export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewPr
         untouchableTaxCents: fiscal.untouchable_tax_cents,
         ticketsCount: tickets.length,
         tracesCount: traces.length,
-        todayScheduleLabel: todayEntry
-          ? `${todayEntry.planned_start}–${todayEntry.actual_end ?? todayEntry.planned_end}`
-          : `${scheduleDefaults.morning_start}–${scheduleDefaults.afternoon_end}`,
-        todayJobLabel: activeJob ? `${activeJob.job_code}` : "Sin obra asignada",
+        todayScheduleLabel:
+          todayEntries.length > 1
+            ? `${todayEntries.length} citas (${todayHoursFmt} h)`
+            : primaryTodayEntry
+              ? `${primaryTodayEntry.planned_start}–${primaryTodayEntry.actual_end ?? primaryTodayEntry.planned_end}`
+              : `${scheduleDefaults.morning_start}–${scheduleDefaults.afternoon_end}`,
+        todayJobLabel:
+          todayEntries.length === 1 && !primaryTodayEntry?.job_id && primaryTodayEntry?.notes
+            ? primaryTodayEntry.notes
+            : activeJob
+              ? `${activeJob.job_code}`
+              : "Sin obra asignada",
         weekLoggedHours,
         weekPlannedHours,
         weekPct,
@@ -211,6 +240,21 @@ export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewPr
           {metrics?.emitterName || "Tu taller y reformas al día"}
         </p>
       </section>
+
+      <TaxAlertsBanner
+        executor={executor}
+        refreshTick={refreshTick}
+        todayIso={todayIso}
+        maxVisible={3}
+        onOpenTaxCalendar={(focusDateIso) =>
+          onNavigate({
+            name: "calendar",
+            tab: "hacienda",
+            ...(focusDateIso ? { focusDateIso } : {}),
+          })
+        }
+        onTaxStateChanged={onTaxStateChanged}
+      />
 
       {/* Widget Héroe Financiero */}
       <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3">
@@ -351,7 +395,7 @@ export function HomeHubView({ executor, refreshTick, onNavigate }: HomeHubViewPr
               </div>
               <span className="font-mono text-[12px] font-semibold text-on-success-container tabular-nums shrink-0">
                 {metrics
-                  ? `${metrics.weekLoggedHours.toFixed(0)}/${metrics.weekPlannedHours.toFixed(0)} h`
+                  ? `${metrics.weekLoggedHours.toFixed(1).replace(/\.0$/, "").replace(".", ",")}/${metrics.weekPlannedHours.toFixed(1).replace(/\.0$/, "").replace(".", ",")} h`
                   : "0/40 h"}
               </span>
             </div>

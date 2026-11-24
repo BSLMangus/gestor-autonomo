@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SpecialistRouteSchema } from "../../core/contracts/schemas";
+import { truncateText } from "../../core/contracts/textLimits";
 import type {
   InferenceEngine,
   PendingDisambiguation,
@@ -63,7 +64,7 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       "Responde únicamente JSON válido con { intent, confidence, entities }.",
       "Intents válidos: quote_specialist, ocr_ticket_specialist, fiscal_piggybank_specialist, lifecycle_billing_specialist, site_log_specialist, schedule_specialist, assistant_qa_node, clarification_node.",
       `active_job_id=${params.activeJobId ?? "null"} active_quote_id=${params.activeQuoteId ?? "null"}`,
-      `Texto usuario: ${JSON.stringify(params.text)}`,
+      `Texto usuario: ${JSON.stringify(truncateText(params.text, 2500))}`,
     ].join("\n");
 
     try {
@@ -105,7 +106,7 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
 
     const historyLines = (params.recentMessages ?? [])
       .slice(-4)
-      .map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`)
+      .map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${truncateText(m.content, 600)}`)
       .join("\n");
 
     const prompt = [
@@ -114,9 +115,9 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       "Responde en español, de forma breve, clara y práctica (máximo 3 frases).",
       "Si el usuario no dio suficientes datos para crear un presupuesto, ticket o cliente, pídele exactamente los datos que faltan con un ejemplo corto.",
       "No inventes importes, facturas, precios ni datos que no estén en el contexto.",
-      params.activeJobTitle ? `Obra activa: ${params.activeJobTitle}` : "",
+      params.activeJobTitle ? `Obra activa: ${truncateText(params.activeJobTitle, 200)}` : "",
       historyLines ? `Historial reciente:\n${historyLines}` : "",
-      `Mensaje del usuario: ${params.text}`,
+      `Mensaje del usuario: ${truncateText(params.text, 2500)}`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -156,8 +157,8 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       "Devuelve ÚNICAMENTE un objeto JSON válido con solo los campos que el usuario menciona o modifica en su dictado.",
       "No incluyas campos no mencionados ni inventes valores.",
       `Campos permitidos: ${params.fieldSpec}`,
-      `Estado actual: ${JSON.stringify(params.currentSnapshot)}`,
-      `Dictado del usuario: ${JSON.stringify(params.transcript.trim())}`,
+      `Estado actual: ${truncateText(JSON.stringify(params.currentSnapshot), 1500)}`,
+      `Dictado del usuario: ${JSON.stringify(truncateText(params.transcript.trim(), 2500))}`,
     ].join("\n");
 
     try {

@@ -1,4 +1,5 @@
 import { AIMessage } from "@langchain/core/messages";
+import { TEXT_LIMITS, truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   PendingDisambiguation,
@@ -358,8 +359,11 @@ export function createAssistantQaNode(deps: GraphDependencies) {
           rag_snippets: items.slice(0, 5).map((i) => ({
             source_table: "catalog_items",
             record_id: i.id,
-            title: i.description,
-            snippet_text: `${formatCentsEs(i.unit_price_cents)}/${i.unit}`,
+            title: truncateText(i.description, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            snippet_text: truncateText(
+              `${formatCentsEs(i.unit_price_cents)}/${i.unit}`,
+              TEXT_LIMITS.RAG_SNIPPET
+            ),
             bm25_score: i.bm25_score,
           })),
           messages: [new AIMessage(`Precios en tu tarifario: ${lines.join(" · ")}.`)],
@@ -380,8 +384,8 @@ export function createAssistantQaNode(deps: GraphDependencies) {
           snippets.push({
             source_table: "jobs",
             record_id: m.id,
-            title: `${m.job_code} ${m.title}`,
-            snippet_text: m.address || m.status,
+            title: truncateText(`${m.job_code} ${m.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            snippet_text: truncateText(m.address || m.status, TEXT_LIMITS.RAG_SNIPPET),
             bm25_score: m.bm25_score,
           });
         }
@@ -398,8 +402,8 @@ export function createAssistantQaNode(deps: GraphDependencies) {
               candidates: matches.slice(0, 5).map((m) => ({
                 entity_type: "job",
                 id: m.id,
-                label: `${m.job_code} · ${m.title}`,
-                subtitle: m.status,
+                label: truncateText(`${m.job_code} · ${m.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+                subtitle: truncateText(m.status, 200),
                 job_id: m.id,
               })),
               attempts: 0,
@@ -499,8 +503,8 @@ export function createAssistantQaNode(deps: GraphDependencies) {
           candidates: allJobs.items.map((j) => ({
             entity_type: "job",
             id: j.id,
-            label: `${j.job_code} · ${j.title}`,
-            subtitle: j.status,
+            label: truncateText(`${j.job_code} · ${j.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            subtitle: truncateText(j.status, 200),
             job_id: j.id,
           })),
           attempts: 0,

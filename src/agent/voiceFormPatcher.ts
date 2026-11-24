@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TEXT_LIMITS } from "../core/contracts/textLimits";
 import type {
   CatalogCategory,
   CatalogItemRow,
@@ -646,9 +647,9 @@ export async function patchQuoteDraftByVoice(
   let engineUsed: InferenceEngine = "deterministic_rule_engine";
   if (appliedChanges.length === 0 && !disambiguation && deps.inferenceAdapter?.hasLlmRunner()) {
     const llmPatchSchema = z.object({
-      job_title: z.string().max(180).optional(),
+      job_title: z.string().max(TEXT_LIMITS.TITLE).optional(),
       vat_rate: z.number().min(0).max(100).optional(),
-      notes: z.string().max(1000).optional(),
+      notes: z.string().max(TEXT_LIMITS.NOTES).optional(),
     });
     const llmRes = await deps.inferenceAdapter.extractFormPatch({
       formKind: "Presupuesto (Gate 1)",
@@ -827,9 +828,9 @@ export async function patchInvoiceGate3ByVoice(
   let engineUsed: InferenceEngine = "deterministic_rule_engine";
   if (appliedChanges.length === 0 && deps.inferenceAdapter?.hasLlmRunner()) {
     const schema = z.object({
-      client_nif: z.string().max(24).optional(),
-      client_fiscal_address: z.string().max(240).optional(),
-      notes: z.string().max(1000).optional(),
+      client_nif: z.string().max(TEXT_LIMITS.TAX_ID).optional(),
+      client_fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
+      notes: z.string().max(TEXT_LIMITS.NOTES).optional(),
     });
     const llmRes = await deps.inferenceAdapter.extractFormPatch({
       formKind: "Emisión de Factura (Gate 3)",
@@ -1577,12 +1578,12 @@ export async function patchClientProfileByVoice(
   let engineUsed: InferenceEngine = "deterministic_rule_engine";
   if (appliedChanges.length === 0 && deps.inferenceAdapter?.hasLlmRunner()) {
     const schema = z.object({
-      name: z.string().max(160).optional(),
-      phone: z.string().max(32).optional(),
-      nif: z.string().max(24).optional(),
-      fiscalAddress: z.string().max(240).optional(),
-      email: z.string().max(160).optional(),
-      notes: z.string().max(1000).optional(),
+      name: z.string().max(TEXT_LIMITS.NAME).optional(),
+      phone: z.string().max(TEXT_LIMITS.PHONE).optional(),
+      nif: z.string().max(TEXT_LIMITS.TAX_ID).optional(),
+      fiscalAddress: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
+      email: z.string().max(TEXT_LIMITS.EMAIL).optional(),
+      notes: z.string().max(TEXT_LIMITS.NOTES).optional(),
     });
     const llmRes = await deps.inferenceAdapter.extractFormPatch({
       formKind: "Ficha de Cliente",

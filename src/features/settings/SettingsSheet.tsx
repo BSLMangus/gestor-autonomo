@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
 import { BackupService } from "../../core/backup/backupService";
 import { ResetService } from "../../core/backup/resetService";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
+  AppSettingsRecord,
   DocumentImportReviewDraft,
   LocalAccountRecord,
   MemoryCoordinator,
@@ -15,6 +17,8 @@ import { getFiscalYearFromIso, getLocalTodayIso } from "../../core/fiscal/dateQu
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { OcrPort } from "../../core/ports/mediaPorts";
+import { useZoomTextEditor } from "../../ui/zoomTextEditorContext";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import {
   ApkUpdaterService,
   type AvailableUpdateInfo,
@@ -24,8 +28,10 @@ import type { CapacitorLlmAdapter } from "../llm/capacitorLlmAdapter";
 import type { MediaPipeLlmAdapter } from "../llm/mediaPipeAdapter";
 import { PricingCatalogPanel } from "../pricing/PricingCatalogPanel";
 import { UpdateBanner } from "../updates/UpdateBanner";
+import { QuoteDefaultsCard } from "./QuoteDefaultsCard";
 import { isUsingDevSuperAdminPin, verifySuperAdminPin } from "./superAdminAuth";
 import { SuperAdminLlmPanel } from "./SuperAdminLlmPanel";
+import { TaxCalendarSettingsCard } from "./TaxCalendarSettingsCard";
 
 interface SettingsSheetProps {
   executor: SqliteExecutor;
@@ -81,6 +87,7 @@ export function SettingsSheet({
   const [emitterLogoDataUrl, setEmitterLogoDataUrl] = useState<string | null>(null);
   const [defaultVatRate, setDefaultVatRate] = useState("21");
   const [irpfReserveRate, setIrpfReserveRate] = useState("20");
+  const [loadedSettings, setLoadedSettings] = useState<AppSettingsRecord | null>(null);
 
   const [seqPRE, setSeqPRE] = useState("0");
   const [seqANT, setSeqANT] = useState("0");
@@ -99,6 +106,8 @@ export function SettingsSheet({
   const [busy, setBusy] = useState(false);
 
   const updater = useRef<ApkUpdaterService>(apkUpdaterService ?? new ApkUpdaterService()).current;
+  const { enabled: expandLongTextInputs, setEnabled: setExpandLongTextInputs } = useZoomTextEditor();
+  const [savingExpandToggle, setSavingExpandToggle] = useState(false);
   const [installedVersion, setInstalledVersion] = useState<InstalledAppVersion | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateCheckInfo, setUpdateCheckInfo] = useState<string | null>(null);
@@ -159,6 +168,7 @@ export function SettingsSheet({
     setEmitterLogoDataUrl(settings.emitter_logo_data_url);
     setDefaultVatRate(String(settings.default_vat_rate));
     setIrpfReserveRate(String(settings.irpf_reserve_rate));
+    setLoadedSettings(settings);
 
     const mapSeq = new Map<SeriesType, number>();
     for (const s of sequences) mapSeq.set(s.series_type, s.last_seq);
@@ -447,11 +457,14 @@ export function SettingsSheet({
             className="rounded-xl border border-slate-300 px-3 py-2 text-xs"
           />
         </div>
-        <input
-          type="text"
+        <ZoomableTextField
+          as="input"
+          multiline={false}
+          maxLength={TEXT_LIMITS.ADDRESS}
+          zoomLabel="Domicilio fiscal completo"
           placeholder="Domicilio fiscal completo"
           value={emitterAddr}
-          onChange={(e) => setEmitterAddr(e.target.value)}
+          onValueChange={setEmitterAddr}
           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
         />
         <input
@@ -572,6 +585,73 @@ export function SettingsSheet({
           Guardar impuestos
         </button>
       </form>
+
+      <QuoteDefaultsCard
+        executor={executor}
+        settings={loadedSettings}
+        onSettingsUpdated={async (updated) => {
+          setLoadedSettings(updated);
+          await onDataRebuilt({ resetRoute: false });
+        }}
+      />
+
+      <TaxCalendarSettingsCard
+        executor={executor}
+        settings={loadedSettings}
+        onSettingsUpdated={async (updated) => {
+          setLoadedSettings(updated);
+          await onDataRebuilt({ resetRoute: false });
+        }}
+      />
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-extrabold text-slate-900">Comodidad de escritura</div>
+            <div className="mt-0.5 text-[11px] font-semibold text-slate-800">
+              Ampliar campos largos al escribir
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+              Al tocar descripciones de partidas, notas o direcciones, el campo se amplía en una
+              tarjeta flotante para escribir más cómodo.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={expandLongTextInputs}
+            aria-label="Ampliar campos largos al escribir"
+            data-testid="settings-expand-inputs-toggle"
+            disabled={busy || savingExpandToggle}
+            onClick={async () => {
+              setErrorMsg(null);
+              setSavingExpandToggle(true);
+              try {
+                const next = !expandLongTextInputs;
+                await setExpandLongTextInputs(next);
+                setStatusMsg(
+                  next
+                    ? "Ampliación de campos largos activada."
+                    : "Ampliación de campos largos desactivada."
+                );
+              } catch (err) {
+                setErrorMsg(err instanceof Error ? err.message : String(err));
+              } finally {
+                setSavingExpandToggle(false);
+              }
+            }}
+            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+              expandLongTextInputs ? "bg-terracotta" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                expandLongTextInputs ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
       <form
         onSubmit={(e) => void handleSaveSequences(e)}

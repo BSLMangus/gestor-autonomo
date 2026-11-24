@@ -4,7 +4,9 @@ import {
   type ClientProfileFormState,
 } from "../../../agent/voiceFormPatcher";
 import { ClientProfileCommitSchema } from "../../../core/contracts/schemas";
+import { TEXT_LIMITS } from "../../../core/contracts/textLimits";
 import { useRegisterOverlayVoice } from "../../../ui/overlayVoiceContext";
+import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 import type { ActiveWidgetEnvelope } from "../../../core/contracts/types";
 import { ClientsRepository } from "../../../core/db/repositories/clientsRepo";
 import type { WidgetCommonProps } from "./widgetTypes";
@@ -219,13 +221,16 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
           <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-address">
             Domicilio fiscal / obra
           </label>
-          <input
+          <ZoomableTextField
             id="cpw-address"
+            as="input"
+            multiline={false}
+            maxLength={TEXT_LIMITS.ADDRESS}
+            zoomLabel="Domicilio fiscal / obra"
             data-testid="client-widget-address-input"
-            type="text"
             disabled={disabled}
             value={fiscalAddress}
-            onChange={(e) => setFiscalAddress(e.target.value)}
+            onValueChange={setFiscalAddress}
             placeholder="Calle, número, código postal y ciudad"
             className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
@@ -251,13 +256,17 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
           <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-notes">
             Notas internas
           </label>
-          <textarea
+          <ZoomableTextField
             id="cpw-notes"
+            as="textarea"
+            multiline
+            maxLength={TEXT_LIMITS.NOTES}
+            zoomLabel="Notas internas del cliente"
             data-testid="client-widget-notes-input"
             rows={2}
             disabled={disabled}
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onValueChange={setNotes}
             placeholder="Horarios de acceso, preferencias de facturación..."
             className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
           />

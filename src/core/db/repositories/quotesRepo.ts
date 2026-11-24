@@ -1,4 +1,9 @@
 import { formatLocalDateIso, getLocalTodayIso, isValidIsoDate } from "../../fiscal/dateQuarter";
+import {
+  computeQuoteValidUntilIso,
+  parseQuotePaymentMethodsJson,
+  parseQuotePaymentScheduleJson,
+} from "../../fiscal/fiscalEngine";
 import type { PdfPort, PdfQuoteDocumentInput } from "../../ports/mediaPorts";
 import type {
   ClientRow,
@@ -185,16 +190,23 @@ export class QuotesRepository {
       emitter_logo_data_url: null,
     };
 
-    const clientRows = await this.executor.query<ClientRow>(
-      `SELECT * FROM clients WHERE id = ? LIMIT 1`,
-      [quote.client_id]
-    );
+    const clientRows = quote.client_id
+      ? await this.executor.query<ClientRow>(`SELECT * FROM clients WHERE id = ? LIMIT 1`, [
+          quote.client_id,
+        ])
+      : [];
     const client = clientRows[0];
+
+    const paymentMethods = parseQuotePaymentMethodsJson(quote.payment_methods_json);
+    const paymentSchedule = parseQuotePaymentScheduleJson(quote.payment_schedule_json);
+    const validityDays = quote.validity_days ?? null;
 
     const pdfInput: PdfQuoteDocumentInput = {
       kind: "quote",
       quoteCode: quote.quote_code,
       issuedDateIso: formatLocalDateIso(quote.created_at_ms),
+      validityDays,
+      validUntilIso: computeQuoteValidUntilIso(quote.created_at_ms, validityDays),
       emitter: {
         name: emitter.emitter_name || "Autónomo",
         nif: emitter.emitter_nif,
@@ -214,6 +226,8 @@ export class QuotesRepository {
       subtotalCents: quote.subtotal_cents,
       vatCents: quote.vat_cents,
       totalCents: quote.total_cents,
+      paymentMethods,
+      paymentSchedule,
       notes: quote.notes,
       lines: items.map((item) => ({
         description: item.description,
@@ -239,6 +253,64 @@ export class QuotesRepository {
     } finally {
       await release();
     }
+  }
+
+  async assignClient(
+    quoteId: string,
+    clientId: string,
+    opts?: { pdfPort?: PdfPort; fileBridge?: LocalFileBridge }
+  ): Promise<QuoteRow> {
+    const hadPdf = Boolean((await this.getById(quoteId))?.pdf_uri);
+    await this.executor.inTransaction(async (tx) => {
+      const qRows = await tx.query<QuoteRow>(`SELECT * FROM quotes WHERE id = ? LIMIT 1`, [
+        quoteId,
+      ]);
+      const quote = qRows[0];
+      if (!quote) {
+        throw new Error("INVALID_STATE_TRANSITION: Presupuesto no encontrado");
+      }
+      const cRows = await tx.query<ClientRow>(`SELECT * FROM clients WHERE id = ? LIMIT 1`, [
+        clientId,
+      ]);
+      const client = cRows[0];
+      if (!client) {
+        throw new Error("SCHEMA_VALIDATION_ERROR: Cliente seleccionado no encontrado");
+      }
+      const now = Date.now();
+      await tx.run(
+        `UPDATE quotes
+         SET client_id = ?,
+             client_name_snapshot = ?,
+             client_nif_snapshot = ?,
+             client_address_snapshot = ?,
+             client_phone_snapshot = ?,
+             updated_at_ms = ?
+         WHERE id = ?`,
+        [
+          client.id,
+          client.name,
+          client.nif,
+          client.fiscal_address,
+          client.phone,
+          now,
+          quoteId,
+        ]
+      );
+      await tx.run(
+        `UPDATE jobs SET client_id = ?, updated_at_ms = ? WHERE id = ? AND client_id IS NULL`,
+        [client.id, now, quote.job_id]
+      );
+    });
+
+    if (hadPdf && opts?.pdfPort && opts?.fileBridge) {
+      await this.regeneratePdfOnDemand(quoteId, opts.pdfPort, opts.fileBridge);
+    }
+
+    const updated = await this.getById(quoteId);
+    if (!updated) {
+      throw new Error("SQLITE_QUERY_ERROR: Error al recargar presupuesto tras asignar cliente");
+    }
+    return updated;
   }
 
   async delete(id: string, fileBridge: LocalFileBridge): Promise<void> {

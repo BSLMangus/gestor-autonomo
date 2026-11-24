@@ -5,6 +5,7 @@ import {
   type ScheduleWidgetFormState,
   type VoiceDisambiguationPayload,
 } from "../../agent/voiceFormPatcher";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   JobRow,
@@ -13,6 +14,7 @@ import type {
   WorkScheduleDefaults,
 } from "../../core/contracts/types";
 import { useRegisterOverlayVoice } from "../../ui/overlayVoiceContext";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import {
   computeDailyWorkHoursThousandths,
@@ -25,6 +27,7 @@ import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { addDaysIso } from "../../core/fiscal/dateQuarter";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { WidgetCommonProps } from "../chat/widgets/widgetTypes";
+import { SubDayDurationPicker } from "./SubDayDurationPicker";
 
 type ScheduleWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "ScheduleWorkLogWidget" }>;
 
@@ -80,6 +83,11 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     payload.start_date_iso ?? payload.date_iso
   );
   const [endDateIso, setEndDateIso] = useState<string>(payload.end_date_iso ?? payload.date_iso);
+  const [planStartTime, setPlanStartTime] = useState<string>(DEFAULT_SCHEDULE.morning_start);
+  const [planEndTime, setPlanEndTime] = useState<string>(DEFAULT_SCHEDULE.afternoon_end);
+  const [planHoursThousandths, setPlanHoursThousandths] = useState<number>(8000);
+  const [actualStart, setActualStart] = useState<string>(DEFAULT_SCHEDULE.morning_start);
+  const [actualEndOverride, setActualEndOverride] = useState<string | null>(null);
 
   const [deltaThousandths, setDeltaThousandths] = useState<number>(
     payload.suggested_delta_thousandths ?? 0
@@ -103,6 +111,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     setStartDateIso(payload.start_date_iso ?? payload.date_iso);
     setEndDateIso(payload.end_date_iso ?? payload.date_iso);
     setDeltaThousandths(payload.suggested_delta_thousandths ?? 0);
+    setActualEndOverride(null);
     setReason(payload.suggested_reason || DEVIATION_REASONS[0]!);
     setNotes(payload.suggested_notes || "");
     setErrorMsg(null);
@@ -125,7 +134,9 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
         settingsRepo.getAppSettings(),
       ]);
       const validJobs = allJobs.filter((j) => j.status !== "cancelado");
-      const targetJobId = payload.job_id || validJobs[0]?.id || "";
+      const targetJobId = payload.entry_id
+        ? (payload.job_id ?? "")
+        : payload.job_id || validJobs[0]?.id || "";
       const [existingEntry, entriesForJob] = await Promise.all([
         payload.entry_id
           ? scheduleRepo.getEntryById(payload.entry_id)
@@ -143,6 +154,21 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       setHourlyRateCents(settings.hourly_rate_cents);
       setEntry(existingEntry);
       setJobEntries(entriesForJob);
+
+      const defaultEnd = schedDefaults.afternoon_end || schedDefaults.morning_end;
+      const defaultHours = computeDailyWorkHoursThousandths(schedDefaults) || 8000;
+      if (existingEntry) {
+        setPlanStartTime(existingEntry.planned_start);
+        setPlanEndTime(existingEntry.planned_end);
+        setPlanHoursThousandths(existingEntry.planned_hours_thousandths);
+        setActualStart(existingEntry.actual_start ?? existingEntry.planned_start);
+      } else {
+        setPlanStartTime(schedDefaults.morning_start);
+        setPlanEndTime(defaultEnd);
+        setPlanHoursThousandths(defaultHours);
+        setActualStart(schedDefaults.morning_start);
+      }
+      setActualEndOverride(null);
 
       if (existingEntry && payload.suggested_delta_thousandths == null) {
         if (existingEntry.actual_hours_thousandths !== null) {
@@ -166,21 +192,39 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     let active = true;
     const syncSelection = async () => {
       const scheduleRepo = new ScheduleRepository(runtime.executor);
+      const usePayloadEntry =
+        Boolean(payload.entry_id) &&
+        (selectedJobId || "") === (payload.job_id ?? "") &&
+        dateIso === payload.date_iso;
       const [existingEntry, entriesForJob] = await Promise.all([
-        selectedJobId
-          ? scheduleRepo.getEntryByJobAndDate(selectedJobId, dateIso)
-          : Promise.resolve(null),
+        usePayloadEntry && payload.entry_id
+          ? scheduleRepo.getEntryById(payload.entry_id)
+          : selectedJobId
+            ? scheduleRepo.getEntryByJobAndDate(selectedJobId, dateIso)
+            : Promise.resolve(null),
         selectedJobId ? scheduleRepo.listEntriesByJob(selectedJobId) : Promise.resolve([]),
       ]);
       if (!active) return;
       setEntry(existingEntry);
       setJobEntries(entriesForJob);
+      setActualStart(
+        existingEntry?.actual_start ?? existingEntry?.planned_start ?? defaults.morning_start
+      );
+      setActualEndOverride(null);
     };
     void syncSelection();
     return () => {
       active = false;
     };
-  }, [runtime.executor, selectedJobId, dateIso]);
+  }, [
+    runtime.executor,
+    selectedJobId,
+    dateIso,
+    payload.entry_id,
+    payload.job_id,
+    payload.date_iso,
+    defaults.morning_start,
+  ]);
 
   const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
   const defaultPlannedThousandths = computeDailyWorkHoursThousandths(defaults) || 8000;
@@ -195,6 +239,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     setStartDateIso(st.startDateIso);
     setEndDateIso(st.endDateIso);
     setDeltaThousandths(st.deltaThousandths);
+    setActualEndOverride(null);
     setReason(st.reason);
     setNotes(st.notes);
     setAlsoLogInSiteLogs(st.alsoLogInSiteLogs);
@@ -282,17 +327,59 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
     },
   });
 
-  const actualThousandths = Math.max(500, plannedThousandths + deltaThousandths);
-  const deltaMinutes = Math.round((deltaThousandths / 1000) * 60);
-  const actualEnd = minutesToHHMM(parseHHMMToMinutes(plannedEnd) + deltaMinutes);
-  const impactCents = Math.round((deltaThousandths / 1000) * hourlyRateCents);
+  const effectiveActualStart = actualStart || plannedStart;
+  const startShiftMin =
+    parseHHMMToMinutes(effectiveActualStart) - parseHHMMToMinutes(plannedStart);
+  const rawActualThousandths = Math.max(250, plannedThousandths + deltaThousandths);
+  const clampedDeltaThousandths = rawActualThousandths - plannedThousandths;
+  const deltaMinutes = Math.round((clampedDeltaThousandths / 1000) * 60);
+  const computedActualEndMin = Math.min(
+    23 * 60 + 59,
+    Math.max(
+      parseHHMMToMinutes(effectiveActualStart) + 15,
+      parseHHMMToMinutes(plannedEnd) + deltaMinutes + startShiftMin
+    )
+  );
+  const actualEnd = actualEndOverride ?? minutesToHHMM(computedActualEndMin);
+  const actualStartMin = parseHHMMToMinutes(effectiveActualStart);
+  const actualEndMin = parseHHMMToMinutes(actualEnd);
+  const actualSpanValid = actualEndMin > actualStartMin;
+  const actualThousandths = actualEndOverride
+    ? Math.max(
+        250,
+        plannedThousandths +
+          Math.round(
+            ((actualEndMin -
+              actualStartMin -
+              (parseHHMMToMinutes(plannedEnd) - parseHHMMToMinutes(plannedStart))) *
+              1000) /
+              60
+          )
+      )
+    : rawActualThousandths;
+  const effectiveDeltaThousandths = actualThousandths - plannedThousandths;
+  const impactCents = Math.round((effectiveDeltaThousandths / 1000) * hourlyRateCents);
 
   const computedStatus: ScheduleStatus =
-    deltaThousandths > 0 ? "alargado" : deltaThousandths < 0 ? "antes" : "en_hora";
+    effectiveDeltaThousandths > 0
+      ? "alargado"
+      : effectiveDeltaThousandths < 0
+        ? "antes"
+        : "en_hora";
+
+  const isSameDayRange = Boolean(startDateIso && endDateIso && startDateIso === endDateIso);
+  const planSpanValid =
+    !isSameDayRange || parseHHMMToMinutes(planEndTime) > parseHHMMToMinutes(planStartTime);
 
   const planPreview = useMemo(() => {
     if (!startDateIso || !endDateIso || endDateIso < startDateIso) {
       return { days: 0, totalThousandths: 0 };
+    }
+    if (startDateIso === endDateIso) {
+      return {
+        days: 1,
+        totalThousandths: planHoursThousandths,
+      };
     }
     const workSet = new Set(defaults.work_days.length > 0 ? defaults.work_days : [1, 2, 3, 4, 5]);
     let cursor = startDateIso;
@@ -309,9 +396,13 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       days: count,
       totalThousandths: count * defaultPlannedThousandths,
     };
-  }, [startDateIso, endDateIso, defaults.work_days, defaultPlannedThousandths]);
+  }, [startDateIso, endDateIso, defaults.work_days, defaultPlannedThousandths, planHoursThousandths]);
 
   const handleSaveDailyLog = async () => {
+    if (!actualSpanValid) {
+      setErrorMsg("La hora de salida real debe ser posterior a la de inicio real.");
+      return;
+    }
     setErrorMsg(null);
     setBusy(true);
     try {
@@ -319,11 +410,11 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       const saved = await scheduleRepo.recordDailyWorkLog(
         entry?.id ?? dateIso,
         {
-          actual_start: plannedStart,
+          actual_start: effectiveActualStart,
           actual_end: actualEnd,
           actual_hours_thousandths: actualThousandths,
           status: computedStatus,
-          deviation_reason: deltaThousandths === 0 ? "En hora" : reason,
+          deviation_reason: effectiveDeltaThousandths === 0 ? "En hora" : reason,
           notes: notes.trim(),
           also_log_in_site_logs: alsoLogInSiteLogs,
         },
@@ -343,24 +434,54 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
   };
 
   const handleSavePlanRange = async () => {
-    if (!selectedJobId) {
-      setErrorMsg("Selecciona una obra para planificar en el calendario.");
+    if (!planSpanValid) {
+      setErrorMsg("La hora de fin debe ser posterior a la hora de inicio.");
+      return;
+    }
+    if (!selectedJobId && !isSameDayRange) {
+      setErrorMsg("Selecciona una obra para planificar varios días en el calendario.");
       return;
     }
     setErrorMsg(null);
     setBusy(true);
     try {
       const scheduleRepo = new ScheduleRepository(runtime.executor);
-      const entries = await scheduleRepo.generateEntriesForJobDateRange(
-        selectedJobId,
-        startDateIso,
-        endDateIso
-      );
-      await runtime.onDataMutated?.();
-      runtime.onScheduleSaved?.({
-        mode: "plan_range",
-        message: `Calendario actualizado: ${entries.length} jornada(s) planificada(s) para ${selectedJob?.job_code ?? "la obra"}.`,
-      });
+      if (!selectedJobId && isSameDayRange) {
+        await scheduleRepo.createSingleEntry({
+          job_id: null,
+          date_iso: startDateIso,
+          planned_start: planStartTime,
+          planned_end: planEndTime,
+          planned_hours_thousandths: planHoursThousandths,
+          notes: notes.trim(),
+        });
+        await runtime.onDataMutated?.();
+        runtime.onScheduleSaved?.({
+          mode: "plan_range",
+          message: `Cita guardada (${formatHoursFromThousandths(planHoursThousandths)}) para el ${startDateIso}.`,
+        });
+      } else {
+        const entries = await scheduleRepo.generateEntriesForJobDateRange(
+          selectedJobId,
+          startDateIso,
+          endDateIso,
+          isSameDayRange
+            ? {
+                plannedStart: planStartTime,
+                plannedEnd: planEndTime,
+                plannedHoursThousandths: planHoursThousandths,
+                replaceSingleDayHours: true,
+              }
+            : undefined
+        );
+        await runtime.onDataMutated?.();
+        runtime.onScheduleSaved?.({
+          mode: "plan_range",
+          message: isSameDayRange
+            ? `Calendario actualizado (${formatHoursFromThousandths(planHoursThousandths)}) para ${selectedJob?.job_code ?? "la obra"}.`
+            : `Calendario actualizado: ${entries.length} jornada(s) planificada(s) para ${selectedJob?.job_code ?? "la obra"}.`,
+        });
+      }
       runtime.onDismissOverlay?.();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
@@ -456,7 +577,13 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                 type="date"
                 data-testid="schedule-plan-start-input"
                 value={startDateIso}
-                onChange={(e) => setStartDateIso(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setStartDateIso(next);
+                  if (!endDateIso || endDateIso === startDateIso || endDateIso < next) {
+                    setEndDateIso(next);
+                  }
+                }}
                 className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono text-[13px]"
               />
             </label>
@@ -472,17 +599,47 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
             </label>
           </div>
 
+          {isSameDayRange && (
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
+              <SubDayDurationPicker
+                startTime={planStartTime}
+                endTime={planEndTime}
+                defaults={defaults}
+                disabled={busy || isSubmitting}
+                onChange={(next) => {
+                  setPlanStartTime(next.startTime);
+                  setPlanEndTime(next.endTime);
+                  setPlanHoursThousandths(next.hoursThousandths);
+                }}
+              />
+            </div>
+          )}
+
           <div className="rounded-2xl border border-outline-variant bg-terracotta-soft p-3.5 flex items-start gap-2.5">
             <CalendarCheck2 className="w-5 h-5 text-on-primary-container shrink-0 mt-0.5" />
             <div className="text-[13px] text-on-primary-container">
-              Se generarán{" "}
-              <strong className="font-mono tabular-nums">{planPreview.days} jornadas laborables</strong>{" "}
-              (
-              <strong className="font-mono tabular-nums">
-                {formatHoursFromThousandths(planPreview.totalThousandths)}
-              </strong>{" "}
-              previstas) de {defaults.morning_start} a{" "}
-              {defaults.afternoon_end || defaults.morning_end} según tu horario habitual.
+              {isSameDayRange ? (
+                <>
+                  Cita puntual de{" "}
+                  <strong className="font-mono tabular-nums">
+                    {formatHoursFromThousandths(planPreview.totalThousandths)}
+                  </strong>{" "}
+                  ({planStartTime} a {planEndTime}).
+                </>
+              ) : (
+                <>
+                  Se generarán{" "}
+                  <strong className="font-mono tabular-nums">
+                    {planPreview.days} jornadas laborables
+                  </strong>{" "}
+                  (
+                  <strong className="font-mono tabular-nums">
+                    {formatHoursFromThousandths(planPreview.totalThousandths)}
+                  </strong>{" "}
+                  previstas) de {defaults.morning_start} a{" "}
+                  {defaults.afternoon_end || defaults.morning_end} según tu horario habitual.
+                </>
+              )}
             </div>
           </div>
 
@@ -498,12 +655,12 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
             <button
               type="button"
               data-testid="schedule-plan-save-btn"
-              disabled={busy || isSubmitting || !selectedJobId}
+              disabled={busy || isSubmitting || !planSpanValid || (!selectedJobId && !isSameDayRange)}
               onClick={() => void handleSavePlanRange()}
               className="col-span-2 min-h-[48px] rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[14px] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>Generar bloques en calendario</span>
+              <span>{isSameDayRange ? "Guardar cita en calendario" : "Generar bloques en calendario"}</span>
             </button>
           </div>
         </>
@@ -533,7 +690,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-surface-container-low rounded-2xl p-3 flex flex-col gap-0.5">
               <span className="text-[11px] font-semibold text-on-surface-variant">
-                Salida prevista
+                Previsto ({plannedStart} – {plannedEnd})
               </span>
               <span className="font-mono text-[22px] font-bold text-on-surface tabular-nums">
                 {plannedEnd}
@@ -545,9 +702,9 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
 
             <div
               className={`rounded-2xl p-3 border border-outline-variant flex flex-col gap-0.5 ${
-                deltaThousandths > 0
+                effectiveDeltaThousandths > 0
                   ? "bg-warning-container text-on-warning-container"
-                  : deltaThousandths < 0
+                  : effectiveDeltaThousandths < 0
                     ? "bg-info-container text-on-info-container"
                     : "bg-success-container text-on-success-container"
               }`}
@@ -568,16 +725,53 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
             </div>
           </div>
 
+          {/* Edición manual de hora inicio/fin reales */}
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold text-on-surface-variant">Inicio real</span>
+              <input
+                type="time"
+                data-testid="schedule-actual-start-input"
+                value={effectiveActualStart}
+                onChange={(e) => {
+                  const nextStart = e.target.value;
+                  if (!nextStart) return;
+                  const keptEnd = actualEnd;
+                  setActualStart(nextStart);
+                  setActualEndOverride(keptEnd);
+                }}
+                className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[13px]"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold text-on-surface-variant">Salida real</span>
+              <input
+                type="time"
+                data-testid="schedule-actual-end-input"
+                value={actualEnd}
+                onChange={(e) => {
+                  const nextEnd = e.target.value;
+                  if (!nextEnd) return;
+                  setActualEndOverride(nextEnd);
+                }}
+                className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[13px]"
+              />
+            </label>
+          </div>
+
           {/* Botones rápidos de ajuste */}
           <div className="grid grid-cols-3 gap-2">
             {QUICK_DELTAS.map((opt) => {
-              const active = deltaThousandths === opt.deltaThousandths;
+              const active = !actualEndOverride && deltaThousandths === opt.deltaThousandths;
               return (
                 <button
                   key={opt.label}
                   type="button"
                   data-testid={`schedule-delta-${opt.deltaThousandths}`}
-                  onClick={() => setDeltaThousandths(opt.deltaThousandths)}
+                  onClick={() => {
+                    setActualEndOverride(null);
+                    setDeltaThousandths(opt.deltaThousandths);
+                  }}
                   className={`min-h-[44px] rounded-xl font-mono text-[12px] font-semibold tabular-nums transition-colors cursor-pointer ${
                     active
                       ? "bg-terracotta-soft border-2 border-terracotta text-on-primary-container"
@@ -591,19 +785,19 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
           </div>
 
           {/* Banner dinámico impacto económico */}
-          {deltaThousandths > 0 ? (
+          {effectiveDeltaThousandths > 0 ? (
             <div className="rounded-2xl bg-warning-container border border-outline-variant p-3 flex items-center gap-2">
               <Clock className="w-5 h-5 text-on-warning-container shrink-0" />
               <span className="text-[12px] font-semibold text-on-warning-container">
-                Jornada alargada {formatSignedHoursFromThousandths(deltaThousandths)} (+
+                Jornada alargada {formatSignedHoursFromThousandths(effectiveDeltaThousandths)} (+
                 {formatCentsEs(impactCents)} según tu tarifa/hora)
               </span>
             </div>
-          ) : deltaThousandths < 0 ? (
+          ) : effectiveDeltaThousandths < 0 ? (
             <div className="rounded-2xl bg-info-container border border-outline-variant p-3 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-on-info-container shrink-0" />
               <span className="text-[12px] font-semibold text-on-info-container">
-                Terminado {formatHoursFromThousandths(Math.abs(deltaThousandths))} antes de lo previsto (
+                Terminado {formatHoursFromThousandths(Math.abs(effectiveDeltaThousandths))} antes de lo previsto (
                 {formatCentsEs(impactCents)})
               </span>
             </div>
@@ -640,11 +834,15 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               })}
             </div>
 
-            <textarea
+            <ZoomableTextField
+              as="textarea"
+              multiline
               rows={2}
+              maxLength={TEXT_LIMITS.NOTES}
+              zoomLabel="Notas de la jornada"
               data-testid="schedule-notes-input"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onValueChange={setNotes}
               placeholder="Anota qué ocurrió en obra hoy..."
               className="w-full rounded-xl bg-surface-container-low border border-outline-variant p-3 text-[13px] text-on-surface focus:outline-none focus:border-terracotta"
             />

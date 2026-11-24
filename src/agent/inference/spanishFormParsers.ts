@@ -663,7 +663,7 @@ const STOP_FIELD_LOOKAHEAD =
  */
 export function extractAddress(text: string): string | null {
   const explicitRx = new RegExp(
-    `(?:domicilio\\s+fiscal|direcci[oó]n(?:\\s+fiscal|\\s+de\\s+la\\s+obra)?|domicilio|ubicaci[oó]n)\\s*(?:es|:|\\s+en)?\\s+([^\\n]{4,180}?)${STOP_FIELD_LOOKAHEAD}`,
+    `(?:domicilio\\s+fiscal|direcci[oó]n(?:\\s+fiscal|\\s+de\\s+la\\s+obra)?|domicilio|ubicaci[oó]n)\\s*(?:es|:|\\s+en)?\\s+([^\\n]{4,550}?)${STOP_FIELD_LOOKAHEAD}`,
     "i"
   );
   const explicit = explicitRx.exec(text);
@@ -673,7 +673,7 @@ export function extractAddress(text: string): string | null {
   }
 
   const streetRx = new RegExp(
-    `\\b((?:calle|c\\/|avenida|avda\\.?|av\\.?|plaza|pza\\.?|paseo|ronda|camino|carretera|traves[ií]a)\\s+[^\\n]{3,140}?)${STOP_FIELD_LOOKAHEAD}`,
+    `\\b((?:calle|c\\/|avenida|avda\\.?|av\\.?|plaza|pza\\.?|paseo|ronda|camino|carretera|traves[ií]a)\\s+[^\\n]{3,500}?)${STOP_FIELD_LOOKAHEAD}`,
     "i"
   );
   const street = streetRx.exec(text);

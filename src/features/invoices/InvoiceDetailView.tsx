@@ -14,7 +14,11 @@ import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import type { DocumentOpenerService } from "../../core/files/documentOpener";
 import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
-import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import {
+  deriveInvoiceAdvancePercent,
+  formatCentsEs,
+  formatPercentEs,
+} from "../../core/fiscal/fiscalEngine";
 import type { PdfPort } from "../../core/ports/mediaPorts";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 
@@ -40,10 +44,13 @@ function formatThousandthsEs(thousandths: number): string {
   return Number.isInteger(val) ? String(val) : val.toFixed(2).replace(/0+$/, "").replace(".", ",");
 }
 
-function kindLabel(kind: InvoiceRow["kind"]): string {
+function kindLabel(
+  kind: InvoiceRow["kind"],
+  advancePercent?: number
+): string {
   switch (kind) {
     case "advance_40":
-      return "Factura de anticipo (40 %)";
+      return `Factura de anticipo (${formatPercentEs(advancePercent ?? 40)})`;
     case "final":
       return "Factura final / liquidación";
     case "full":
@@ -266,7 +273,9 @@ export function InvoiceDetailView({
                 {isPaid ? "Cobrada" : isOverdue ? "Vencida" : "Pendiente cobro"}
               </span>
             </div>
-            <div className="font-semibold text-on-surface">{kindLabel(invoice.kind)}</div>
+            <div className="font-semibold text-on-surface">
+              {kindLabel(invoice.kind, deriveInvoiceAdvancePercent(invoice, quote))}
+            </div>
             <div className="text-[11px] text-on-surface-variant">
               Emisión: <strong className="font-mono">{invoice.issued_at_iso}</strong> · Vencimiento:{" "}
               <strong className="font-mono">{invoice.due_at_iso}</strong> · {invoice.quarter}

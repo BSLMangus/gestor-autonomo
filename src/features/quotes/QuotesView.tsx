@@ -2,7 +2,8 @@ import { ChevronRight, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LocalFileBridge, QuoteStatus, SqliteExecutor } from "../../core/contracts/types";
 import { QuotesRepository, type QuoteWithJobSummary } from "../../core/db/repositories/quotesRepo";
-import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
+import { computeQuoteValidUntilIso, formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 
 interface QuotesViewProps {
@@ -142,6 +143,10 @@ export function QuotesView({
       <div className="space-y-3">
         {quotes.map((q) => {
           const badge = STATUS_BADGES[q.status];
+          const validUntilIso = computeQuoteValidUntilIso(q.created_at_ms, q.validity_days);
+          const isExpired =
+            (q.status === "borrador" || q.status === "enviado") &&
+            Boolean(validUntilIso && validUntilIso < getLocalTodayIso());
           return (
             <div
               key={q.id}
@@ -163,6 +168,19 @@ export function QuotesView({
                     >
                       {badge.label}
                     </span>
+                    {!q.client_id && (
+                      <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                        Sin cliente
+                      </span>
+                    )}
+                    {isExpired && (
+                      <span
+                        data-testid={`quote-expired-badge-${q.id}`}
+                        className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900"
+                      >
+                        Caducado
+                      </span>
+                    )}
                   </div>
 
                   <div className="shrink-0 text-right">
@@ -185,7 +203,7 @@ export function QuotesView({
                   className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1 text-left cursor-pointer"
                 >
                   <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant">
-                    {q.client_name_snapshot}
+                    {q.client_name_snapshot || "Sin datos de cliente"}
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
                 </button>

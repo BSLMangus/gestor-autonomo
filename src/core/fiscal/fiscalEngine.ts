@@ -1,10 +1,16 @@
-import { compareQuarter } from "./dateQuarter";
+import { addDaysIso, compareQuarter, formatLocalDateIso } from "./dateQuarter";
+import {
+  QuotePaymentMethodSchema,
+  QuotePaymentScheduleSchema,
+} from "../contracts/schemas";
 import type {
   ExpenseTicketRow,
   FiscalPiggyBankPayload,
   InvoiceRow,
   JobFiscalSummary,
   JobRow,
+  QuotePaymentInstallment,
+  QuotePaymentMethod,
   QuoteRow,
   QuoteVatRate,
   TicketVatRate,
@@ -51,6 +57,26 @@ export function computeQuoteTotals(
   };
 }
 
+export function computeAdvanceByPercent(
+  quoteSubtotalCents: number,
+  vatRate: QuoteVatRate,
+  percent: number
+): {
+  baseCents: number;
+  vatCents: number;
+  totalCents: number;
+} {
+  const bps = Math.max(0, Math.round(percent * 100));
+  const baseCents = roundHalfUpDiv(quoteSubtotalCents * bps, 10_000);
+  const vatRateThousandths = Math.round(vatRate * 1000);
+  const vatCents = roundHalfUpDiv(baseCents * vatRateThousandths, 100_000);
+  return {
+    baseCents,
+    vatCents,
+    totalCents: baseCents + vatCents,
+  };
+}
+
 export function computeAdvance40(
   quoteSubtotalCents: number,
   vatRate: QuoteVatRate
@@ -59,14 +85,128 @@ export function computeAdvance40(
   vatCents: number;
   totalCents: number;
 } {
-  const baseCents = roundHalfUpDiv(quoteSubtotalCents * 40, 100);
-  const vatRateThousandths = Math.round(vatRate * 1000);
-  const vatCents = roundHalfUpDiv(baseCents * vatRateThousandths, 100_000);
+  return computeAdvanceByPercent(quoteSubtotalCents, vatRate, 40);
+}
+
+export function computePaymentScheduleAmounts(
+  totalCents: number,
+  schedule: ReadonlyArray<{ label: string; percentage: number }>
+): Array<{ label: string; percentage: number; amount_cents: number }> {
+  if (schedule.length === 0) return [];
+  const safeTotal = Math.max(0, Math.round(totalCents));
+  let prevCumCents = 0;
+  let cumBps = 0;
+  return schedule.map((item, idx) => {
+    cumBps += Math.max(0, Math.round(item.percentage * 100));
+    const isLast = idx === schedule.length - 1;
+    const clampedCumBps = Math.min(10_000, cumBps);
+    const cumCents = isLast ? safeTotal : roundHalfUpDiv(safeTotal * clampedCumBps, 10_000);
+    const amountCents = Math.max(0, cumCents - prevCumCents);
+    prevCumCents = cumCents;
+    return {
+      label: item.label,
+      percentage: item.percentage,
+      amount_cents: amountCents,
+    };
+  });
+}
+
+export function parseQuotePaymentMethodsJson(
+  raw: string | null | undefined
+): QuotePaymentMethod[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const out: QuotePaymentMethod[] = [];
+    for (const item of parsed) {
+      const check = QuotePaymentMethodSchema.safeParse(item);
+      if (check.success && !out.includes(check.data)) {
+        out.push(check.data);
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export function parseQuotePaymentScheduleJson(
+  raw: string | null | undefined
+): QuotePaymentInstallment[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    const check = QuotePaymentScheduleSchema.safeParse(parsed);
+    return check.success ? check.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export type QuoteAdvancePolicy =
+  | { allowAdvance: true; advancePercent: number; mode: "default_40" }
+  | { allowAdvance: false; advancePercent: 100; mode: "single_payment" }
+  | { allowAdvance: true; advancePercent: number; mode: "first_installment"; firstLabel: string };
+
+export function resolveQuoteAdvancePolicy(
+  schedule: ReadonlyArray<QuotePaymentInstallment>
+): QuoteAdvancePolicy {
+  if (schedule.length === 0) {
+    return { allowAdvance: true, advancePercent: 40, mode: "default_40" };
+  }
+  if (schedule.length === 1) {
+    return { allowAdvance: false, advancePercent: 100, mode: "single_payment" };
+  }
+  const first = schedule[0]!;
   return {
-    baseCents,
-    vatCents,
-    totalCents: baseCents + vatCents,
+    allowAdvance: true,
+    advancePercent: first.percentage,
+    mode: "first_installment",
+    firstLabel: first.label,
   };
+}
+
+export function deriveInvoiceAdvancePercent(
+  invoice: Pick<InvoiceRow, "kind" | "base_cents">,
+  quote?: Pick<QuoteRow, "subtotal_cents" | "vat_rate" | "payment_schedule_json"> | null
+): number {
+  if (invoice.kind !== "advance_40") return 100;
+  if (quote) {
+    const policy = resolveQuoteAdvancePolicy(
+      parseQuotePaymentScheduleJson(quote.payment_schedule_json)
+    );
+    if (policy.allowAdvance) {
+      const expected = computeAdvanceByPercent(
+        quote.subtotal_cents,
+        quote.vat_rate,
+        policy.advancePercent
+      );
+      if (expected.baseCents === invoice.base_cents) {
+        return policy.advancePercent;
+      }
+    }
+    if (quote.subtotal_cents > 0) {
+      return Math.round((invoice.base_cents * 10_000) / quote.subtotal_cents) / 100;
+    }
+  }
+  return 40;
+}
+
+export function formatPercentEs(percent: number): string {
+  const rounded = Math.round(percent * 100) / 100;
+  return `${String(rounded).replace(".", ",")} %`;
+}
+
+export function computeQuoteValidUntilIso(
+  createdAtMs: number,
+  validityDays: number | null | undefined
+): string | null {
+  if (validityDays === null || validityDays === undefined) return null;
+  const days = Math.trunc(validityDays);
+  if (!Number.isFinite(days) || days < 1) return null;
+  const issuedIso = formatLocalDateIso(createdAtMs);
+  return addDaysIso(issuedIso, days);
 }
 
 export function computeFinalInvoiceFromQuoteAndAdvance(

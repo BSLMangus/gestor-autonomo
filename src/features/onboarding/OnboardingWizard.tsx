@@ -15,6 +15,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { ZodError } from "zod";
 import { BackupService } from "../../core/backup/backupService";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   CatalogItemRow,
   DocumentImportReviewDraft,
@@ -23,6 +24,7 @@ import type {
   WorkScheduleDefaults,
 } from "../../core/contracts/types";
 import { AuthRepository } from "../../core/db/repositories/authRepo";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import { CatalogRepository } from "../../core/db/repositories/catalogRepo";
 import {
   computeDailyWorkHoursBreakdown,
@@ -462,15 +464,18 @@ export function OnboardingWizard({
                 <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-address">
                   Domicilio fiscal
                 </label>
-                <input
+                <ZoomableTextField
                   id="onb-address"
+                  as="input"
+                  multiline={false}
+                  maxLength={TEXT_LIMITS.ADDRESS}
+                  zoomLabel="Domicilio fiscal"
                   data-testid="onboarding-emitter-address"
-                  type="text"
                   disabled={busy}
                   value={emitterAddress}
-                  onChange={(e) => {
+                  onValueChange={(next) => {
                     editedFieldsRef.current.add("emitterAddress");
-                    setEmitterAddress(e.target.value);
+                    setEmitterAddress(next);
                   }}
                   placeholder="Calle, número, código postal y ciudad"
                   className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"

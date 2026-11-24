@@ -2,11 +2,13 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+export type CalendarRouteTab = "month" | "week" | "jobs" | "hacienda";
+
 export type AppRoute =
   | { name: "home" }
   | { name: "chat" }
   | { name: "jobs"; focusJobId?: string }
-  | { name: "calendar"; focusDateIso?: string }
+  | { name: "calendar"; focusDateIso?: string; tab?: CalendarRouteTab }
   | { name: "quotes" }
   | { name: "quote_detail"; quoteId: string }
   | { name: "invoice_detail"; invoiceId: string }
@@ -39,7 +41,19 @@ export function parseHashToRoute(rawHash: string): AppRoute {
     const [, query] = normalized.split("?");
     const params = query ? new URLSearchParams(query) : null;
     const focusDateIso = params?.get("date") ?? undefined;
-    return focusDateIso ? { name: "calendar", focusDateIso } : { name: "calendar" };
+    const rawTab = params?.get("tab");
+    const tab: CalendarRouteTab | undefined =
+      rawTab === "month" || rawTab === "week" || rawTab === "jobs" || rawTab === "hacienda"
+        ? rawTab
+        : undefined;
+    if (focusDateIso || tab) {
+      return {
+        name: "calendar",
+        ...(focusDateIso ? { focusDateIso } : {}),
+        ...(tab ? { tab } : {}),
+      };
+    }
+    return { name: "calendar" };
   }
   if (normalized === "/presupuestos") {
     return { name: "quotes" };
@@ -109,10 +123,13 @@ export function routeToHash(route: AppRoute): string {
       return route.focusJobId
         ? `#/obras?job=${encodeURIComponent(route.focusJobId)}`
         : "#/obras";
-    case "calendar":
-      return route.focusDateIso
-        ? `#/calendario?date=${encodeURIComponent(route.focusDateIso)}`
-        : "#/calendario";
+    case "calendar": {
+      const search = new URLSearchParams();
+      if (route.focusDateIso) search.set("date", route.focusDateIso);
+      if (route.tab) search.set("tab", route.tab);
+      const qs = search.toString();
+      return qs ? `#/calendario?${qs}` : "#/calendario";
+    }
     case "quotes":
       return "#/presupuestos";
     case "quote_detail":
@@ -156,7 +173,7 @@ export function isSameRoute(a: AppRoute, b: AppRoute): boolean {
     return a.focusJobId === b.focusJobId;
   }
   if (a.name === "calendar" && b.name === "calendar") {
-    return a.focusDateIso === b.focusDateIso;
+    return a.focusDateIso === b.focusDateIso && a.tab === b.tab;
   }
   if (a.name === "settings" && b.name === "settings") {
     return (a.section ?? "general") === (b.section ?? "general");
@@ -198,6 +215,7 @@ export function getRouteTitle(route: AppRoute): string {
 }
 
 export const BACK_PRIORITY = {
+  ZOOM_TEXT_EDITOR: 120,
   CONTEXTUAL_VOICE: 110,
   VOICE_OVERLAY: 100,
   CAMERA_SHEET: 90,

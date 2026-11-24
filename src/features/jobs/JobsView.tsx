@@ -5,19 +5,35 @@ import {
   type NewJobFormState,
   type VoiceDisambiguationPayload,
 } from "../../agent/voiceFormPatcher";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ClientRow,
   JobRow,
   JobStatus,
   LocalFileBridge,
   SqliteExecutor,
+  WorkScheduleDefaults,
 } from "../../core/contracts/types";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
-import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
+import {
+  computeDailyWorkHoursThousandths,
+  ScheduleRepository,
+} from "../../core/db/repositories/scheduleRepo";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
+import { SubDayDurationPicker } from "../calendar/SubDayDurationPicker";
 import { JobDetailDrawer } from "../directory/JobDetailDrawer";
+
+const FALLBACK_SCHEDULE_DEFAULTS: WorkScheduleDefaults = {
+  work_days: [1, 2, 3, 4, 5],
+  morning_start: "08:00",
+  morning_end: "14:00",
+  afternoon_start: "15:00",
+  afternoon_end: "17:00",
+  auto_apply_to_jobs: true,
+};
 
 interface JobsViewProps {
   executor: SqliteExecutor;
@@ -73,6 +89,15 @@ export function JobsView({
   const [newClientId, setNewClientId] = useState("");
   const [newStartDate, setNewStartDate] = useState("");
   const [newEndDate, setNewEndDate] = useState("");
+  const [scheduleDefaults, setScheduleDefaults] =
+    useState<WorkScheduleDefaults>(FALLBACK_SCHEDULE_DEFAULTS);
+  const [newPlanStartTime, setNewPlanStartTime] = useState(
+    FALLBACK_SCHEDULE_DEFAULTS.morning_start
+  );
+  const [newPlanEndTime, setNewPlanEndTime] = useState(
+    FALLBACK_SCHEDULE_DEFAULTS.afternoon_end
+  );
+  const [newPlanHoursThousandths, setNewPlanHoursThousandths] = useState<number>(8000);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newJobUndoStack, setNewJobUndoStack] = useState<NewJobFormState[]>([]);
@@ -88,7 +113,8 @@ export function JobsView({
   }, [initialFocusJobId]);
 
   const loadJobs = async () => {
-    const [jobsRes, clientsRes] = await Promise.all([
+    const scheduleRepo = new ScheduleRepository(executor);
+    const [jobsRes, clientsRes, defaults] = await Promise.all([
       new JobsRepository(executor).listPaginated({
         search: search.trim() || undefined,
         status: statusFilter || undefined,
@@ -96,10 +122,17 @@ export function JobsView({
         offset: pageOffset,
       }),
       new ClientsRepository(executor).listPaginated({ limit: 100, offset: 0 }),
+      scheduleRepo.getWorkScheduleDefaults(),
     ]);
     setJobs(jobsRes.items);
     setTotalCount(jobsRes.totalCount);
     setClients(clientsRes.items);
+    setScheduleDefaults(defaults);
+    if (!showNewJobForm) {
+      setNewPlanStartTime(defaults.morning_start);
+      setNewPlanEndTime(defaults.afternoon_end || defaults.morning_end);
+      setNewPlanHoursThousandths(computeDailyWorkHoursThousandths(defaults) || 8000);
+    }
   };
 
   useEffect(() => {
@@ -112,18 +145,35 @@ export function JobsView({
     setErrorMsg(null);
     setBusy(true);
     try {
+      const effectiveEndDate = newStartDate ? newEndDate || newStartDate : newEndDate || null;
       const created = await new JobsRepository(executor).createDirectJob({
         title: newTitle,
         address: newAddress,
         client_id: newClientId || null,
         start_date_iso: newStartDate || null,
-        end_date_iso: newEndDate || null,
+        end_date_iso: effectiveEndDate,
       });
-      if (newStartDate && newEndDate) {
+      if (newStartDate && effectiveEndDate) {
         const scheduleRepo = new ScheduleRepository(executor);
         const defaults = await scheduleRepo.getWorkScheduleDefaults();
-        if (defaults.auto_apply_to_jobs) {
-          await scheduleRepo.generateEntriesForJobDateRange(created.id, newStartDate, newEndDate);
+        const isSameDay = newStartDate === effectiveEndDate;
+        const fullEnd = defaults.afternoon_end || defaults.morning_end;
+        const hasCustomSubDay =
+          isSameDay &&
+          (newPlanStartTime !== defaults.morning_start || newPlanEndTime !== fullEnd);
+        if (defaults.auto_apply_to_jobs || hasCustomSubDay) {
+          await scheduleRepo.generateEntriesForJobDateRange(
+            created.id,
+            newStartDate,
+            effectiveEndDate,
+            isSameDay
+              ? {
+                  plannedStart: newPlanStartTime,
+                  plannedEnd: newPlanEndTime,
+                  plannedHoursThousandths: newPlanHoursThousandths,
+                }
+              : undefined
+          );
         }
       }
       setNewTitle("");
@@ -131,6 +181,9 @@ export function JobsView({
       setNewClientId("");
       setNewStartDate("");
       setNewEndDate("");
+      setNewPlanStartTime(scheduleDefaults.morning_start);
+      setNewPlanEndTime(scheduleDefaults.afternoon_end || scheduleDefaults.morning_end);
+      setNewPlanHoursThousandths(computeDailyWorkHoursThousandths(scheduleDefaults) || 8000);
       setShowNewJobForm(false);
       await loadJobs();
       await onDataChanged();
@@ -265,11 +318,14 @@ export function JobsView({
             onChange={(e) => setNewTitle(e.target.value)}
             className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
           />
-          <input
-            type="text"
+          <ZoomableTextField
+            as="input"
+            multiline={false}
+            maxLength={TEXT_LIMITS.ADDRESS}
+            zoomLabel="Dirección de la obra"
             placeholder="Dirección / Ubicación (opcional)"
             value={newAddress}
-            onChange={(e) => setNewAddress(e.target.value)}
+            onValueChange={setNewAddress}
             className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
           />
           <select
@@ -293,7 +349,13 @@ export function JobsView({
                 type="date"
                 data-testid="jobs-new-start-date"
                 value={newStartDate}
-                onChange={(e) => setNewStartDate(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setNewStartDate(next);
+                  if (!newEndDate || newEndDate === newStartDate || (next && newEndDate < next)) {
+                    setNewEndDate(next);
+                  }
+                }}
                 className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
               />
             </label>
@@ -310,9 +372,26 @@ export function JobsView({
               />
             </label>
           </div>
-          {newStartDate && newEndDate && (
+          {newStartDate && (!newEndDate || newStartDate === newEndDate) && (
+            <div className="rounded-xl border border-outline-variant bg-surface-container-low/60 p-3">
+              <SubDayDurationPicker
+                startTime={newPlanStartTime}
+                endTime={newPlanEndTime}
+                defaults={scheduleDefaults}
+                disabled={busy}
+                onChange={(next) => {
+                  setNewPlanStartTime(next.startTime);
+                  setNewPlanEndTime(next.endTime);
+                  setNewPlanHoursThousandths(next.hoursThousandths);
+                }}
+              />
+            </div>
+          )}
+          {newStartDate && (!newEndDate || newEndDate >= newStartDate) && (
             <div className="rounded-xl border border-outline-variant bg-terracotta-soft px-3 py-2 text-[11px] font-medium text-on-primary-container">
-              Si tienes activado el horario habitual, se generarán automáticamente las jornadas en el calendario.
+              {!newEndDate || newStartDate === newEndDate
+                ? "Trabajo de un solo día o por horas: se fijará directamente en el calendario."
+                : "Si tienes activado el horario habitual, se generarán automáticamente las jornadas en el calendario."}
             </div>
           )}
           <div className="flex gap-2">

@@ -12,6 +12,7 @@ import {
   Gate3InvoiceCommitPayloadSchema,
   Gate4ShareCommitPayloadSchema,
 } from "../../../core/contracts/schemas";
+import { TEXT_LIMITS } from "../../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   Gate3InvoiceDraftPayload,
@@ -23,8 +24,14 @@ import type {
 import { InvoicesRepository } from "../../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../../core/db/repositories/quotesRepo";
+import {
+  formatPercentEs,
+  parseQuotePaymentScheduleJson,
+  resolveQuoteAdvancePolicy,
+} from "../../../core/fiscal/fiscalEngine";
 import { formatCentsEs } from "../../../core/fiscal/fiscalEngine";
 import { ConfirmDeleteDialog } from "../../../ui/ConfirmDeleteDialog";
+import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 import type { WidgetCommonProps } from "./widgetTypes";
 
 type LifecycleWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "JobLifecycleActionWidget" }>;
@@ -312,6 +319,16 @@ export function JobLifecycleActionWidget({
 
   const hasAdvance = invoicesForJob.some((i) => i.series_type === "ANT");
   const hasFinal = invoicesForJob.some((i) => i.series_type === "FAC");
+  const quotePaymentSchedule = useMemo(
+    () => (quote ? parseQuotePaymentScheduleJson(quote.payment_schedule_json) : []),
+    [quote]
+  );
+  const advancePolicy = useMemo(
+    () => resolveQuoteAdvancePolicy(quotePaymentSchedule),
+    [quotePaymentSchedule]
+  );
+  const advPctLabel = formatPercentEs(advancePolicy.advancePercent);
+  const quoteMissingClient = Boolean(quote && !quote.client_id);
   const isInvoiceMissing = entitiesLoaded && Boolean(lp.invoice_id) && !invoice;
   const isQuoteMissing = entitiesLoaded && !lp.invoice_id && Boolean(lp.quote_id) && !quote;
   const isDocDeleted = isInvoiceMissing || isQuoteMissing;
@@ -435,17 +452,24 @@ export function JobLifecycleActionWidget({
         await handleAcceptQuote();
         setVoiceChanges(["Presupuesto marcado como aceptado"]);
         setVoiceWarnings([]);
-      } else if (/\b(anticipo|adelanto|40)\b/.test(norm) && lp.quote_id && !hasAdvance && !hasFinal) {
+      } else if (
+        /\b(anticipo|adelanto|40)\b/.test(norm) &&
+        lp.quote_id &&
+        !hasAdvance &&
+        !hasFinal &&
+        advancePolicy.allowAdvance &&
+        !quoteMissingClient
+      ) {
         await onQuickAction({
           id: "qa_req_advance",
-          label: "Facturar anticipo 40 %",
+          label: `Facturar anticipo ${advPctLabel}`,
           action_type: "request_advance_gate",
           payload: {
             target_ids: { job_id: lp.job_id, quote_id: lp.quote_id },
             billing_sub_intent: "advance_40",
           },
         });
-      } else if (/\b(factura|facturar|emitir)\b/.test(norm) && lp.quote_id && !hasFinal) {
+      } else if (/\b(factura|facturar|emitir)\b/.test(norm) && lp.quote_id && !hasFinal && !quoteMissingClient) {
         await onQuickAction({
           id: "qa_req_final",
           label: "Emitir factura final",
@@ -548,7 +572,9 @@ export function JobLifecycleActionWidget({
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-2 text-xs text-amber-950">
             Bloqueo fiscal correlativo:{" "}
             <strong>
-              {g3Draft.sub_intent === "advance_40" ? "Serie ANT (Anticipo 40 %)" : "Serie FAC (Liquidación final)"}
+              {g3Draft.sub_intent === "advance_40"
+                ? `Serie ANT (Anticipo ${advPctLabel})`
+                : "Serie FAC (Liquidación final)"}
             </strong>
             . Verifica emisor y cliente conforme al RD 1619/2012.
           </div>
@@ -617,13 +643,16 @@ export function JobLifecycleActionWidget({
             <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-em-addr">
               Domicilio fiscal emisor *
             </label>
-            <input
+            <ZoomableTextField
               id="g3-em-addr"
-              type="text"
+              as="input"
+              multiline={false}
+              maxLength={TEXT_LIMITS.ADDRESS}
+              zoomLabel="Domicilio fiscal emisor"
               disabled={!canActGate3 || isSubmitting}
               value={g3Draft.emitter_fiscal_address}
-              onChange={(e) =>
-                setG3Draft((p) => (p ? { ...p, emitter_fiscal_address: e.target.value } : p))
+              onValueChange={(next) =>
+                setG3Draft((p) => (p ? { ...p, emitter_fiscal_address: next } : p))
               }
               className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
             />
@@ -651,14 +680,17 @@ export function JobLifecycleActionWidget({
               <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-cl-addr">
                 Domicilio fiscal cliente *
               </label>
-              <input
+              <ZoomableTextField
                 id="g3-cl-addr"
+                as="input"
+                multiline={false}
+                maxLength={TEXT_LIMITS.ADDRESS}
+                zoomLabel="Domicilio fiscal cliente"
                 data-testid="gate3-client-address-input"
-                type="text"
                 disabled={!canActGate3 || isSubmitting}
                 value={g3Draft.client_fiscal_address}
-                onChange={(e) =>
-                  setG3Draft((p) => (p ? { ...p, client_fiscal_address: e.target.value } : p))
+                onValueChange={(next) =>
+                  setG3Draft((p) => (p ? { ...p, client_fiscal_address: next } : p))
                 }
                 placeholder="Calle, CP, Ciudad"
                 className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
@@ -670,12 +702,16 @@ export function JobLifecycleActionWidget({
             <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-notes">
               Notas de factura
             </label>
-            <textarea
+            <ZoomableTextField
               id="g3-notes"
+              as="textarea"
+              multiline
               rows={2}
+              maxLength={TEXT_LIMITS.NOTES}
+              zoomLabel="Notas de factura"
               disabled={!canActGate3 || isSubmitting}
               value={g3Draft.notes}
-              onChange={(e) => setG3Draft((p) => (p ? { ...p, notes: e.target.value } : p))}
+              onValueChange={(next) => setG3Draft((p) => (p ? { ...p, notes: next } : p))}
               className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
             />
           </div>
@@ -755,13 +791,17 @@ export function JobLifecycleActionWidget({
             <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g4-msg">
               Mensaje para el cliente
             </label>
-            <textarea
+            <ZoomableTextField
               id="g4-msg"
+              as="textarea"
+              multiline
               rows={3}
+              maxLength={TEXT_LIMITS.SHARE_MESSAGE}
+              zoomLabel="Mensaje para el cliente"
               disabled={!canActGate4 || isSubmitting}
               value={g4Draft.message_text}
-              onChange={(e) =>
-                setG4Draft((p) => (p ? { ...p, message_text: e.target.value } : p))
+              onValueChange={(next) =>
+                setG4Draft((p) => (p ? { ...p, message_text: next } : p))
               }
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
             />
@@ -832,14 +872,20 @@ export function JobLifecycleActionWidget({
                 </button>
               )}
 
-            {lp.quote_id && !hasAdvance && !hasFinal && (
+            {lp.quote_id && !hasFinal && quoteMissingClient && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+                Asigna un cliente al presupuesto (desde Presupuestos) antes de poder emitir facturas.
+              </div>
+            )}
+
+            {lp.quote_id && !hasAdvance && !hasFinal && !quoteMissingClient && advancePolicy.allowAdvance && (
               <button
                 type="button"
                 data-testid="lifecycle-request-advance-btn"
                 onClick={() =>
                   void onQuickAction({
                     id: "qa_req_advance",
-                    label: "Facturar anticipo 40 %",
+                    label: `Facturar anticipo ${advPctLabel}`,
                     action_type: "request_advance_gate",
                     payload: {
                       target_ids: { job_id: lp.job_id, quote_id: lp.quote_id ?? undefined },
@@ -849,11 +895,11 @@ export function JobLifecycleActionWidget({
                 }
                 className="min-h-10 rounded-xl bg-orange-600 px-3 text-xs font-bold text-white"
               >
-                Facturar anticipo 40 %
+                Facturar anticipo {advPctLabel}
               </button>
             )}
 
-            {lp.quote_id && !hasFinal && (
+            {lp.quote_id && !hasFinal && !quoteMissingClient && (
               <button
                 type="button"
                 data-testid="lifecycle-request-final-btn"
@@ -870,7 +916,11 @@ export function JobLifecycleActionWidget({
                 }
                 className="min-h-10 rounded-xl bg-slate-900 px-3 text-xs font-bold text-white"
               >
-                {hasAdvance ? "Factura final (60 % restante)" : "Emitir factura final"}
+                {hasAdvance
+                  ? "Factura final (resto)"
+                  : !advancePolicy.allowAdvance
+                    ? "Emitir factura completa (100 %)"
+                    : "Emitir factura final"}
               </button>
             )}
 

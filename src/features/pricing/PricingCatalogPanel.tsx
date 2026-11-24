@@ -6,6 +6,7 @@ import {
   patchWorkScheduleDefaultsByVoice,
   type CatalogItemFormState,
 } from "../../agent/voiceFormPatcher";
+import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   CatalogCategory,
   CatalogItemRow,
@@ -25,6 +26,7 @@ import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import type { OcrPort } from "../../core/ports/mediaPorts";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
+import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import {
   computeTemplatePreviewPriceCents,
   findMatchingCatalogItemForTemplate,
@@ -799,12 +801,15 @@ export function PricingCatalogPanel({
                 }
               }}
             />
-            <input
-              type="text"
+            <ZoomableTextField
+              as="input"
+              multiline={false}
+              maxLength={TEXT_LIMITS.DESCRIPTION}
+              zoomLabel="Descripción técnica de la partida"
               data-testid="pricing-custom-desc-input"
               placeholder="Descripción técnica de la partida *"
               value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
+              onValueChange={setFormDesc}
               className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs"
             />
             <div className="grid grid-cols-3 gap-2">

@@ -219,7 +219,7 @@ describe("Asistente Conversacional Offline y Completado Guiado (Slot-Filling)", 
     });
     expect(q1.checkpoint_status).toBe("interrupted");
     expect(q1.active_interrupt?.gate_id).toBe("gate_1_quote");
-    expect(q1.assistant_message?.content).toContain("falta seleccionar o crear el cliente");
+    expect(q1.assistant_message?.content).toContain("confirmar sin datos de cliente");
     if (q1.active_interrupt?.gate_id === "gate_1_quote") {
       expect(q1.active_interrupt.proposed_payload.client_id).toBeNull();
       expect(q1.active_interrupt.proposed_payload.job_title).toBe("Nuevo presupuesto de obra");

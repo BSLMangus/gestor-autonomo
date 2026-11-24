@@ -25,7 +25,11 @@ import { AuthRepository } from "./core/db/repositories/authRepo";
 import { ChatRepository } from "./core/db/repositories/chatRepo";
 import { SettingsRepository } from "./core/db/repositories/settingsRepo";
 import type { DocumentOpenerService } from "./core/files/documentOpener";
-import { formatLocalDateTimeIso } from "./core/fiscal/dateQuarter";
+import { formatLocalDateTimeIso, getLocalTodayIso } from "./core/fiscal/dateQuarter";
+import {
+  registerTaxNotificationClickListener,
+  syncTaxLocalNotifications,
+} from "./core/fiscal/taxLocalNotifications";
 import type { CameraAdapter } from "./core/hardware/cameraAdapter";
 import type { VoiceInputAdapter } from "./core/hardware/voiceAdapter";
 import { BACK_PRIORITY, getRouteTitle, useAppRouter, type AppRoute } from "./core/navigation/routes";
@@ -62,6 +66,7 @@ import { GlobalCameraChoiceSheet } from "./ui/GlobalCameraChoiceSheet";
 import { GlobalVoiceOverlay } from "./ui/GlobalVoiceOverlay";
 import { GuardBanners } from "./ui/GuardBanners";
 import { MobileShell } from "./ui/MobileShell";
+import { ZoomTextEditorProvider } from "./ui/ZoomTextEditorProvider";
 
 export interface AppRuntime {
   executor: SqliteExecutor;
@@ -213,6 +218,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
   const [toast, setToast] = useState<ToastNotification | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [todayIso, setTodayIso] = useState<string>(() => getLocalTodayIso());
   const [superAdminUnlocked, setSuperAdminUnlocked] = useState(false);
 
   const showCleanToast = useCallback((nextToast: ToastNotification) => {
@@ -319,6 +325,72 @@ export function App({ runtime }: { runtime: AppRuntime }) {
       active = false;
     };
   }, [authRepo]);
+
+  useEffect(() => {
+    let active = true;
+    const refreshTodayAndSync = () => {
+      const latest = getLocalTodayIso();
+      setTodayIso((prev) => (prev === latest ? prev : latest));
+      void syncTaxLocalNotifications(executor, latest).catch(() => undefined);
+    };
+
+    refreshTodayAndSync();
+
+    let appStateHandle: { remove: () => Promise<void> } | null = null;
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive && active) {
+        refreshTodayAndSync();
+      }
+    })
+      .then((h) => {
+        if (!active) {
+          void h.remove();
+        } else {
+          appStateHandle = h;
+        }
+      })
+      .catch(() => undefined);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && active) {
+        refreshTodayAndSync();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    const intervalId = window.setInterval(refreshTodayAndSync, 60 * 60 * 1000);
+
+    return () => {
+      active = false;
+      void appStateHandle?.remove();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [executor, refreshTick]);
+
+  useEffect(() => {
+    let active = true;
+    let cleanup: (() => void) | null = null;
+    void registerTaxNotificationClickListener((focusDateIso) => {
+      navigate({
+        name: "calendar",
+        tab: "hacienda",
+        ...(focusDateIso ? { focusDateIso } : {}),
+      });
+    })
+      .then((fn) => {
+        if (!active) {
+          fn();
+        } else {
+          cleanup = fn;
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, [navigate]);
 
   const handleLogout = useCallback(async () => {
     setDrawerOpen(false);
@@ -921,14 +993,6 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     });
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-surface text-xs font-semibold text-on-surface-variant">
-        Cargando cuenta local...
-      </div>
-    );
-  }
-
   const visibleUpdateBanner =
     availableUpdate && !updateDismissed ? (
       <UpdateBanner
@@ -938,48 +1002,57 @@ export function App({ runtime }: { runtime: AppRuntime }) {
       />
     ) : null;
 
-  if (!activeAccount) {
-    return (
-      <div className="min-h-dvh bg-surface">
-        {visibleUpdateBanner && <div className="px-4 pt-3">{visibleUpdateBanner}</div>}
-        <AuthScreen
-          executor={executor}
-          hasExistingAccounts={hasExistingAccounts}
-          onAuthenticated={async (account) => {
-            setActiveAccount(account);
-            setHasExistingAccounts(true);
-            selectAndSetActiveThreadId(null);
-            await loadThreadsAndActive(null);
-            setRefreshTick((t) => t + 1);
-            navigate({ name: "home" }, { replace: true });
-          }}
-        />
-      </div>
-    );
-  }
+  const renderContent = () => {
+    if (authLoading) {
+      return (
+        <div className="flex h-dvh items-center justify-center bg-surface text-xs font-semibold text-on-surface-variant">
+          Cargando cuenta local...
+        </div>
+      );
+    }
 
-  if (!activeAccount.onboarding_completed) {
-    return (
-      <div className="min-h-dvh bg-surface">
-        {visibleUpdateBanner && <div className="px-4 pt-3">{visibleUpdateBanner}</div>}
-        <OnboardingWizard
-          account={activeAccount}
-          executor={executor}
-          ocrPort={ocrPort}
-          onFinished={async () => {
-            const fresh = await authRepo.getActiveAccount();
-            setActiveAccount(fresh);
-            setRefreshTick((t) => t + 1);
-            navigate({ name: "home" }, { replace: true });
-          }}
-        />
-      </div>
-    );
-  }
+    if (!activeAccount) {
+      return (
+        <div className="min-h-dvh bg-surface">
+          {visibleUpdateBanner && <div className="px-4 pt-3">{visibleUpdateBanner}</div>}
+          <AuthScreen
+            executor={executor}
+            hasExistingAccounts={hasExistingAccounts}
+            onAuthenticated={async (account) => {
+              setActiveAccount(account);
+              setHasExistingAccounts(true);
+              selectAndSetActiveThreadId(null);
+              await loadThreadsAndActive(null);
+              setRefreshTick((t) => t + 1);
+              navigate({ name: "home" }, { replace: true });
+            }}
+          />
+        </div>
+      );
+    }
 
-  return (
-    <>
-      <MobileShell
+    if (!activeAccount.onboarding_completed) {
+      return (
+        <div className="min-h-dvh bg-surface">
+          {visibleUpdateBanner && <div className="px-4 pt-3">{visibleUpdateBanner}</div>}
+          <OnboardingWizard
+            account={activeAccount}
+            executor={executor}
+            ocrPort={ocrPort}
+            onFinished={async () => {
+              const fresh = await authRepo.getActiveAccount();
+              setActiveAccount(fresh);
+              setRefreshTick((t) => t + 1);
+              navigate({ name: "home" }, { replace: true });
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <MobileShell
         currentRoute={route}
         headerTitle={headerTitle}
         isSubmitting={isSubmitting}
@@ -1092,7 +1165,11 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           <HomeHubView
             executor={executor}
             refreshTick={refreshTick}
+            todayIso={todayIso}
             onNavigate={(next) => navigate(next)}
+            onTaxStateChanged={async () => {
+              setRefreshTick((t) => t + 1);
+            }}
           />
         )}
 
@@ -1133,6 +1210,8 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             refreshTick={refreshTick}
             initialFocusDateIso={route.focusDateIso}
+            initialTab={route.tab}
+            todayIso={todayIso}
             voiceAdapter={voiceAdapter}
             inferenceAdapter={inferenceAdapter}
             registerBackHandler={registerBackHandler}
@@ -1317,6 +1396,14 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             fileBridge={fileBridge}
             refreshTick={refreshTick}
+            todayIso={todayIso}
+            onOpenTaxCalendar={(focusDateIso) =>
+              navigate({
+                name: "calendar",
+                tab: "hacienda",
+                ...(focusDateIso ? { focusDateIso } : {}),
+              })
+            }
             onQuickManualTicket={handleQuickManualTicket}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onOpenTicket={(tid) => navigate({ name: "ticket_detail", ticketId: tid })}
@@ -1469,6 +1556,17 @@ export function App({ runtime }: { runtime: AppRuntime }) {
         onCloseOrReject={() => void handleCloseOrRejectOverlay()}
       />
     </>
+    );
+  };
+
+  return (
+    <ZoomTextEditorProvider
+      executor={executor}
+      refreshTick={refreshTick}
+      registerBackHandler={registerBackHandler}
+    >
+      {renderContent()}
+    </ZoomTextEditorProvider>
   );
 }
 

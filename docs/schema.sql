@@ -1,7 +1,7 @@
 -- =============================================================================
 -- ObraLocal AI — Esquema SQLite + FTS5 + Triggers + Checkpointer LangGraph.js
 -- Compatible con: @capacitor-community/sqlite (Android/iOS) y @sqlite.org/sqlite-wasm (Web OPFS / :memory:)
--- Versión de esquema: 1.4.0 (Checkpoint Schema Version: 1.0.0)
+-- Versión de esquema: 1.5.0 (Checkpoint Schema Version: 1.0.0)
 -- Regla invariante: cloud_cost_eur = 0.0 | Importes monetarios en céntimos enteros
 -- =============================================================================
 
@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS app_settings (
   irpf_reserve_rate REAL NOT NULL DEFAULT 20 CHECK (irpf_reserve_rate >= 0 AND irpf_reserve_rate <= 100),
   hourly_rate_cents INTEGER NOT NULL DEFAULT 3800 CHECK (hourly_rate_cents > 0),
   boot_mode TEXT NOT NULL DEFAULT 'clean' CHECK (boot_mode IN ('demo', 'clean')),
+  expand_long_text_inputs INTEGER NOT NULL DEFAULT 1 CHECK (expand_long_text_inputs IN (0, 1)),
+  default_quote_validity_days INTEGER NOT NULL DEFAULT 30 CHECK (default_quote_validity_days BETWEEN 1 AND 365),
+  default_payment_methods_json TEXT NOT NULL DEFAULT '["transferencia"]',
+  default_payment_schedule_json TEXT NOT NULL DEFAULT '[]',
+  active_tax_models_json TEXT NOT NULL DEFAULT '["303","130","390","347","100"]',
   updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
 );
 
@@ -110,8 +115,8 @@ CREATE TABLE IF NOT EXISTS quotes (
   id TEXT PRIMARY KEY,
   quote_code TEXT NOT NULL UNIQUE,
   job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE RESTRICT,
-  client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
-  client_name_snapshot TEXT NOT NULL CHECK (length(trim(client_name_snapshot)) > 0),
+  client_id TEXT REFERENCES clients(id) ON DELETE RESTRICT,
+  client_name_snapshot TEXT NOT NULL DEFAULT '',
   client_nif_snapshot TEXT NOT NULL DEFAULT '',
   client_address_snapshot TEXT NOT NULL DEFAULT '',
   client_phone_snapshot TEXT NOT NULL DEFAULT '',
@@ -121,6 +126,9 @@ CREATE TABLE IF NOT EXISTS quotes (
   total_cents INTEGER NOT NULL CHECK (total_cents >= 0 AND total_cents = subtotal_cents + vat_cents),
   status TEXT NOT NULL DEFAULT 'borrador'
     CHECK (status IN ('borrador', 'enviado', 'aceptado', 'rechazado')),
+  validity_days INTEGER CHECK (validity_days IS NULL OR (validity_days BETWEEN 1 AND 365)),
+  payment_methods_json TEXT NOT NULL DEFAULT '[]',
+  payment_schedule_json TEXT NOT NULL DEFAULT '[]',
   notes TEXT NOT NULL DEFAULT '',
   pdf_uri TEXT,
   sent_at_iso TEXT CHECK (
@@ -525,3 +533,25 @@ CREATE TABLE IF NOT EXISTS schedule_entries (
 
 CREATE INDEX IF NOT EXISTS idx_schedule_entries_date ON schedule_entries(date_iso);
 CREATE INDEX IF NOT EXISTS idx_schedule_entries_job_date ON schedule_entries(job_id, date_iso);
+
+-- -----------------------------------------------------------------------------
+-- 13. Calendario Fiscal AEAT y Alertas de Vencimiento
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tax_obligation_states (
+  obligation_key TEXT PRIMARY KEY,
+  model_code TEXT NOT NULL,
+  fiscal_year INTEGER NOT NULL CHECK (fiscal_year >= 2020 AND fiscal_year <= 2100),
+  period_code TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pendiente', 'presentado', 'no_aplica')) DEFAULT 'pendiente',
+  presented_at_iso TEXT,
+  notes TEXT NOT NULL DEFAULT '',
+  updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tax_obligation_states_model_year
+  ON tax_obligation_states(model_code, fiscal_year);
+
+CREATE TABLE IF NOT EXISTS tax_alert_dismissals (
+  alert_key TEXT PRIMARY KEY,
+  dismissed_at_ms INTEGER NOT NULL CHECK (dismissed_at_ms >= 0)
+);

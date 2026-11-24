@@ -17,6 +17,8 @@ import type {
   SqliteExecutor,
   SymmetricBackupEnvelope,
   SymmetricBackupPlaintext,
+  TaxAlertDismissalRow,
+  TaxObligationStateRow,
 } from "../contracts/types";
 import { CheckpointsRepository } from "../db/repositories/checkpointsRepo";
 import { ScheduleRepository } from "../db/repositories/scheduleRepo";
@@ -82,6 +84,8 @@ export async function purgeDomainAndCheckpointsInTx(
   await tx.run(`DELETE FROM site_logs`);
   await tx.run(`DELETE FROM schedule_entries`);
   await tx.run(`DELETE FROM work_schedule_defaults`);
+  await tx.run(`DELETE FROM tax_alert_dismissals`);
+  await tx.run(`DELETE FROM tax_obligation_states`);
   await tx.run(`DELETE FROM expense_tickets`);
   await tx.run(`DELETE FROM quote_items`);
   await tx.run(`DELETE FROM invoices`);
@@ -123,6 +127,12 @@ export class BackupService {
     );
     const workScheduleDefaults = await this.scheduleRepo.getWorkScheduleDefaults();
     const scheduleEntries = await this.scheduleRepo.listAllEntries();
+    const taxObligationStates = await this.executor.query<TaxObligationStateRow>(
+      `SELECT * FROM tax_obligation_states`
+    );
+    const taxAlertDismissals = await this.executor.query<TaxAlertDismissalRow>(
+      `SELECT * FROM tax_alert_dismissals`
+    );
 
     const plaintext: SymmetricBackupPlaintext = SymmetricBackupPlaintextSchema.parse({
       app_settings_emitter: {
@@ -140,6 +150,12 @@ export class BackupService {
       app_settings_pricing: {
         hourly_rate_cents: settings.hourly_rate_cents,
       },
+      app_settings_quote_defaults: {
+        default_quote_validity_days: settings.default_quote_validity_days,
+        default_payment_methods: settings.default_payment_methods,
+        default_payment_schedule: settings.default_payment_schedule,
+      },
+      app_settings_tax_models: settings.active_tax_models,
       work_schedule_defaults: workScheduleDefaults,
       sequences,
       clients,
@@ -152,6 +168,8 @@ export class BackupService {
       site_logs: siteLogs,
       feedback_corrections: feedbackCorrections,
       schedule_entries: scheduleEntries,
+      tax_obligation_states: taxObligationStates,
+      tax_alert_dismissals: taxAlertDismissals,
     });
 
     const trimmedPass = password?.trim() ?? "";
@@ -245,8 +263,10 @@ export class BackupService {
           id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
           emitter_iban, emitter_logo_data_url,
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
-          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode, updated_at_ms
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?)
+          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
+          default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
+          updated_at_ms
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = excluded.emitter_name,
           emitter_nif = excluded.emitter_nif,
@@ -262,6 +282,10 @@ export class BackupService {
           irpf_reserve_rate = excluded.irpf_reserve_rate,
           hourly_rate_cents = excluded.hourly_rate_cents,
           boot_mode = 'clean',
+          default_quote_validity_days = excluded.default_quote_validity_days,
+          default_payment_methods_json = excluded.default_payment_methods_json,
+          default_payment_schedule_json = excluded.default_payment_schedule_json,
+          active_tax_models_json = excluded.active_tax_models_json,
           updated_at_ms = excluded.updated_at_ms`,
         [
           plaintext.app_settings_emitter.emitter_name,
@@ -273,6 +297,12 @@ export class BackupService {
           plaintext.app_settings_tax?.default_vat_rate ?? 21,
           plaintext.app_settings_tax?.irpf_reserve_rate ?? 20,
           plaintext.app_settings_pricing?.hourly_rate_cents ?? 3800,
+          plaintext.app_settings_quote_defaults?.default_quote_validity_days ?? 30,
+          JSON.stringify(
+            plaintext.app_settings_quote_defaults?.default_payment_methods ?? ["transferencia"]
+          ),
+          JSON.stringify(plaintext.app_settings_quote_defaults?.default_payment_schedule ?? []),
+          JSON.stringify(plaintext.app_settings_tax_models ?? ["303", "130", "390", "347", "100"]),
           now,
         ]
       );
@@ -356,9 +386,10 @@ export class BackupService {
           `INSERT INTO quotes (
             id, quote_code, job_id, client_id, client_name_snapshot, client_nif_snapshot,
             client_address_snapshot, client_phone_snapshot, vat_rate, subtotal_cents,
-            vat_cents, total_cents, status, notes, pdf_uri, sent_at_iso,
+            vat_cents, total_cents, status, validity_days, payment_methods_json,
+            payment_schedule_json, notes, pdf_uri, sent_at_iso,
             created_at_ms, updated_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             q.id,
             q.quote_code,
@@ -373,6 +404,9 @@ export class BackupService {
             q.vat_cents,
             q.total_cents,
             q.status,
+            q.validity_days ?? null,
+            q.payment_methods_json ?? "[]",
+            q.payment_schedule_json ?? "[]",
             q.notes,
             q.pdf_uri,
             q.sent_at_iso,
@@ -565,6 +599,32 @@ export class BackupService {
             se.created_at_ms,
             se.updated_at_ms,
           ]
+        );
+      }
+
+      for (const st of plaintext.tax_obligation_states ?? []) {
+        await tx.run(
+          `INSERT INTO tax_obligation_states (
+            obligation_key, model_code, fiscal_year, period_code, status,
+            presented_at_iso, notes, updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            st.obligation_key,
+            st.model_code,
+            st.fiscal_year,
+            st.period_code,
+            st.status,
+            st.presented_at_iso,
+            st.notes,
+            st.updated_at_ms,
+          ]
+        );
+      }
+
+      for (const d of plaintext.tax_alert_dismissals ?? []) {
+        await tx.run(
+          `INSERT INTO tax_alert_dismissals (alert_key, dismissed_at_ms) VALUES (?, ?)`,
+          [d.alert_key, d.dismissed_at_ms]
         );
       }
     });

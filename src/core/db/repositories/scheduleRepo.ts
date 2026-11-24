@@ -255,34 +255,67 @@ export class ScheduleRepository {
     date_iso: string;
     planned_start: string;
     planned_end: string;
+    planned_hours_thousandths?: number;
     notes?: string;
   }): Promise<ScheduleEntryRow> {
     const dateIso = IsoDateSchema.parse(input.date_iso);
     const plannedStart = TimeHHMMSchema.parse(input.planned_start);
     const plannedEnd = TimeHHMMSchema.parse(input.planned_end);
-    const diffMin = Math.max(0, parseHHMMToMinutes(plannedEnd) - parseHHMMToMinutes(plannedStart));
-    const plannedThousandths = Math.round((diffMin * 1000) / 60);
+    const diffMin = parseHHMMToMinutes(plannedEnd) - parseHHMMToMinutes(plannedStart);
+    if (diffMin <= 0) {
+      throw new Error(
+        "SCHEMA_VALIDATION_ERROR: La hora de fin debe ser posterior a la hora de inicio"
+      );
+    }
+    const plannedThousandths =
+      input.planned_hours_thousandths !== undefined
+        ? Math.max(1, Math.round(input.planned_hours_thousandths))
+        : Math.round((diffMin * 1000) / 60);
     const now = Date.now();
     const id = `sch_${crypto.randomUUID().slice(0, 12)}`;
 
-    await this.executor.run(
-      `INSERT INTO schedule_entries (
-        id, job_id, date_iso, planned_start, planned_end, planned_hours_thousandths,
-        actual_start, actual_end, actual_hours_thousandths, status, deviation_reason,
-        notes, created_at_ms, updated_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'previsto', '', ?, ?, ?)`,
-      [
-        id,
-        input.job_id,
-        dateIso,
-        plannedStart,
-        plannedEnd,
-        plannedThousandths,
-        (input.notes ?? "").trim(),
-        now,
-        now,
-      ]
-    );
+    await this.executor.inTransaction(async (tx) => {
+      await tx.run(
+        `INSERT INTO schedule_entries (
+          id, job_id, date_iso, planned_start, planned_end, planned_hours_thousandths,
+          actual_start, actual_end, actual_hours_thousandths, status, deviation_reason,
+          notes, created_at_ms, updated_at_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'previsto', '', ?, ?, ?)`,
+        [
+          id,
+          input.job_id,
+          dateIso,
+          plannedStart,
+          plannedEnd,
+          plannedThousandths,
+          (input.notes ?? "").trim(),
+          now,
+          now,
+        ]
+      );
+
+      if (input.job_id) {
+        const jobRows = await tx.query<{
+          start_date_iso: string | null;
+          end_date_iso: string | null;
+        }>(`SELECT start_date_iso, end_date_iso FROM jobs WHERE id = ? LIMIT 1`, [input.job_id]);
+        const jobRow = jobRows[0];
+        if (jobRow) {
+          const nextStart =
+            !jobRow.start_date_iso || dateIso < jobRow.start_date_iso
+              ? dateIso
+              : jobRow.start_date_iso;
+          const nextEnd =
+            !jobRow.end_date_iso || dateIso > jobRow.end_date_iso ? dateIso : jobRow.end_date_iso;
+          if (nextStart !== jobRow.start_date_iso || nextEnd !== jobRow.end_date_iso) {
+            await tx.run(
+              `UPDATE jobs SET start_date_iso = ?, end_date_iso = ?, updated_at_ms = ? WHERE id = ?`,
+              [nextStart, nextEnd, now, input.job_id]
+            );
+          }
+        }
+      }
+    });
 
     const created = await this.getEntryById(id);
     if (!created) {
@@ -291,11 +324,21 @@ export class ScheduleRepository {
     return created;
   }
 
+  async deleteEntry(entryId: string): Promise<void> {
+    await this.executor.run(`DELETE FROM schedule_entries WHERE id = ?`, [entryId]);
+  }
+
   async generateEntriesForJobDateRange(
     jobId: string,
     startDateIso: string,
     endDateIso: string,
-    opts?: { forceIncludeAllDays?: boolean }
+    opts?: {
+      forceIncludeAllDays?: boolean;
+      plannedStart?: string;
+      plannedEnd?: string;
+      plannedHoursThousandths?: number;
+      replaceSingleDayHours?: boolean;
+    }
   ): Promise<ScheduleEntryRow[]> {
     const start = IsoDateSchema.parse(startDateIso);
     const end = IsoDateSchema.parse(endDateIso);
@@ -307,16 +350,34 @@ export class ScheduleRepository {
     const workDaySet = new Set(
       defaults.work_days.length > 0 ? defaults.work_days : [1, 2, 3, 4, 5]
     );
-    const plannedStart = defaults.morning_start;
-    const plannedEnd = defaults.afternoon_end || defaults.morning_end;
-    const plannedThousandths = computeDailyWorkHoursThousandths(defaults);
+    const defaultStart = defaults.morning_start;
+    const defaultEnd = defaults.afternoon_end || defaults.morning_end;
+    const plannedStart = opts?.plannedStart
+      ? TimeHHMMSchema.parse(opts.plannedStart)
+      : defaultStart;
+    const plannedEnd = opts?.plannedEnd
+      ? TimeHHMMSchema.parse(opts.plannedEnd)
+      : defaultEnd;
+    const spanMinutes = parseHHMMToMinutes(plannedEnd) - parseHHMMToMinutes(plannedStart);
+    if (spanMinutes <= 0) {
+      throw new Error(
+        "SCHEMA_VALIDATION_ERROR: La hora de fin debe ser posterior a la hora de inicio"
+      );
+    }
+    const plannedThousandths =
+      opts?.plannedHoursThousandths !== undefined
+        ? Math.max(1, Math.round(opts.plannedHoursThousandths))
+        : plannedStart === defaultStart && plannedEnd === defaultEnd
+          ? computeDailyWorkHoursThousandths(defaults)
+          : Math.round((spanMinutes * 1000) / 60);
 
+    const isSameDay = start === end;
     const targetDates: string[] = [];
     let cursor = start;
     let safety = 0;
     while (cursor <= end && safety < 366) {
       const weekday = getIsoWeekday(cursor);
-      if (opts?.forceIncludeAllDays || workDaySet.has(weekday)) {
+      if (opts?.forceIncludeAllDays || isSameDay || workDaySet.has(weekday)) {
         targetDates.push(cursor);
       }
       cursor = addDaysIso(cursor, 1);
@@ -335,7 +396,17 @@ export class ScheduleRepository {
           `SELECT id FROM schedule_entries WHERE job_id = ? AND date_iso = ? LIMIT 1`,
           [jobId, dateIso]
         );
-        if (existing.length > 0) continue;
+        if (existing.length > 0) {
+          if (opts?.replaceSingleDayHours && isSameDay) {
+            await tx.run(
+              `UPDATE schedule_entries
+               SET planned_start = ?, planned_end = ?, planned_hours_thousandths = ?, updated_at_ms = ?
+               WHERE id = ?`,
+              [plannedStart, plannedEnd, plannedThousandths, now, existing[0]!.id]
+            );
+          }
+          continue;
+        }
 
         const id = `sch_${crypto.randomUUID().slice(0, 12)}`;
         await tx.run(
@@ -520,12 +591,14 @@ export class ScheduleRepository {
     let plannedHoursThousandths = 0;
     let loggedPlannedHoursThousandths = 0;
     let actualHoursThousandths = 0;
-    let loggedDays = 0;
+    const plannedDateSet = new Set<string>();
+    const loggedDateSet = new Set<string>();
 
     for (const entry of entries) {
+      plannedDateSet.add(entry.date_iso);
       plannedHoursThousandths += entry.planned_hours_thousandths;
       if (entry.actual_hours_thousandths !== null) {
-        loggedDays += 1;
+        loggedDateSet.add(entry.date_iso);
         loggedPlannedHoursThousandths += entry.planned_hours_thousandths;
         actualHoursThousandths += entry.actual_hours_thousandths;
       }
@@ -536,8 +609,8 @@ export class ScheduleRepository {
 
     return {
       job_id: jobId,
-      planned_days: entries.length,
-      logged_days: loggedDays,
+      planned_days: plannedDateSet.size,
+      logged_days: loggedDateSet.size,
       planned_hours_thousandths: plannedHoursThousandths,
       logged_planned_hours_thousandths: loggedPlannedHoursThousandths,
       actual_hours_thousandths: actualHoursThousandths,

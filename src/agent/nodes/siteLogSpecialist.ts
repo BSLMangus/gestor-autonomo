@@ -1,4 +1,5 @@
 import { AIMessage } from "@langchain/core/messages";
+import { TEXT_LIMITS, truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   PendingSlotFill,
@@ -23,8 +24,10 @@ export function createSiteLogSpecialistNode(deps: GraphDependencies) {
       const resolvedTarget = (state.extracted_entities?.resolved_target ?? {}) as ResolvedTarget;
       const category =
         (state.extracted_entities?.site_log_category as SiteLogCategory | undefined) ?? "nota";
-      const noteText =
-        (state.extracted_entities?.note_text as string | undefined) ?? input?.text ?? "";
+      const noteText = truncateText(
+        (state.extracted_entities?.note_text as string | undefined) ?? input?.text ?? "",
+        TEXT_LIMITS.NOTES
+      );
 
       let candidateJobId =
         resolvedTarget.job_id ?? input?.target_ids?.job_id ?? null;

@@ -1,5 +1,9 @@
 import type { z } from "zod";
 import type {
+  QuotePaymentInstallment,
+  QuotePaymentMethod,
+} from "../contracts/types";
+import type {
   ActiveWidgetEnvelopeSchema,
   ErrorCodeSchema,
   Gate1QuoteDraftPayloadSchema,
@@ -40,6 +44,8 @@ export interface PdfQuoteDocumentInput {
   kind: "quote";
   quoteCode: string;
   issuedDateIso: string;
+  validityDays?: number | null;
+  validUntilIso?: string | null;
   emitter: {
     name: string;
     nif: string;
@@ -54,6 +60,8 @@ export interface PdfQuoteDocumentInput {
   subtotalCents: number;
   vatCents: number;
   totalCents: number;
+  paymentMethods?: QuotePaymentMethod[];
+  paymentSchedule?: QuotePaymentInstallment[];
   notes: string;
   lines: Array<{
     description: string;
@@ -68,6 +76,7 @@ export interface PdfInvoiceDocumentInput {
   kind: "invoice";
   invoiceNumber: string;
   invoiceKind: "advance_40" | "final" | "full";
+  advancePercent?: number;
   issuedAtIso: string;
   dueAtIso: string;
   emitter: {

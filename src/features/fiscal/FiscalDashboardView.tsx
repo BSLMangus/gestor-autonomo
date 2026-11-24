@@ -18,11 +18,14 @@ import { computePiggyBank, formatCentsEs } from "../../core/fiscal/fiscalEngine"
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { DeductibleTicketsModal, ProfitabilityAnalysisModal } from "./FiscalDetailModals";
+import { TaxAlertsBanner } from "./TaxAlertsBanner";
 
 interface FiscalDashboardViewProps {
   executor: SqliteExecutor;
   fileBridge?: LocalFileBridge;
   refreshTick?: number;
+  todayIso?: string;
+  onOpenTaxCalendar?: (focusDateIso?: string) => void;
   onQuickManualTicket: () => Promise<void>;
   onOpenInvoice?: (invoiceId: string) => void;
   onOpenTicket?: (ticketId: string) => void;
@@ -34,6 +37,8 @@ export function FiscalDashboardView({
   executor,
   fileBridge,
   refreshTick = 0,
+  todayIso,
+  onOpenTaxCalendar,
   onQuickManualTicket,
   onOpenInvoice,
   onOpenTicket,
@@ -208,6 +213,18 @@ export function FiscalDashboardView({
           ))}
         </select>
       </div>
+
+      <TaxAlertsBanner
+        executor={executor}
+        refreshTick={refreshTick + localReloadTick}
+        todayIso={todayIso}
+        maxVisible={4}
+        onOpenTaxCalendar={onOpenTaxCalendar}
+        onTaxStateChanged={async () => {
+          setLocalReloadTick((t) => t + 1);
+          await onDataChanged?.();
+        }}
+      />
 
       {summary && (
         <>

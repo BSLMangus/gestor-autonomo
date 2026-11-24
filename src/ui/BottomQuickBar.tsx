@@ -1,5 +1,6 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
+import { TEXT_LIMITS } from "../core/contracts/textLimits";
 import type { PendingGate } from "../core/contracts/types";
 
 interface BottomQuickBarProps {
@@ -54,6 +55,7 @@ export function BottomQuickBar({
       <form onSubmit={(e) => void handleSubmit(e)} className="flex items-center gap-2">
         <input
           type="text"
+          maxLength={TEXT_LIMITS.CHAT_INPUT}
           data-testid="chat-composer-input"
           disabled={locked}
           value={text}

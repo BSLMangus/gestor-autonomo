@@ -36,8 +36,10 @@ export class ResetService {
         `INSERT INTO app_settings (
           id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
-          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode, updated_at_ms
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 21, 20, 3800, 'demo', ?)
+          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
+          default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
+          updated_at_ms
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 21, 20, 3800, 'demo', 30, '["transferencia"]', '[]', '["303","130","390","347","100"]', ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = excluded.emitter_name,
           emitter_nif = excluded.emitter_nif,
@@ -51,6 +53,10 @@ export class ResetService {
           irpf_reserve_rate = 20,
           hourly_rate_cents = 3800,
           boot_mode = 'demo',
+          default_quote_validity_days = 30,
+          default_payment_methods_json = '["transferencia"]',
+          default_payment_schedule_json = '[]',
+          active_tax_models_json = '["303","130","390","347","100"]',
           updated_at_ms = excluded.updated_at_ms`,
         [
           s.emitter_name,
@@ -393,8 +399,10 @@ export class ResetService {
           id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
           emitter_iban, emitter_logo_data_url,
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
-          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode, updated_at_ms
-        ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', ?)
+          default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
+          default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
+          updated_at_ms
+        ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', 30, '["transferencia"]', '[]', '["303","130","390","347","100"]', ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = '',
           emitter_nif = '',
@@ -410,6 +418,10 @@ export class ResetService {
           irpf_reserve_rate = 20,
           hourly_rate_cents = 3800,
           boot_mode = 'clean',
+          default_quote_validity_days = 30,
+          default_payment_methods_json = '["transferencia"]',
+          default_payment_schedule_json = '[]',
+          active_tax_models_json = '["303","130","390","347","100"]',
           updated_at_ms = excluded.updated_at_ms`,
         [now]
       );

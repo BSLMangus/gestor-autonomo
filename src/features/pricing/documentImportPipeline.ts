@@ -179,7 +179,7 @@ export function parseCatalogAndRatesFromText(params: {
       if (unitPriceCents === null) {
         // Línea libre tipo: "2 ud Cambio de grifo monomando ... 89,00 €" o "Instalación termo - 320 €"
         const priceAtEnd =
-          /^(?:(\d+(?:[.,]\d+)?)\s*(m2|m²|ml|kg|lotes?|horas?|h|uds?)\s+)?(.{3,160}?)\s*(?:[-–:|·]|a\s+precio|pvp)?\s*(\d{1,4}(?:\.\d{3})*(?:,\d{1,2}|\.\d{1,2})?)\s*(?:€|eur|euros)(?:\s*\/\s*(m2|m²|ml|h|ud|lote))?(?:\s*\(.*\))?$/i.exec(
+          /^(?:(\d+(?:[.,]\d+)?)\s*(m2|m²|ml|kg|lotes?|horas?|h|uds?)\s+)?(.{3,600}?)\s*(?:[-–:|·]|a\s+precio|pvp)?\s*(\d{1,4}(?:\.\d{3})*(?:,\d{1,2}|\.\d{1,2})?)\s*(?:€|eur|euros)(?:\s*\/\s*(m2|m²|ml|h|ud|lote))?(?:\s*\(.*\))?$/i.exec(
             rawLine
           );
 

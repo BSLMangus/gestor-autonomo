@@ -17,6 +17,10 @@ import { initializeSchema } from "../src/core/db/sqliteExecutor";
 import { MemoryFileBridge } from "../src/core/files/memoryFileBridge";
 import { MemoryCoordinatorNoop } from "../src/core/memory/memoryCoordinator";
 import { parseHashToRoute, routeToHash } from "../src/core/navigation/routes";
+import {
+  Gate1QuoteCommitPayloadSchema,
+  RagSnippetSchema,
+} from "../src/core/contracts/schemas";
 import { MockFreezerPort, MockOcrPort, MockPdfPort } from "./mocks/ports";
 
 describe("Agenda, Calendario, Horario Habitual y ScheduleSpecialist", () => {
@@ -208,5 +212,118 @@ describe("Agenda, Calendario, Horario Habitual y ScheduleSpecialist", () => {
     await backupService.importBackupJson(exported);
     const restoredEntries = await scheduleRepo.listEntriesByJob(job.id);
     expect(restoredEntries).toHaveLength(2);
+  });
+
+  it("permite citas de menos de un día, múltiples bloques en el mismo día y fines de semana puntuales", async () => {
+    const job = await jobsRepo.createDirectJob({
+      title: "Reparación rápida grifería",
+    });
+
+    await expect(
+      scheduleRepo.createSingleEntry({
+        job_id: job.id,
+        date_iso: "2026-11-28",
+        planned_start: "14:00",
+        planned_end: "12:00",
+      })
+    ).rejects.toThrow("SCHEMA_VALIDATION_ERROR");
+
+    const morning = await scheduleRepo.createSingleEntry({
+      job_id: job.id,
+      date_iso: "2026-11-28",
+      planned_start: "09:00",
+      planned_end: "11:00",
+      notes: "Desmontaje grifo antiguo",
+    });
+    expect(morning.planned_hours_thousandths).toBe(2000);
+
+    const syncedJob = await jobsRepo.getById(job.id);
+    expect(syncedJob?.start_date_iso).toBe("2026-11-28");
+    expect(syncedJob?.end_date_iso).toBe("2026-11-28");
+
+    const afternoon = await scheduleRepo.createSingleEntry({
+      job_id: job.id,
+      date_iso: "2026-11-28",
+      planned_start: "16:00",
+      planned_end: "18:00",
+      notes: "Prueba estanqueidad",
+    });
+    expect(afternoon.planned_hours_thousandths).toBe(2000);
+
+    const summary = await scheduleRepo.getJobScheduleDeviationSummary(job.id);
+    expect(summary.planned_days).toBe(1);
+    expect(summary.planned_hours_thousandths).toBe(4000);
+
+    await scheduleRepo.deleteEntry(afternoon.id);
+    expect(await scheduleRepo.listEntriesByJob(job.id)).toHaveLength(1);
+
+    // Obra puntual de 2 horas en sábado (start === end en fin de semana)
+    const weekendJob = await jobsRepo.createDirectJob({ title: "Urgencia sábado" });
+    const weekendEntries = await scheduleRepo.generateEntriesForJobDateRange(
+      weekendJob.id,
+      "2026-11-28",
+      "2026-11-28",
+      {
+        plannedStart: "10:00",
+        plannedEnd: "12:00",
+        plannedHoursThousandths: 2000,
+      }
+    );
+    expect(weekendEntries).toHaveLength(1);
+    expect(weekendEntries[0]?.planned_hours_thousandths).toBe(2000);
+
+    // replaceSingleDayHours actualiza duración del mismo día
+    const updatedWeekend = await scheduleRepo.generateEntriesForJobDateRange(
+      weekendJob.id,
+      "2026-11-28",
+      "2026-11-28",
+      {
+        plannedStart: "10:00",
+        plannedEnd: "13:00",
+        plannedHoursThousandths: 3000,
+        replaceSingleDayHours: true,
+      }
+    );
+    expect(updatedWeekend).toHaveLength(1);
+    expect(updatedWeekend[0]?.planned_hours_thousandths).toBe(3000);
+  });
+
+  it("acepta descripciones y notas largas (>240 caracteres) manteniendo compactos los snippets RAG", () => {
+    const longDescription = "Picado y desescombro completo ".repeat(40).trim(); // > 1000 chars
+    const longNotes = "Condiciones detalladas de obra en vivienda habitada. ".repeat(15).trim(); // > 700 chars
+    expect(longDescription.length).toBeGreaterThan(240);
+    expect(longNotes.length).toBeGreaterThan(500);
+
+    const parsed = Gate1QuoteCommitPayloadSchema.parse({
+      quote_id: null,
+      client_id: "cli-01",
+      job_id: null,
+      job_title: "Reforma completa con descripción extensa " + "detallada ".repeat(20),
+      vat_rate: 10,
+      notes: longNotes,
+      lines: [
+        {
+          catalog_item_id: null,
+          description: longDescription,
+          category: "Albañilería",
+          unit: "m2",
+          quantity_thousandths: 10000,
+          unit_price_cents: 4500,
+          original_unit_price_cents: 4500,
+          save_to_catalog: false,
+        },
+      ],
+    });
+    expect(parsed.lines[0]?.description.length).toBeGreaterThan(240);
+
+    expect(() =>
+      RagSnippetSchema.parse({
+        source_table: "catalog_items",
+        record_id: "cat-1",
+        title: "Partida",
+        snippet_text: "x".repeat(250),
+        bm25_score: 1,
+      })
+    ).toThrow();
   });
 });

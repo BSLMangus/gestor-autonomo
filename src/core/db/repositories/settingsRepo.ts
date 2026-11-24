@@ -2,9 +2,15 @@ import {
   AdminLlmConfigInputSchema,
   EmitterProfileInputSchema,
   PricingSettingsInputSchema,
+  QuoteDefaultsInputSchema,
+  TaxModelCodeSchema,
   TaxSettingsInputSchema,
   type SequenceRowSchema,
 } from "../../contracts/schemas";
+import {
+  parseQuotePaymentMethodsJson,
+  parseQuotePaymentScheduleJson,
+} from "../../fiscal/fiscalEngine";
 import { computeCatalogUnitPriceCents } from "../../pricing/pricingEngine";
 import type {
   AdminLlmConfigInput,
@@ -13,9 +19,12 @@ import type {
   EmitterProfileInput,
   LlmStrategyOverride,
   PendingCameraContext,
+  QuoteDefaultsInput,
+  QuotePaymentMethod,
   RecoveredDraft,
   SeriesType,
   SqliteExecutor,
+  TaxModelCode,
   TaxSettingsInput,
 } from "../../contracts/types";
 import type { z } from "zod";
@@ -37,7 +46,33 @@ interface RawAppSettingsRow extends Record<string, unknown> {
   irpf_reserve_rate: number;
   hourly_rate_cents?: number;
   boot_mode: "demo" | "clean";
+  expand_long_text_inputs?: number;
+  default_quote_validity_days?: number;
+  default_payment_methods_json?: string;
+  default_payment_schedule_json?: string;
+  active_tax_models_json?: string;
   updated_at_ms: number;
+}
+
+const DEFAULT_ACTIVE_MODELS: TaxModelCode[] = ["303", "130", "390", "347", "100"];
+const DEFAULT_PAYMENT_METHODS: QuotePaymentMethod[] = ["transferencia"];
+
+function parseActiveTaxModelsJson(raw: string | undefined): TaxModelCode[] {
+  if (raw === undefined || raw === null) return [...DEFAULT_ACTIVE_MODELS];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [...DEFAULT_ACTIVE_MODELS];
+    const out: TaxModelCode[] = [];
+    for (const item of parsed) {
+      const res = TaxModelCodeSchema.safeParse(item);
+      if (res.success && !out.includes(res.data)) {
+        out.push(res.data);
+      }
+    }
+    return out;
+  } catch {
+    return [...DEFAULT_ACTIVE_MODELS];
+  }
 }
 
 interface RawRecoveredDraftRow extends Record<string, unknown> {
@@ -78,6 +113,15 @@ function mapSettingsRow(row: RawAppSettingsRow): AppSettingsRecord {
     irpf_reserve_rate: Number(row.irpf_reserve_rate ?? 20),
     hourly_rate_cents: Number(row.hourly_rate_cents ?? 3800),
     boot_mode: row.boot_mode,
+    expand_long_text_inputs:
+      row.expand_long_text_inputs === undefined ? true : row.expand_long_text_inputs !== 0,
+    default_quote_validity_days: Number(row.default_quote_validity_days ?? 30),
+    default_payment_methods:
+      row.default_payment_methods_json === undefined
+        ? [...DEFAULT_PAYMENT_METHODS]
+        : parseQuotePaymentMethodsJson(row.default_payment_methods_json),
+    default_payment_schedule: parseQuotePaymentScheduleJson(row.default_payment_schedule_json),
+    active_tax_models: parseActiveTaxModelsJson(row.active_tax_models_json),
     updated_at_ms: row.updated_at_ms,
   };
 }
@@ -202,8 +246,8 @@ export class SettingsRepository {
         id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
         emitter_iban, emitter_logo_data_url, active_account_id,
         last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
-        default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode, updated_at_ms
-      ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', ?)`,
+        default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode, expand_long_text_inputs, updated_at_ms
+      ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', 1, ?)`,
       [now]
     );
     const created = await this.getAppSettingsOrNull();
@@ -279,6 +323,56 @@ export class SettingsRepository {
        SET default_vat_rate = ?, irpf_reserve_rate = ?, updated_at_ms = ?
        WHERE id = 1`,
       [parsed.default_vat_rate, parsed.irpf_reserve_rate, now]
+    );
+    return this.getAppSettings();
+  }
+
+  async updateExpandLongTextInputs(enabled: boolean): Promise<AppSettingsRecord> {
+    const now = Date.now();
+    await this.getAppSettings();
+    await this.executor.run(
+      `UPDATE app_settings
+       SET expand_long_text_inputs = ?, updated_at_ms = ?
+       WHERE id = 1`,
+      [enabled ? 1 : 0, now]
+    );
+    return this.getAppSettings();
+  }
+
+  async updateQuoteDefaults(input: QuoteDefaultsInput): Promise<AppSettingsRecord> {
+    const parsed = QuoteDefaultsInputSchema.parse(input);
+    const now = Date.now();
+    await this.getAppSettings();
+    await this.executor.run(
+      `UPDATE app_settings
+       SET default_quote_validity_days = ?,
+           default_payment_methods_json = ?,
+           default_payment_schedule_json = ?,
+           updated_at_ms = ?
+       WHERE id = 1`,
+      [
+        parsed.default_quote_validity_days,
+        JSON.stringify(Array.from(new Set(parsed.default_payment_methods))),
+        JSON.stringify(parsed.default_payment_schedule),
+        now,
+      ]
+    );
+    return this.getAppSettings();
+  }
+
+  async updateActiveTaxModels(models: TaxModelCode[]): Promise<AppSettingsRecord> {
+    const deduped: TaxModelCode[] = [];
+    for (const item of models) {
+      const valid = TaxModelCodeSchema.parse(item);
+      if (!deduped.includes(valid)) deduped.push(valid);
+    }
+    const now = Date.now();
+    await this.getAppSettings();
+    await this.executor.run(
+      `UPDATE app_settings
+       SET active_tax_models_json = ?, updated_at_ms = ?
+       WHERE id = 1`,
+      [JSON.stringify(deduped), now]
     );
     return this.getAppSettings();
   }

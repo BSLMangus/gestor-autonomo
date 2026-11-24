@@ -1,5 +1,12 @@
-import type { MemoryCoordinator } from "../../core/contracts/types";
-import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import type {
+  MemoryCoordinator,
+  QuotePaymentMethod,
+} from "../../core/contracts/types";
+import {
+  computePaymentScheduleAmounts,
+  formatCentsEs,
+  formatPercentEs,
+} from "../../core/fiscal/fiscalEngine";
 import type {
   PdfBuildInput,
   PdfInvoiceDocumentInput,
@@ -27,10 +34,32 @@ function formatThousandthsEs(thousandths: number): string {
   return `${intPart},${trimmed}`;
 }
 
+const PAYMENT_METHOD_LABELS: Record<QuotePaymentMethod, string> = {
+  transferencia: "Transferencia bancaria",
+  efectivo: "Efectivo",
+  bizum: "Bizum",
+  tarjeta: "Tarjeta",
+};
+
 function buildPartyBlock(
   label: string,
-  party: { name: string; nif: string; fiscalAddress: string; phone: string; iban?: string }
+  party: { name: string; nif: string; fiscalAddress: string; phone: string; iban?: string },
+  options?: { allowEmpty?: boolean }
 ): Record<string, unknown> {
+  const hasName = party.name.trim().length > 0;
+  if (options?.allowEmpty && !hasName) {
+    return {
+      stack: [
+        { text: label, fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
+        {
+          text: "Presupuesto simplificado sin datos de cliente asignados",
+          italics: true,
+          fontSize: 9,
+          color: "#64748b",
+        },
+      ],
+    };
+  }
   return {
     stack: [
       { text: label, fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
@@ -61,6 +90,82 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
     ]),
   ];
 
+  const paymentMethods = input.paymentMethods ?? [];
+  const paymentSchedule = input.paymentSchedule ?? [];
+  const scheduleAmounts = computePaymentScheduleAmounts(input.totalCents, paymentSchedule);
+  const paymentBlocks: Array<Record<string, unknown>> = [];
+
+  if (paymentMethods.length > 0 || scheduleAmounts.length > 0) {
+    const methodLabels = paymentMethods.map((m) => PAYMENT_METHOD_LABELS[m] ?? m);
+    paymentBlocks.push({
+      stack: [
+        {
+          text: "CONDICIONES Y FORMA DE PAGO",
+          fontSize: 8.5,
+          bold: true,
+          color: "#0f172a",
+          margin: [0, 12, 0, 4],
+        },
+        ...(methodLabels.length > 0
+          ? [
+              {
+                text: `Métodos aceptados: ${methodLabels.join(" · ")}`,
+                fontSize: 9,
+                color: "#334155",
+                margin: [0, 0, 0, 3],
+              },
+            ]
+          : []),
+        ...(paymentMethods.includes("transferencia") && input.emitter.iban
+          ? [
+              {
+                text: `Cuenta bancaria (IBAN): ${input.emitter.iban}`,
+                fontSize: 8.5,
+                bold: true,
+                color: "#334155",
+                margin: [0, 0, 0, 4],
+              },
+            ]
+          : []),
+        ...(scheduleAmounts.length > 0
+          ? [
+              {
+                table: {
+                  headerRows: 1,
+                  widths: ["*", 64, 84],
+                  body: [
+                    [
+                      { text: "Hito de pago", style: "th" },
+                      { text: "Porcentaje", style: "th", alignment: "right" },
+                      { text: "Importe", style: "th", alignment: "right" },
+                    ],
+                    ...scheduleAmounts.map((step) => [
+                      { text: step.label, fontSize: 9, color: "#0f172a" },
+                      {
+                        text: formatPercentEs(step.percentage),
+                        fontSize: 9,
+                        alignment: "right",
+                        color: "#334155",
+                      },
+                      {
+                        text: formatCentsEs(step.amount_cents),
+                        fontSize: 9,
+                        bold: true,
+                        alignment: "right",
+                        color: "#0f172a",
+                      },
+                    ]),
+                  ],
+                },
+                layout: "lightHorizontalLines",
+                margin: [0, 2, 0, 4],
+              },
+            ]
+          : []),
+      ],
+    });
+  }
+
   return {
     pageSize: "A4",
     pageMargins: [36, 40, 36, 48],
@@ -80,6 +185,20 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
           {
             stack: [
               { text: `Fecha emisión: ${input.issuedDateIso}`, fontSize: 9.5, alignment: "right" },
+              ...(input.validityDays
+                ? [
+                    {
+                      text: input.validUntilIso
+                        ? `Validez: ${input.validityDays} días (hasta ${input.validUntilIso})`
+                        : `Validez: ${input.validityDays} días`,
+                      fontSize: 9,
+                      bold: true,
+                      color: "#334155",
+                      alignment: "right",
+                      margin: [0, 2, 0, 0],
+                    },
+                  ]
+                : []),
               { text: "Documento generado 100 % offline", fontSize: 8, color: "#64748b", alignment: "right", margin: [0, 2, 0, 0] },
             ],
           },
@@ -89,7 +208,7 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
       {
         columns: [
           buildPartyBlock("EMISOR / PROFESIONAL", input.emitter),
-          buildPartyBlock("CLIENTE", input.client),
+          buildPartyBlock("CLIENTE", input.client, { allowEmpty: true }),
         ],
         columnGap: 20,
         margin: [0, 0, 0, 16],
@@ -101,20 +220,15 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
           body: cleanRows,
         },
         layout: "lightHorizontalLines",
-        margin: [0, 0, 0, 16],
+        margin: [0, 0, 0, 14],
       },
       {
         columns: [
+          { width: "*", text: "" },
           {
-            width: "*",
-            text: input.notes ? `Observaciones:\n${input.notes}` : "",
-            fontSize: 8.5,
-            color: "#475569",
-          },
-          {
-            width: 200,
+            width: 210,
             table: {
-              widths: ["*", 80],
+              widths: ["*", 84],
               body: [
                 [
                   { text: "Base imponible:", fontSize: 9.5 },
@@ -140,6 +254,23 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
           },
         ],
       },
+      ...paymentBlocks,
+      ...(input.notes
+        ? [
+            {
+              stack: [
+                {
+                  text: "OBSERVACIONES Y CONDICIONES ADICIONALES",
+                  fontSize: 8.5,
+                  bold: true,
+                  color: "#0f172a",
+                  margin: [0, 12, 0, 3],
+                },
+                { text: input.notes, fontSize: 8.5, color: "#475569" },
+              ],
+            },
+          ]
+        : []),
     ],
     styles: {
       th: { fontSize: 9, bold: true, color: "#0f172a", fillColor: "#f1f5f9", margin: [0, 3, 0, 3] },
@@ -147,10 +278,13 @@ function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, u
   };
 }
 
-function invoiceKindLabel(kind: PdfInvoiceDocumentInput["invoiceKind"]): string {
+function invoiceKindLabel(
+  kind: PdfInvoiceDocumentInput["invoiceKind"],
+  advancePercent?: number
+): string {
   switch (kind) {
     case "advance_40":
-      return "FACTURA DE ANTICIPO (40 %)";
+      return `FACTURA DE ANTICIPO (${formatPercentEs(advancePercent ?? 40)})`;
     case "final":
       return "FACTURA FINAL / LIQUIDACIÓN";
     case "full":
@@ -159,6 +293,7 @@ function invoiceKindLabel(kind: PdfInvoiceDocumentInput["invoiceKind"]): string 
 }
 
 function buildInvoiceDocDefinition(input: PdfInvoiceDocumentInput): Record<string, unknown> {
+  const kindText = invoiceKindLabel(input.invoiceKind, input.advancePercent);
   const rows: Array<Array<Record<string, unknown>>> = [
     [
       { text: "Concepto", style: "th" },
@@ -168,7 +303,7 @@ function buildInvoiceDocDefinition(input: PdfInvoiceDocumentInput): Record<strin
     ],
     [
       {
-        text: `${invoiceKindLabel(input.invoiceKind)} · Obra ${input.jobCode} (${input.jobTitle}) · Ref. ${input.quoteCode}`,
+        text: `${kindText} · Obra ${input.jobCode} (${input.jobTitle}) · Ref. ${input.quoteCode}`,
         fontSize: 9,
       },
       { text: formatCentsEs(input.baseCents), fontSize: 9, alignment: "right" },
@@ -202,7 +337,7 @@ function buildInvoiceDocDefinition(input: PdfInvoiceDocumentInput): Record<strin
               ...(input.emitter.logoDataUrl
                 ? [{ image: input.emitter.logoDataUrl, fit: [110, 44], margin: [0, 0, 0, 6] }]
                 : []),
-              { text: invoiceKindLabel(input.invoiceKind), fontSize: 15, bold: true, color: "#0f172a" },
+              { text: kindText, fontSize: 15, bold: true, color: "#0f172a" },
               { text: `Número de factura: ${input.invoiceNumber}`, fontSize: 11, bold: true, color: "#ea580c", margin: [0, 3, 0, 0] },
               { text: `Obra ${input.jobCode}: ${input.jobTitle}`, fontSize: 9.5, color: "#334155", margin: [0, 2, 0, 0] },
             ],

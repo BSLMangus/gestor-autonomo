@@ -1,4 +1,5 @@
 import { AIMessage } from "@langchain/core/messages";
+import { TEXT_LIMITS, truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   BillingSubIntent,
@@ -14,6 +15,11 @@ import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { addDaysIso, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
+import {
+  formatPercentEs,
+  parseQuotePaymentScheduleJson,
+  resolveQuoteAdvancePolicy,
+} from "../../core/fiscal/fiscalEngine";
 import type { GraphDependencies } from "../ports";
 import type { ObraLocalGraphState, ObraLocalGraphUpdate } from "../state";
 
@@ -71,8 +77,8 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
           snippets.push({
             source_table: "jobs",
             record_id: m.id,
-            title: `${m.job_code} ${m.title}`,
-            snippet_text: m.address || m.status,
+            title: truncateText(`${m.job_code} ${m.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            snippet_text: truncateText(m.address || m.status, TEXT_LIMITS.RAG_SNIPPET),
             bm25_score: m.bm25_score,
           });
         }
@@ -87,8 +93,8 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
             candidates: matches.slice(0, 5).map((m) => ({
               entity_type: "job",
               id: m.id,
-              label: `${m.job_code} · ${m.title}`,
-              subtitle: m.address || m.status,
+              label: truncateText(`${m.job_code} · ${m.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+              subtitle: truncateText(m.address || m.status, 200),
               job_id: m.id,
             })),
             attempts: 0,
@@ -124,8 +130,8 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
           candidates: recent.items.map((m) => ({
             entity_type: "job",
             id: m.id,
-            label: `${m.job_code} · ${m.title}`,
-            subtitle: m.status,
+            label: truncateText(`${m.job_code} · ${m.title}`, TEXT_LIMITS.DISAMBIGUATION_LABEL),
+            subtitle: truncateText(m.status, 200),
             job_id: m.id,
           })),
           attempts: 0,
@@ -279,22 +285,32 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
         };
       }
 
-      // Gate 3: Emisión de Anticipo 40% o Factura Final
+      // Gate 3: Emisión de Anticipo o Factura Final
       const quoteItems = activeQuote ? await quotesRepo.getItems(activeQuote.id) : [];
+      const advancePolicy = activeQuote
+        ? resolveQuoteAdvancePolicy(parseQuotePaymentScheduleJson(activeQuote.payment_schedule_json))
+        : null;
+      const singlePaymentRedirected =
+        subIntent === "advance_40" && Boolean(advancePolicy && !advancePolicy.allowAdvance);
+      const effectiveSubIntent = singlePaymentRedirected ? "final_invoice" : subIntent;
+      const advPctLabel = formatPercentEs(advancePolicy?.advancePercent ?? 40);
+
       const ineligibleReason =
         job.status === "cancelado"
           ? `La obra ${job.job_code} está cancelada.`
           : !activeQuote || activeQuote.status === "rechazado" || quoteItems.length === 0
             ? `La obra ${job.job_code} necesita un presupuesto no rechazado con al menos una partida para facturar.`
-            : subIntent === "advance_40" && antInv
-              ? `Ya existe un anticipo 40 % (${antInv.invoice_number}) en la obra ${job.job_code}.`
-              : subIntent === "advance_40" && facInv
-                ? `No se puede emitir un anticipo 40 % porque la factura final (${facInv.invoice_number}) ya fue emitida.`
-                : subIntent === "final_invoice" && facInv
-                  ? `La factura final (${facInv.invoice_number}) ya fue emitida para esta obra.`
-                  : null;
+            : !activeQuote.client_id
+              ? `El presupuesto ${activeQuote.quote_code} no tiene cliente asignado. Asigna primero un cliente con NIF y domicilio fiscal (RD 1619/2012) en Presupuestos u Obras antes de facturar.`
+              : effectiveSubIntent === "advance_40" && antInv
+                ? `Ya existe un anticipo (${antInv.invoice_number}) en la obra ${job.job_code}.`
+                : effectiveSubIntent === "advance_40" && facInv
+                  ? `No se puede emitir un anticipo (${advPctLabel}) porque la factura final (${facInv.invoice_number}) ya fue emitida.`
+                  : effectiveSubIntent === "final_invoice" && facInv
+                    ? `La factura final (${facInv.invoice_number}) ya fue emitida para esta obra.`
+                    : null;
 
-      if (ineligibleReason || !activeQuote) {
+      if (ineligibleReason || !activeQuote || !activeQuote.client_id) {
         return {
           routed_intent: "lifecycle_billing_specialist",
           active_job_id: job.id,
@@ -325,7 +341,7 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
 
       const settings = await settingsRepo.getAppSettings();
       const client = await clientsRepo.getById(activeQuote.client_id);
-      const series = subIntent === "advance_40" ? "ANT" : "FAC";
+      const series = effectiveSubIntent === "advance_40" ? "ANT" : "FAC";
       const maxRows = await deps.executor.query<{ max_issued: string | null }>(
         `SELECT MAX(issued_at_iso) AS max_issued FROM invoices WHERE series_type = ?`,
         [series]
@@ -344,7 +360,7 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
           mode: "preview_gate_3",
           pdf_uri: null,
           gate_3_draft: {
-            sub_intent: subIntent,
+            sub_intent: effectiveSubIntent,
             quote_id: activeQuote.id,
             job_id: job.id,
             issued_at_iso: issuedAtIso,
@@ -357,8 +373,8 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
             client_fiscal_address:
               client?.fiscal_address || activeQuote.client_address_snapshot || "",
             notes:
-              subIntent === "advance_40"
-                ? `Anticipo 40 % sobre presupuesto ${activeQuote.quote_code}.`
+              effectiveSubIntent === "advance_40"
+                ? `Anticipo ${advPctLabel} sobre presupuesto ${activeQuote.quote_code}.`
                 : antInv
                   ? `Factura final con deducción íntegra de ${antInv.invoice_number}.`
                   : `Factura completa sobre presupuesto ${activeQuote.quote_code}.`,
@@ -367,6 +383,9 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
       };
 
       const pendingGate: PendingGate = "gate_3_invoice";
+      const singlePaymentHint = singlePaymentRedirected
+        ? " El presupuesto está configurado en pago único (100 %), así que preparamos directamente la factura completa."
+        : "";
       return {
         routed_intent: "lifecycle_billing_specialist",
         rag_snippets: snippets,
@@ -374,7 +393,9 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
         pending_gate: pendingGate,
         messages: [
           new AIMessage(
-            `Borrador fiscal listo (${subIntent === "advance_40" ? "Anticipo 40 %" : "Factura correlativa"}) para ${job.job_code}. Verifica NIF/dirección de emisor y cliente antes de confirmar la emisión legal.`
+            `Borrador fiscal listo (${
+              effectiveSubIntent === "advance_40" ? `Anticipo ${advPctLabel}` : "Factura correlativa"
+            }) para ${job.job_code}. Verifica NIF/dirección de emisor y cliente antes de confirmar la emisión legal.${singlePaymentHint}`
           ),
         ],
         turn_trace: {

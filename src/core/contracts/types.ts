@@ -38,7 +38,11 @@ import type {
   PendingSlotFillSchema,
   PricingSettingsInputSchema,
   QuickActionSchema,
+  QuoteDefaultsInputSchema,
   QuoteItemRowSchema,
+  QuotePaymentInstallmentSchema,
+  QuotePaymentMethodSchema,
+  QuotePaymentScheduleSchema,
   QuoteRowSchema,
   QuoteStatusSchema,
   QuoteVatRateSchema,
@@ -51,6 +55,10 @@ import type {
   SiteLogCategorySchema,
   SiteLogInputSchema,
   SlotFillTargetSchema,
+  TaxAlertDismissalRowSchema,
+  TaxModelCodeSchema,
+  TaxObligationStateRowSchema,
+  TaxObligationStatusSchema,
   TaxSettingsInputSchema,
   SiteLogRowSchema,
   SpecialistRouteSchema,
@@ -72,6 +80,14 @@ export type SiteLogCategory = z.infer<typeof SiteLogCategorySchema>;
 export type CatalogCategory = z.infer<typeof CatalogCategorySchema>;
 export type CatalogPricingMode = z.infer<typeof CatalogPricingModeSchema>;
 export type QuoteVatRate = z.infer<typeof QuoteVatRateSchema>;
+export type QuotePaymentMethod = z.infer<typeof QuotePaymentMethodSchema>;
+export type QuotePaymentInstallment = z.infer<typeof QuotePaymentInstallmentSchema>;
+export type QuotePaymentSchedule = z.infer<typeof QuotePaymentScheduleSchema>;
+export type QuoteDefaultsInput = z.infer<typeof QuoteDefaultsInputSchema>;
+export type TaxModelCode = z.infer<typeof TaxModelCodeSchema>;
+export type TaxObligationStatus = z.infer<typeof TaxObligationStatusSchema>;
+export type TaxObligationStateRow = z.infer<typeof TaxObligationStateRowSchema>;
+export type TaxAlertDismissalRow = z.infer<typeof TaxAlertDismissalRowSchema>;
 export type TicketVatRate = z.infer<typeof TicketVatRateSchema>;
 export type UiWidgetType = z.infer<typeof UiWidgetTypeSchema>;
 export type PendingGate = z.infer<typeof PendingGateSchema>;
@@ -241,6 +257,11 @@ export interface AppSettingsRecord {
   irpf_reserve_rate: number;
   hourly_rate_cents: number;
   boot_mode: "demo" | "clean";
+  expand_long_text_inputs: boolean;
+  default_quote_validity_days: number;
+  default_payment_methods: QuotePaymentMethod[];
+  default_payment_schedule: QuotePaymentInstallment[];
+  active_tax_models: TaxModelCode[];
   updated_at_ms: number;
 }
 

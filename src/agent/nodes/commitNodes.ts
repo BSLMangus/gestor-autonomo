@@ -7,6 +7,7 @@ import {
   Gate4ShareCommitPayloadSchema,
   HumanDecisionSchema,
 } from "../../core/contracts/schemas";
+import { truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   ClientRow,
@@ -35,11 +36,14 @@ import {
   getLocalTodayIso,
 } from "../../core/fiscal/dateQuarter";
 import {
-  computeAdvance40,
+  computeAdvanceByPercent,
   computeFinalInvoiceFromQuoteAndAdvance,
   computeQuoteTotals,
+  computeQuoteValidUntilIso,
   deriveRateOrMixed,
   formatCentsEs,
+  parseQuotePaymentScheduleJson,
+  resolveQuoteAdvancePolicy,
 } from "../../core/fiscal/fiscalEngine";
 import {
   getSeedOverride,
@@ -238,11 +242,23 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
             phone: committed.new_client?.phone?.trim() ?? "",
           };
 
+      const effectiveJobTitle =
+        committed.job_title.trim() ||
+        truncateText(committed.lines[0]?.description.trim() || "Presupuesto sin título", 80);
+      const issuedDateIso = existingQuote ? formatLocalDateIso(existingQuote.created_at_ms) : todayIso;
+      const issuedMs = existingQuote ? existingQuote.created_at_ms : now;
+      const validityDays = committed.validity_days ?? null;
+      const validUntilIso = computeQuoteValidUntilIso(issuedMs, validityDays);
+      const paymentMethods = committed.payment_methods ?? [];
+      const paymentSchedule = committed.payment_schedule ?? [];
+
       // Pre-generación PDF en memoria + disco ANTES de abrir transacción SQLite (Sección 3.2)
       const pdfInput: PdfQuoteDocumentInput = {
         kind: "quote",
         quoteCode: projectedQuoteCode,
-        issuedDateIso: existingQuote ? formatLocalDateIso(existingQuote.created_at_ms) : todayIso,
+        issuedDateIso,
+        validityDays,
+        validUntilIso,
         emitter: {
           name: emitter.emitter_name || "Autónomo",
           nif: emitter.emitter_nif,
@@ -252,11 +268,13 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
           logoDataUrl: emitter.emitter_logo_data_url ?? null,
         },
         client: clientSnapshot,
-        jobTitle: committed.job_title,
+        jobTitle: effectiveJobTitle,
         vatRate: committed.vat_rate,
         subtotalCents: totals.subtotalCents,
         vatCents: totals.vatCents,
         totalCents: totals.totalCents,
+        paymentMethods,
+        paymentSchedule,
         notes: committed.notes,
         lines: committed.lines.map((line, i) => ({
           description: line.description,
@@ -287,7 +305,7 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
 
       try {
         await deps.executor.inTransaction(async (tx) => {
-          let resolvedClientId = committed.client_id;
+          let resolvedClientId: string | null = committed.client_id;
           if (!resolvedClientId && committed.new_client) {
             resolvedClientId = `cli_${crypto.randomUUID().slice(0, 12)}`;
             await tx.run(
@@ -305,9 +323,6 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
               ]
             );
           }
-          if (!resolvedClientId) {
-            throw new Error("SCHEMA_VALIDATION_ERROR: Cliente requerido para presupuesto");
-          }
 
           if (finalJobId) {
             const jobRows = await tx.query<JobRow>(
@@ -320,12 +335,16 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 "INVALID_STATE_TRANSITION: La obra ya no existe o ha sido cancelada"
               );
             }
-            if (liveJob.client_id !== null && liveJob.client_id !== resolvedClientId) {
+            if (
+              resolvedClientId !== null &&
+              liveJob.client_id !== null &&
+              liveJob.client_id !== resolvedClientId
+            ) {
               throw new Error(
                 "INVALID_STATE_TRANSITION: La obra ya pertenece a otro cliente distinto"
               );
             }
-            if (liveJob.client_id === null) {
+            if (liveJob.client_id === null && resolvedClientId !== null) {
               await tx.run(
                 `UPDATE jobs SET client_id = ?, updated_at_ms = ? WHERE id = ? AND client_id IS NULL`,
                 [resolvedClientId, now, finalJobId]
@@ -353,7 +372,7 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 finalJobId,
                 jobCode,
                 resolvedClientId,
-                committed.job_title.trim(),
+                effectiveJobTitle,
                 clientSnapshot.fiscalAddress,
                 todayIso,
                 now,
@@ -378,6 +397,7 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                SET client_id = ?, client_name_snapshot = ?, client_nif_snapshot = ?,
                    client_address_snapshot = ?, client_phone_snapshot = ?,
                    vat_rate = ?, subtotal_cents = ?, vat_cents = ?, total_cents = ?,
+                   validity_days = ?, payment_methods_json = ?, payment_schedule_json = ?,
                    notes = ?, pdf_uri = ?, updated_at_ms = ?
                WHERE id = ?`,
               [
@@ -390,6 +410,9 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 totals.subtotalCents,
                 totals.vatCents,
                 totals.totalCents,
+                validityDays,
+                JSON.stringify(paymentMethods),
+                JSON.stringify(paymentSchedule),
                 committed.notes,
                 pdfUri,
                 now,
@@ -407,9 +430,10 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
               `INSERT INTO quotes (
                 id, quote_code, job_id, client_id, client_name_snapshot, client_nif_snapshot,
                 client_address_snapshot, client_phone_snapshot, vat_rate, subtotal_cents,
-                vat_cents, total_cents, status, notes, pdf_uri, sent_at_iso,
+                vat_cents, total_cents, status, validity_days, payment_methods_json,
+                payment_schedule_json, notes, pdf_uri, sent_at_iso,
                 created_at_ms, updated_at_ms
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, NULL, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, NULL, ?, ?)`,
               [
                 finalQuoteId,
                 quoteCode,
@@ -423,6 +447,9 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 totals.subtotalCents,
                 totals.vatCents,
                 totals.totalCents,
+                validityDays,
+                JSON.stringify(paymentMethods),
+                JSON.stringify(paymentSchedule),
                 committed.notes,
                 pdfUri,
                 now,
@@ -986,7 +1013,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
           pdfUri = quote.pdf_uri;
           docJobId = quote.job_id;
           docQuoteId = quote.id;
-          docClientId = quote.client_id;
+          docClientId = quote.client_id ?? "";
         }
 
         if (committed.recipient_phone.length > 0 && docClientId) {
@@ -1081,6 +1108,11 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
           "INVALID_STATE_TRANSITION: El presupuesto ya no existe o está rechazado"
         );
       }
+      if (!liveQuote.client_id) {
+        throw new Error(
+          "INVALID_STATE_TRANSITION: El presupuesto no tiene cliente asignado. Asigna un cliente antes de facturar."
+        );
+      }
       const liveJobRows = await deps.executor.query<JobRow>(
         `SELECT * FROM jobs WHERE id = ? LIMIT 1`,
         [committed.job_id]
@@ -1093,10 +1125,18 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
       const existingInvoices = await invoicesRepo.listByJobId(committed.job_id);
       const existingAnt = existingInvoices.find((i) => i.series_type === "ANT") ?? null;
       const existingFac = existingInvoices.find((i) => i.series_type === "FAC") ?? null;
+      const advancePolicy = resolveQuoteAdvancePolicy(
+        parseQuotePaymentScheduleJson(liveQuote.payment_schedule_json)
+      );
 
+      if (committed.sub_intent === "advance_40" && !advancePolicy.allowAdvance) {
+        throw new Error(
+          "INVALID_STATE_TRANSITION: Presupuesto configurado en pago único (100 %). Emite directamente la factura completa."
+        );
+      }
       if (committed.sub_intent === "advance_40" && (existingAnt || existingFac)) {
         throw new Error(
-          "INVALID_STATE_TRANSITION: No se puede emitir anticipo 40 % sobre una obra con ANT o FAC previa"
+          "INVALID_STATE_TRANSITION: No se puede emitir anticipo sobre una obra con ANT o FAC previa"
         );
       }
       if (committed.sub_intent === "final_invoice" && existingFac) {
@@ -1118,6 +1158,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
       }
 
       let invoiceKind: InvoiceKind;
+      let advancePercent = 100;
       let baseCents: number;
       let vatCents: number;
       let totalCents: number;
@@ -1127,7 +1168,12 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
 
       if (committed.sub_intent === "advance_40") {
         invoiceKind = "advance_40";
-        const adv = computeAdvance40(liveQuote.subtotal_cents, liveQuote.vat_rate);
+        advancePercent = advancePolicy.advancePercent;
+        const adv = computeAdvanceByPercent(
+          liveQuote.subtotal_cents,
+          liveQuote.vat_rate,
+          advancePercent
+        );
         baseCents = adv.baseCents;
         vatCents = adv.vatCents;
         totalCents = adv.totalCents;
@@ -1166,6 +1212,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
         kind: "invoice",
         invoiceNumber: projectedNumber,
         invoiceKind,
+        advancePercent,
         issuedAtIso: committed.issued_at_iso,
         dueAtIso: committed.due_at_iso,
         emitter: {
@@ -1248,21 +1295,16 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
           }
 
           await tx.run(
-            `INSERT INTO app_settings (
-              id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
-              last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
-              boot_mode, updated_at_ms
-            ) VALUES (1, ?, ?, ?, ?, NULL, NULL, 1, NULL, 'clean', ?)
-            ON CONFLICT(id) DO UPDATE SET
-              emitter_name = excluded.emitter_name,
-              emitter_nif = excluded.emitter_nif,
-              emitter_fiscal_address = excluded.emitter_fiscal_address,
-              updated_at_ms = excluded.updated_at_ms`,
+            `UPDATE app_settings
+             SET emitter_name = ?,
+                 emitter_nif = ?,
+                 emitter_fiscal_address = ?,
+                 updated_at_ms = ?
+             WHERE id = 1`,
             [
               committed.emitter_name,
               committed.emitter_nif,
               committed.emitter_fiscal_address,
-              settings.emitter_phone,
               now,
             ]
           );
