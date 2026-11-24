@@ -128,6 +128,51 @@ function extractNumericSuffix(code: string, prefix: string): number {
   return Number.isInteger(suffix) && suffix > 0 ? suffix : 0;
 }
 
+export async function rewindSequenceIfLatest(
+  tx: Pick<SqliteExecutor, "query" | "run">,
+  seriesType: Extract<SeriesType, "PRE" | "ANT" | "FAC">,
+  fiscalYear: number,
+  deletedCode: string,
+  nowMs = Date.now()
+): Promise<void> {
+  const prefix = `${seriesType}-${fiscalYear}-`;
+  const deletedSeq = extractNumericSuffix(deletedCode, prefix);
+  if (deletedSeq <= 0) return;
+
+  const seqRows = await tx.query<{ last_seq: number }>(
+    `SELECT last_seq FROM sequences WHERE series_type = ? AND fiscal_year = ?`,
+    [seriesType, fiscalYear]
+  );
+  if (!seqRows[0] || Number(seqRows[0].last_seq) !== deletedSeq) {
+    return;
+  }
+
+  let maxRemaining = 0;
+  if (seriesType === "PRE") {
+    const rows = await tx.query<{ quote_code: string }>(
+      `SELECT quote_code FROM quotes WHERE quote_code LIKE ?`,
+      [`${prefix}%`]
+    );
+    for (const r of rows) {
+      maxRemaining = Math.max(maxRemaining, extractNumericSuffix(r.quote_code, prefix));
+    }
+  } else {
+    const rows = await tx.query<{ invoice_number: string }>(
+      `SELECT invoice_number FROM invoices WHERE series_type = ? AND fiscal_year = ?`,
+      [seriesType, fiscalYear]
+    );
+    for (const r of rows) {
+      maxRemaining = Math.max(maxRemaining, extractNumericSuffix(r.invoice_number, prefix));
+    }
+  }
+
+  await tx.run(
+    `UPDATE sequences SET last_seq = ?, updated_at_ms = ?
+     WHERE series_type = ? AND fiscal_year = ?`,
+    [maxRemaining, nowMs, seriesType, fiscalYear]
+  );
+}
+
 export class SettingsRepository {
   constructor(private readonly executor: SqliteExecutor) {}
 

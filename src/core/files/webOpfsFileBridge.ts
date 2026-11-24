@@ -133,7 +133,7 @@ export class WebOpfsFileBridge implements LocalFileBridge {
   }
 
   async deletePdf(uri: string | null): Promise<void> {
-    if (!uri) return;
+    if (!uri || isSeedVirtualUri(uri)) return;
     await this.call({ op: "delete", relPath: uri });
   }
 

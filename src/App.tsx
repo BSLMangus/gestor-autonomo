@@ -1153,9 +1153,14 @@ export function App({ runtime }: { runtime: AppRuntime }) {
         {route.name === "quotes" && (
           <QuotesView
             executor={executor}
+            fileBridge={fileBridge}
             refreshTick={refreshTick}
             onStartEmptyQuote={handleStartEmptyQuote}
             onOpenQuoteDetail={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
+            onDataChanged={async () => {
+              setRefreshTick((t) => t + 1);
+            }}
+            registerBackHandler={registerBackHandler}
           />
         )}
 
@@ -1163,9 +1168,11 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           <QuoteDetailView
             quoteId={route.quoteId}
             executor={executor}
+            fileBridge={fileBridge}
             pdfPort={pdfPort}
             documentOpener={documentOpener}
             refreshTick={refreshTick}
+            registerBackHandler={registerBackHandler}
             onBack={() => navigate({ name: "quotes" })}
             onOpenJob={(jobId) => navigate({ name: "jobs", focusJobId: jobId })}
             onOpenClient={(cid) => navigate({ name: "client_detail", clientId: cid })}
@@ -1192,9 +1199,11 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           <InvoiceDetailView
             invoiceId={route.invoiceId}
             executor={executor}
+            fileBridge={fileBridge}
             pdfPort={pdfPort}
             documentOpener={documentOpener}
             refreshTick={refreshTick}
+            registerBackHandler={registerBackHandler}
             onBack={() => {
               goBack();
             }}
@@ -1311,6 +1320,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onQuickManualTicket={handleQuickManualTicket}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onOpenTicket={(tid) => navigate({ name: "ticket_detail", ticketId: tid })}
+            onDataChanged={async () => {
+              setRefreshTick((t) => t + 1);
+            }}
             registerBackHandler={registerBackHandler}
           />
         )}

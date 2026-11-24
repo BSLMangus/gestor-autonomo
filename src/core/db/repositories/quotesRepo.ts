@@ -12,6 +12,7 @@ import type {
   SqliteExecutor,
 } from "../../contracts/types";
 import { normalizeSpanishText } from "../../text/spanishText";
+import { rewindSequenceIfLatest } from "./settingsRepo";
 
 export interface QuoteWithJobSummary extends QuoteRow {
   job_code: string;
@@ -238,5 +239,35 @@ export class QuotesRepository {
     } finally {
       await release();
     }
+  }
+
+  async delete(id: string, fileBridge: LocalFileBridge): Promise<void> {
+    const existing = await this.getById(id);
+    if (!existing) return;
+
+    await this.executor.inTransaction(async (tx) => {
+      const linkedInvoices = await tx.query<{ invoice_number: string }>(
+        `SELECT invoice_number FROM invoices WHERE quote_id = ? ORDER BY invoice_number ASC`,
+        [id]
+      );
+      if (linkedInvoices.length > 0) {
+        throw new Error(
+          `INVALID_STATE_TRANSITION: No se puede eliminar el presupuesto porque tiene factura(s) emitida(s) (${linkedInvoices.map((i) => i.invoice_number).join(", ")}). Elimina primero las facturas asociadas.`
+        );
+      }
+
+      await tx.run(
+        `UPDATE recovered_drafts SET active_quote_id = NULL WHERE active_quote_id = ?`,
+        [id]
+      );
+      await tx.run(`DELETE FROM quotes WHERE id = ?`, [id]);
+
+      const match = /^PRE-(\d{4})-\d+$/.exec(existing.quote_code);
+      if (match) {
+        await rewindSequenceIfLatest(tx, "PRE", Number(match[1]), existing.quote_code, Date.now());
+      }
+    });
+
+    await fileBridge.deletePdf(existing.pdf_uri);
   }
 }

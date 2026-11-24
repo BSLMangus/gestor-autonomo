@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
 import { extractFlexibleDateRange, extractFlexibleSpanishDateIso } from "../../agent/inference/spanishFormParsers";
@@ -22,6 +23,7 @@ import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { LocalFileBridge, SqliteExecutor } from "../../core/contracts/types";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 
 interface JobDetailDrawerProps {
@@ -117,6 +119,8 @@ export function JobDetailDrawer({
   const [scheduleSavedMsg, setScheduleSavedMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteSiteLogTarget, setDeleteSiteLogTarget] = useState<SiteLogRecord | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const reload = async (targetId: string) => {
     const jobsRepo = new JobsRepository(executor);
@@ -153,9 +157,27 @@ export function JobDetailDrawer({
   useEffect(() => {
     if (!jobId) return;
     setErrorMsg(null);
+    setDeleteSiteLogTarget(null);
+    setDeleteError(null);
     void reload(jobId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, executor]);
+
+  const handleConfirmDeleteSiteLog = async () => {
+    if (!deleteSiteLogTarget || !jobId) return;
+    setDeleteError(null);
+    setBusy(true);
+    try {
+      await new SiteLogsRepository(executor).delete(deleteSiteLogTarget.id, fileBridge);
+      setDeleteSiteLogTarget(null);
+      await reload(jobId);
+      await onDataChanged();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!jobId || !registerBackHandler) return;
@@ -521,9 +543,24 @@ export function JobDetailDrawer({
                       key={sl.id}
                       className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"
                     >
-                      <div className="flex justify-between text-[11px] text-slate-500">
-                        <span className="font-bold uppercase text-sky-800">{sl.category}</span>
-                        <span>{sl.created_at_iso}</span>
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold uppercase text-sky-800">{sl.category}</span>
+                          <span>{sl.created_at_iso}</span>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid={`site-log-delete-${sl.id}`}
+                          aria-label="Eliminar entrada del diario de obra"
+                          disabled={busy}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteSiteLogTarget(sl);
+                          }}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-coral-alert/25 bg-white text-coral-alert hover:bg-error-container cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
                       </div>
                       <p className="mt-1 text-slate-800">{sl.note_text}</p>
                       <SiteLogThumbnail
@@ -542,6 +579,23 @@ export function JobDetailDrawer({
           )}
         </div>
       </div>
+
+      <ConfirmDeleteDialog
+        open={deleteSiteLogTarget !== null}
+        title="¿Eliminar entrada del diario de obra?"
+        description="Se eliminará esta nota y su foto sellada asociada. Esta acción no se puede deshacer."
+        errorMsg={deleteError}
+        busy={busy}
+        confirmTestId="site-log-confirm-delete-btn"
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!busy) {
+            setDeleteSiteLogTarget(null);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteSiteLog}
+      />
     </div>
   );
 }

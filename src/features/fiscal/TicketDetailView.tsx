@@ -18,6 +18,7 @@ import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { deriveFiscalQuarter, isValidIsoDate } from "../../core/fiscal/dateQuarter";
 import { computeInverseVat21, formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 
 interface TicketDetailViewProps {
@@ -65,6 +66,7 @@ export function TicketDetailView({
 
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [supplierNif, setSupplierNif] = useState("");
   const [issueDateIso, setIssueDateIso] = useState("");
@@ -117,6 +119,7 @@ export function TicketDetailView({
   useEffect(() => {
     setEditing(false);
     setConfirmDelete(false);
+    setDeleteError(null);
     setErrorMsg(null);
     setStatusMsg(null);
     void loadTicket();
@@ -181,14 +184,15 @@ export function TicketDetailView({
 
   const handleDelete = async () => {
     if (!ticket) return;
-    setErrorMsg(null);
+    setDeleteError(null);
     setBusy(true);
     try {
       await new TicketsRepository(executor).delete(ticket.id, fileBridge);
       await onDataChanged();
+      setConfirmDelete(false);
       onBack();
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
+      setDeleteError(err instanceof Error ? err.message : String(err));
       setBusy(false);
     }
   };
@@ -372,44 +376,39 @@ export function TicketDetailView({
             </div>
           </section>
 
-          <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-2">
-            {!confirmDelete ? (
-              <button
-                type="button"
-                data-testid="ticket-detail-delete-btn"
-                disabled={busy}
-                onClick={() => setConfirmDelete(true)}
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-coral-alert/30 bg-surface-container-lowest font-semibold text-coral-alert cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Eliminar ticket</span>
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <div className="font-semibold text-coral-alert text-center">
-                  ¿Seguro que quieres eliminar este ticket de tu Hucha Fiscal?
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    className="min-h-[42px] flex-1 rounded-xl border border-outline-variant font-semibold text-on-surface cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="ticket-detail-confirm-delete-btn"
-                    disabled={busy}
-                    onClick={() => void handleDelete()}
-                    className="min-h-[42px] flex-1 rounded-xl bg-coral-alert font-semibold text-white cursor-pointer"
-                  >
-                    Sí, eliminar
-                  </button>
-                </div>
-              </div>
-            )}
+          <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4">
+            <button
+              type="button"
+              data-testid="ticket-detail-delete-btn"
+              disabled={busy}
+              onClick={() => {
+                setDeleteError(null);
+                setConfirmDelete(true);
+              }}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-coral-alert/30 bg-surface-container-lowest font-semibold text-coral-alert cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Eliminar ticket</span>
+            </button>
           </section>
+
+          <ConfirmDeleteDialog
+            open={confirmDelete}
+            title={`¿Eliminar ticket de ${ticket.supplier_name}?`}
+            description={`Se eliminará este ticket de gasto (${formatCentsEs(ticket.total_cents)}) y su imagen asociada. Esta acción no se puede deshacer.`}
+            warningNote="Se recalculará el IVA soportado y el beneficio neto en tu Hucha Fiscal."
+            errorMsg={deleteError}
+            busy={busy}
+            confirmTestId="ticket-detail-confirm-delete-btn"
+            registerBackHandler={registerBackHandler}
+            onCancel={() => {
+              if (!busy) {
+                setConfirmDelete(false);
+                setDeleteError(null);
+              }
+            }}
+            onConfirm={handleDelete}
+          />
         </>
       ) : (
         <form

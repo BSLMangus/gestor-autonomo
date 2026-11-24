@@ -1,4 +1,4 @@
-import { Landmark, Plus, Wallet } from "lucide-react";
+import { Landmark, Plus, Trash2, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   ExpenseTicketRow,
@@ -16,6 +16,7 @@ import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { compareQuarter, deriveFiscalQuarter, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import { computePiggyBank, formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { DeductibleTicketsModal, ProfitabilityAnalysisModal } from "./FiscalDetailModals";
 
 interface FiscalDashboardViewProps {
@@ -25,6 +26,7 @@ interface FiscalDashboardViewProps {
   onQuickManualTicket: () => Promise<void>;
   onOpenInvoice?: (invoiceId: string) => void;
   onOpenTicket?: (ticketId: string) => void;
+  onDataChanged?: () => Promise<void>;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
 }
 
@@ -35,6 +37,7 @@ export function FiscalDashboardView({
   onQuickManualTicket,
   onOpenInvoice,
   onOpenTicket,
+  onDataChanged,
   registerBackHandler,
 }: FiscalDashboardViewProps) {
   const defaultQuarter = deriveFiscalQuarter(getLocalTodayIso());
@@ -52,6 +55,11 @@ export function FiscalDashboardView({
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const [selectedProfitJobId, setSelectedProfitJobId] = useState<string | null>(null);
+  const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<InvoiceRow | null>(null);
+  const [deleteTicketTarget, setDeleteTicketTarget] = useState<ExpenseTicketRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [localReloadTick, setLocalReloadTick] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -98,7 +106,30 @@ export function FiscalDashboardView({
     return () => {
       active = false;
     };
-  }, [executor, quarter, defaultQuarter, refreshTick]);
+  }, [executor, quarter, defaultQuarter, refreshTick, localReloadTick]);
+
+  const handleConfirmDelete = async () => {
+    if (!fileBridge) return;
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      if (deleteInvoiceTarget) {
+        await new InvoicesRepository(executor).delete(deleteInvoiceTarget.id, fileBridge);
+        setDeleteInvoiceTarget(null);
+      } else if (deleteTicketTarget) {
+        await new TicketsRepository(executor).delete(deleteTicketTarget.id, fileBridge);
+        setDeleteTicketTarget(null);
+      } else {
+        return;
+      }
+      setLocalReloadTick((n) => n + 1);
+      await onDataChanged?.();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   useEffect(() => {
     if ((!ticketsModalOpen && !profitModalOpen) || !registerBackHandler) return;
@@ -497,43 +528,62 @@ export function FiscalDashboardView({
                   const isPaid = inv.status === "pagado";
                   const isOverdue = inv.status === "vencido";
                   return (
-                    <button
+                    <div
                       key={inv.id}
-                      type="button"
-                      data-testid={`fiscal-invoice-${inv.id}`}
-                      onClick={() => onOpenInvoice?.(inv.id)}
-                      className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-surface-container-lowest/80 transition-colors cursor-pointer"
+                      className="flex items-center gap-2 pr-3 hover:bg-surface-container-lowest/80 transition-colors"
                     >
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-[13px] font-bold text-on-surface">
-                            {inv.invoice_number}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                              isPaid
-                                ? "bg-success-container text-on-success-container"
-                                : isOverdue
-                                  ? "bg-error-container text-on-error-container"
-                                  : "bg-warning-container text-on-warning-container"
-                            }`}
-                          >
-                            {isPaid ? "Cobrada" : isOverdue ? "Vencida" : "Pendiente"}
-                          </span>
+                      <button
+                        type="button"
+                        data-testid={`fiscal-invoice-${inv.id}`}
+                        onClick={() => onOpenInvoice?.(inv.id)}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 p-4 text-left cursor-pointer"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-[13px] font-bold text-on-surface">
+                              {inv.invoice_number}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                isPaid
+                                  ? "bg-success-container text-on-success-container"
+                                  : isOverdue
+                                    ? "bg-error-container text-on-error-container"
+                                    : "bg-warning-container text-on-warning-container"
+                              }`}
+                            >
+                              {isPaid ? "Cobrada" : isOverdue ? "Vencida" : "Pendiente"}
+                            </span>
+                          </div>
+                          <div className="truncate text-[12px] text-on-surface-variant">
+                            {inv.client_name_snapshot} · {inv.issued_at_iso}
+                          </div>
                         </div>
-                        <div className="truncate text-[12px] text-on-surface-variant">
-                          {inv.client_name_snapshot} · {inv.issued_at_iso}
+                        <div className="shrink-0 text-right">
+                          <div className="font-mono text-[15px] font-semibold text-on-surface tabular-nums">
+                            {formatCentsEs(inv.total_cents)}
+                          </div>
+                          <div className="text-[11px] font-semibold text-on-primary-container">
+                            Ver detalle →
+                          </div>
                         </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-mono text-[15px] font-semibold text-on-surface tabular-nums">
-                          {formatCentsEs(inv.total_cents)}
-                        </div>
-                        <div className="text-[11px] font-semibold text-on-primary-container">
-                          Ver detalle →
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+                      {fileBridge && (
+                        <button
+                          type="button"
+                          data-testid={`fiscal-invoice-delete-${inv.id}`}
+                          aria-label={`Eliminar factura ${inv.invoice_number}`}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTicketTarget(null);
+                            setDeleteInvoiceTarget(inv);
+                          }}
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-coral-alert/25 bg-surface-container-lowest text-coral-alert hover:bg-error-container cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -571,42 +621,61 @@ export function FiscalDashboardView({
             ) : (
               <div className="bg-surface-warm-card border border-outline-variant rounded-[20px] divide-y divide-outline-variant shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
                 {quarterTickets.map((t) => (
-                  <button
+                  <div
                     key={t.id}
-                    type="button"
-                    data-testid={`fiscal-ticket-${t.id}`}
-                    onClick={() => {
-                      if (onOpenTicket) {
-                        onOpenTicket(t.id);
-                      } else {
-                        setSelectedTicketId(t.id);
-                        setTicketsModalOpen(true);
-                      }
-                    }}
-                    className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-surface-container-lowest/80 transition-colors cursor-pointer"
+                    className="flex items-center gap-2 pr-3 hover:bg-surface-container-lowest/80 transition-colors"
                   >
-                    <div className="min-w-0 space-y-1">
-                      <div className="text-[15px] font-semibold text-on-surface truncate">
-                        {t.supplier_name}
+                    <button
+                      type="button"
+                      data-testid={`fiscal-ticket-${t.id}`}
+                      onClick={() => {
+                        if (onOpenTicket) {
+                          onOpenTicket(t.id);
+                        } else {
+                          setSelectedTicketId(t.id);
+                          setTicketsModalOpen(true);
+                        }
+                      }}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 p-4 text-left cursor-pointer"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="text-[15px] font-semibold text-on-surface truncate">
+                          {t.supplier_name}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant">
+                          <span className="rounded-full bg-terracotta-soft px-2 py-0.5 text-on-primary-container capitalize">
+                            {t.category}
+                          </span>
+                          <span className="font-mono tabular-nums">
+                            {t.issue_date_iso} · Base {formatCentsEs(t.base_cents)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant">
-                        <span className="rounded-full bg-terracotta-soft px-2 py-0.5 text-on-primary-container capitalize">
-                          {t.category}
-                        </span>
-                        <span className="font-mono tabular-nums">
-                          {t.issue_date_iso} · Base {formatCentsEs(t.base_cents)}
-                        </span>
+                      <div className="shrink-0 text-right">
+                        <div className="font-mono text-[15px] font-semibold text-on-surface tabular-nums">
+                          {formatCentsEs(t.total_cents)}
+                        </div>
+                        <div className="text-[11px] font-semibold text-on-primary-container">
+                          Ver ficha →
+                        </div>
                       </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-mono text-[15px] font-semibold text-on-surface tabular-nums">
-                        {formatCentsEs(t.total_cents)}
-                      </div>
-                      <div className="text-[11px] font-semibold text-on-primary-container">
-                        Ver ficha →
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    {fileBridge && (
+                      <button
+                        type="button"
+                        data-testid={`fiscal-ticket-delete-${t.id}`}
+                        aria-label={`Eliminar ticket ${t.supplier_name}`}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteInvoiceTarget(null);
+                          setDeleteTicketTarget(t);
+                        }}
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-coral-alert/25 bg-surface-container-lowest text-coral-alert hover:bg-error-container cursor-pointer"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -637,6 +706,49 @@ export function FiscalDashboardView({
         onClose={() => setProfitModalOpen(false)}
         onOpenInvoice={onOpenInvoice}
         onOpenTicket={onOpenTicket}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteInvoiceTarget !== null || deleteTicketTarget !== null}
+        title={
+          deleteInvoiceTarget
+            ? `¿Eliminar factura ${deleteInvoiceTarget.invoice_number}?`
+            : deleteTicketTarget
+              ? `¿Eliminar ticket de ${deleteTicketTarget.supplier_name}?`
+              : "¿Eliminar documento?"
+        }
+        description={
+          deleteInvoiceTarget
+            ? `Se eliminará la factura de ${deleteInvoiceTarget.client_name_snapshot} (${formatCentsEs(deleteInvoiceTarget.total_cents)}) y su PDF generado. Esta acción no se puede deshacer.`
+            : deleteTicketTarget
+              ? `Se eliminará este ticket (${formatCentsEs(deleteTicketTarget.total_cents)}) y su imagen asociada. Esta acción no se puede deshacer.`
+              : ""
+        }
+        warningNote={
+          deleteInvoiceTarget
+            ? `${
+                deleteInvoiceTarget.status === "pagado" || deleteInvoiceTarget.sent_at_iso
+                  ? `Atención: esta factura ya figura como ${
+                      deleteInvoiceTarget.status === "pagado" ? "cobrada" : "enviada"
+                    }. En facturación oficial corresponde emitir una rectificativa; elimínala solo si fue un error de registro. `
+                  : ""
+              }Se recalcularán los totales de tu Hucha Fiscal.`
+            : deleteTicketTarget
+              ? "Se recalculará el IVA soportado y el beneficio neto en tu Hucha Fiscal."
+              : null
+        }
+        errorMsg={deleteError}
+        busy={deleteBusy}
+        confirmTestId="fiscal-confirm-delete-btn"
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!deleteBusy) {
+            setDeleteInvoiceTarget(null);
+            setDeleteTicketTarget(null);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   patchInvoiceGate3ByVoice,
@@ -23,6 +24,7 @@ import { InvoicesRepository } from "../../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../../core/db/repositories/quotesRepo";
 import { formatCentsEs } from "../../../core/fiscal/fiscalEngine";
+import { ConfirmDeleteDialog } from "../../../ui/ConfirmDeleteDialog";
 import type { WidgetCommonProps } from "./widgetTypes";
 
 type LifecycleWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "JobLifecycleActionWidget" }>;
@@ -42,6 +44,7 @@ export function JobLifecycleActionWidget({
   const [quote, setQuote] = useState<QuoteRow | null>(null);
   const [invoice, setInvoice] = useState<InvoiceRow | null>(null);
   const [invoicesForJob, setInvoicesForJob] = useState<InvoiceRow[]>([]);
+  const [entitiesLoaded, setEntitiesLoaded] = useState(false);
 
   const initialG3 = lp.gate_3_draft ?? null;
   const initialG4 = lp.gate_4_draft ?? null;
@@ -53,6 +56,8 @@ export function JobLifecycleActionWidget({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [manualBusy, setManualBusy] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [g3UndoStack, setG3UndoStack] = useState<Gate3InvoiceDraftPayload[]>([]);
   const [g4UndoStack, setG4UndoStack] = useState<Gate4ShareDraftPayload[]>([]);
   const [voiceChanges, setVoiceChanges] = useState<string[]>([]);
@@ -73,19 +78,26 @@ export function JobLifecycleActionWidget({
     const jobsRepo = new JobsRepository(runtime.executor);
     const quotesRepo = new QuotesRepository(runtime.executor);
     const invoicesRepo = new InvoicesRepository(runtime.executor);
-    const [j, q, invList, inv] = await Promise.all([
-      jobsRepo.getById(lp.job_id),
-      lp.quote_id ? quotesRepo.getById(lp.quote_id) : Promise.resolve(null),
-      invoicesRepo.listByJobId(lp.job_id),
-      lp.invoice_id ? invoicesRepo.getById(lp.invoice_id) : Promise.resolve(null),
-    ]);
-    setJob(j);
-    setQuote(q);
-    setInvoicesForJob(invList);
-    setInvoice(inv);
+    try {
+      const [j, q, invList, inv] = await Promise.all([
+        jobsRepo.getById(lp.job_id),
+        lp.quote_id ? quotesRepo.getById(lp.quote_id) : Promise.resolve(null),
+        invoicesRepo.listByJobId(lp.job_id),
+        lp.invoice_id ? invoicesRepo.getById(lp.invoice_id) : Promise.resolve(null),
+      ]);
+      setJob(j);
+      setQuote(q);
+      setInvoicesForJob(invList);
+      setInvoice(inv);
+    } finally {
+      setEntitiesLoaded(true);
+    }
   };
 
   useEffect(() => {
+    setEntitiesLoaded(false);
+    setConfirmDeleteOpen(false);
+    setDeleteError(null);
     void loadEntities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runtime.executor, lp.job_id, lp.quote_id, lp.invoice_id, lp.mode]);
@@ -300,11 +312,36 @@ export function JobLifecycleActionWidget({
 
   const hasAdvance = invoicesForJob.some((i) => i.series_type === "ANT");
   const hasFinal = invoicesForJob.some((i) => i.series_type === "FAC");
+  const isInvoiceMissing = entitiesLoaded && Boolean(lp.invoice_id) && !invoice;
+  const isQuoteMissing = entitiesLoaded && !lp.invoice_id && Boolean(lp.quote_id) && !quote;
+  const isDocDeleted = isInvoiceMissing || isQuoteMissing;
+
+  const handleDeleteDoc = async () => {
+    setDeleteError(null);
+    setManualBusy(true);
+    try {
+      if (invoice) {
+        await new InvoicesRepository(runtime.executor).delete(invoice.id, runtime.fileBridge);
+      } else if (quote) {
+        await new QuotesRepository(runtime.executor).delete(quote.id, runtime.fileBridge);
+      } else {
+        return;
+      }
+      setConfirmDeleteOpen(false);
+      await loadEntities();
+      await runtime.onDataMutated?.();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setManualBusy(false);
+    }
+  };
 
   useRegisterOverlayVoice({
     enabled:
       !isSubmitting &&
       !manualBusy &&
+      !isDocDeleted &&
       (canActGate3 || canActGate4 || lp.mode === "overview" || lp.mode === "ready_to_share"),
     title: canActGate3
       ? "Dictar datos de factura"
@@ -479,21 +516,30 @@ export function JobLifecycleActionWidget({
           )}
         </div>
 
-        {(lp.pdf_uri || lp.invoice_id || lp.quote_id) && (
-          <button
-            type="button"
-            data-testid="lifecycle-open-pdf-btn"
-            onClick={() =>
-              void handleOpenPdf(
-                lp.pdf_uri,
-                lp.invoice_id ? "invoice" : "quote",
-                lp.invoice_id ?? lp.quote_id ?? ""
-              )
-            }
-            className="min-h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs font-bold text-slate-800"
+        {isDocDeleted ? (
+          <span
+            data-testid="lifecycle-doc-deleted-badge"
+            className="inline-flex shrink-0 items-center rounded-full bg-error-container px-2.5 py-1 text-[11px] font-semibold text-on-error-container"
           >
-            Abrir PDF
-          </button>
+            Documento eliminado
+          </span>
+        ) : (
+          (lp.pdf_uri || lp.invoice_id || lp.quote_id) && (
+            <button
+              type="button"
+              data-testid="lifecycle-open-pdf-btn"
+              onClick={() =>
+                void handleOpenPdf(
+                  lp.pdf_uri,
+                  lp.invoice_id ? "invoice" : "quote",
+                  lp.invoice_id ?? lp.quote_id ?? ""
+                )
+              }
+              className="min-h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs font-bold text-slate-800"
+            >
+              Abrir PDF
+            </button>
+          )
         )}
       </div>
 
@@ -752,7 +798,7 @@ export function JobLifecycleActionWidget({
         </div>
       )}
 
-      {(lp.mode === "overview" || lp.mode === "ready_to_share") && (
+      {(lp.mode === "overview" || lp.mode === "ready_to_share") && !isDocDeleted && (
         <div className="space-y-2">
           {shareFeedback && (
             <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900">
@@ -852,9 +898,61 @@ export function JobLifecycleActionWidget({
                 Enviar por WhatsApp / Share
               </button>
             )}
+
+            {(invoice || quote) && (
+              <button
+                type="button"
+                data-testid="lifecycle-delete-doc-btn"
+                disabled={manualBusy}
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirmDeleteOpen(true);
+                }}
+                className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-coral-alert/30 bg-white px-3 text-xs font-bold text-coral-alert cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Eliminar</span>
+              </button>
+            )}
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteOpen}
+        title={
+          invoice
+            ? `¿Eliminar factura ${invoice.invoice_number}?`
+            : `¿Eliminar presupuesto ${quote?.quote_code ?? ""}?`
+        }
+        description={
+          invoice
+            ? "Se eliminará el registro de esta factura y su archivo PDF. Esta acción no se puede deshacer."
+            : "Se eliminará el presupuesto, todas sus partidas y su PDF generado. Esta acción no se puede deshacer."
+        }
+        warningNote={
+          invoice
+            ? `${
+                invoice.status === "pagado" || invoice.sent_at_iso
+                  ? `Atención: esta factura ya figura como ${
+                      invoice.status === "pagado" ? "cobrada" : "enviada"
+                    }. En facturación oficial corresponde emitir una rectificativa; elimínala solo si fue un error de registro. `
+                  : ""
+              }Se recalcularán los totales de tu Hucha Fiscal.`
+            : null
+        }
+        errorMsg={deleteError}
+        busy={manualBusy}
+        confirmTestId="lifecycle-confirm-delete-btn"
+        registerBackHandler={runtime.registerBackHandler}
+        onCancel={() => {
+          if (!manualBusy) {
+            setConfirmDeleteOpen(false);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleDeleteDoc}
+      />
     </section>
   );
 }

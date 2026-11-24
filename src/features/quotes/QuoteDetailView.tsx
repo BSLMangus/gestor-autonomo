@@ -1,10 +1,11 @@
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Send, Share2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Send, Share2, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   ActionType,
   ClientRow,
   InvoiceRow,
   JobRow,
+  LocalFileBridge,
   QuoteItemRow,
   QuoteRow,
   QuoteStatus,
@@ -18,13 +19,16 @@ import type { DocumentOpenerService } from "../../core/files/documentOpener";
 import { formatLocalDateIso } from "../../core/fiscal/dateQuarter";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { PdfPort } from "../../core/ports/mediaPorts";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 
 interface QuoteDetailViewProps {
   quoteId: string;
   executor: SqliteExecutor;
+  fileBridge: LocalFileBridge;
   pdfPort: PdfPort;
   documentOpener: DocumentOpenerService;
   refreshTick: number;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onBack: () => void;
   onOpenJob: (jobId: string) => void;
   onOpenClient: (clientId: string) => void;
@@ -69,9 +73,11 @@ function formatThousandthsEs(thousandths: number): string {
 export function QuoteDetailView({
   quoteId,
   executor,
+  fileBridge,
   pdfPort,
   documentOpener,
   refreshTick,
+  registerBackHandler,
   onBack,
   onOpenJob,
   onOpenClient,
@@ -89,6 +95,8 @@ export function QuoteDetailView({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadQuote = async () => {
     setLoading(true);
@@ -122,9 +130,26 @@ export function QuoteDetailView({
   useEffect(() => {
     setErrorMsg(null);
     setStatusMsg(null);
+    setConfirmDeleteOpen(false);
+    setDeleteError(null);
     void loadQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId, executor, refreshTick]);
+
+  const handleDeleteQuote = async () => {
+    if (!quote) return;
+    setDeleteError(null);
+    setBusy(true);
+    try {
+      await new QuotesRepository(executor).delete(quote.id, fileBridge);
+      await onDataChanged();
+      setConfirmDeleteOpen(false);
+      onBack();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  };
 
   const runAction = async (fn: () => Promise<void>, successMessage?: string) => {
     setErrorMsg(null);
@@ -582,6 +607,52 @@ export function QuoteDetailView({
           )}
         </div>
       </section>
+
+      {/* Zona de borrado */}
+      <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-2">
+        <button
+          type="button"
+          data-testid="quote-detail-delete-btn"
+          disabled={busy}
+          onClick={() => {
+            setDeleteError(null);
+            setConfirmDeleteOpen(true);
+          }}
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-coral-alert/30 bg-surface-container-lowest font-semibold text-coral-alert cursor-pointer disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4 shrink-0" />
+          <span>Eliminar presupuesto</span>
+        </button>
+        {invoices.length > 0 && (
+          <p className="text-[11px] text-on-surface-variant text-center">
+            Tiene {invoices.length} factura(s) asociada(s) (
+            {invoices.map((i) => i.invoice_number).join(", ")}). Elimina primero las facturas si
+            quieres borrar este presupuesto.
+          </p>
+        )}
+      </section>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteOpen}
+        title={`¿Eliminar presupuesto ${quote.quote_code}?`}
+        description="Se eliminará el presupuesto, todas sus partidas y su PDF generado. Esta acción no se puede deshacer."
+        warningNote={
+          invoices.length > 0
+            ? `Este presupuesto tiene ${invoices.length} factura(s) asociada(s) (${invoices.map((i) => i.invoice_number).join(", ")}). Debes eliminar primero esas facturas.`
+            : null
+        }
+        errorMsg={deleteError}
+        busy={busy}
+        confirmTestId="quote-detail-confirm-delete-btn"
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!busy) {
+            setConfirmDeleteOpen(false);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleDeleteQuote}
+      />
     </div>
   );
 }

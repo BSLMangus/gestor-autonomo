@@ -66,7 +66,7 @@ export class MemoryFileBridge implements LocalFileBridge {
   }
 
   async deletePdf(uri: string | null): Promise<void> {
-    if (!uri) return;
+    if (!uri || isSeedVirtualUri(uri)) return;
     this.files.delete(uri);
   }
 

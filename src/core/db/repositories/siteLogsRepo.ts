@@ -1,6 +1,6 @@
 import { SiteLogInputSchema } from "../../contracts/schemas";
 import { getFiscalYearFromIso, getLocalTodayIso } from "../../fiscal/dateQuarter";
-import type { SiteLogInput, SiteLogRecord, SqliteExecutor } from "../../contracts/types";
+import type { LocalFileBridge, SiteLogInput, SiteLogRecord, SqliteExecutor } from "../../contracts/types";
 import { allocateNextSequence } from "./settingsRepo";
 
 export class SiteLogsRepository {
@@ -93,5 +93,20 @@ export class SiteLogsRepository {
     const created = rows[0];
     if (!created) throw new Error("SQLITE_QUERY_ERROR: error guardando diario de obra");
     return created;
+  }
+
+  async getById(id: string): Promise<SiteLogRecord | null> {
+    const rows = await this.executor.query<SiteLogRecord & Record<string, unknown>>(
+      `SELECT * FROM site_logs WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    return rows[0] ?? null;
+  }
+
+  async delete(id: string, fileBridge: LocalFileBridge): Promise<void> {
+    const existing = await this.getById(id);
+    if (!existing) return;
+    await this.executor.run(`DELETE FROM site_logs WHERE id = ?`, [id]);
+    await fileBridge.deleteCommittedMedia(existing.photo_uri);
   }
 }

@@ -8,6 +8,7 @@ import type {
   QuoteRow,
   SqliteExecutor,
 } from "../../contracts/types";
+import { rewindSequenceIfLatest } from "./settingsRepo";
 
 export class InvoicesRepository {
   constructor(
@@ -187,5 +188,33 @@ export class InvoicesRepository {
     } finally {
       await release();
     }
+  }
+
+  async delete(id: string, fileBridge: LocalFileBridge): Promise<void> {
+    const existing = await this.getById(id);
+    if (!existing) return;
+
+    await this.executor.inTransaction(async (tx) => {
+      const dependentFinals = await tx.query<{ invoice_number: string }>(
+        `SELECT invoice_number FROM invoices WHERE advance_invoice_id = ? ORDER BY invoice_number ASC`,
+        [id]
+      );
+      if (dependentFinals.length > 0) {
+        throw new Error(
+          `INVALID_STATE_TRANSITION: No se puede eliminar este anticipo porque está descontado en la factura final (${dependentFinals.map((i) => i.invoice_number).join(", ")}). Elimina primero la factura final.`
+        );
+      }
+
+      await tx.run(`DELETE FROM invoices WHERE id = ?`, [id]);
+      await rewindSequenceIfLatest(
+        tx,
+        existing.series_type,
+        existing.fiscal_year,
+        existing.invoice_number,
+        Date.now()
+      );
+    });
+
+    await fileBridge.deletePdf(existing.pdf_uri);
   }
 }

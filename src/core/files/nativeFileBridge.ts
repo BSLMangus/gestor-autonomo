@@ -139,7 +139,7 @@ export class NativeFileBridge implements LocalFileBridge {
   }
 
   async deletePdf(uri: string | null): Promise<void> {
-    if (!uri) return;
+    if (!uri || isSeedVirtualUri(uri)) return;
     try {
       await Filesystem.deleteFile({ path: uri });
     } catch {

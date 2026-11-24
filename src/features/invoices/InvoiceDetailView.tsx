@@ -1,8 +1,9 @@
-import { ArrowLeft, CheckCircle2, FileText, RotateCcw, Send, Share2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, RotateCcw, Send, Share2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   InvoiceRow,
   JobRow,
+  LocalFileBridge,
   QuoteItemRow,
   QuoteRow,
   SqliteExecutor,
@@ -15,13 +16,16 @@ import type { DocumentOpenerService } from "../../core/files/documentOpener";
 import { getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { PdfPort } from "../../core/ports/mediaPorts";
+import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 
 interface InvoiceDetailViewProps {
   invoiceId: string;
   executor: SqliteExecutor;
+  fileBridge: LocalFileBridge;
   pdfPort: PdfPort;
   documentOpener: DocumentOpenerService;
   refreshTick: number;
+  registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onBack: () => void;
   onOpenJob: (jobId: string) => void;
   onOpenClient: (clientId: string) => void;
@@ -50,9 +54,11 @@ function kindLabel(kind: InvoiceRow["kind"]): string {
 export function InvoiceDetailView({
   invoiceId,
   executor,
+  fileBridge,
   pdfPort,
   documentOpener,
   refreshTick,
+  registerBackHandler,
   onBack,
   onOpenJob,
   onOpenClient,
@@ -73,6 +79,8 @@ export function InvoiceDetailView({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadInvoice = async () => {
     setLoading(true);
@@ -113,9 +121,26 @@ export function InvoiceDetailView({
   useEffect(() => {
     setErrorMsg(null);
     setStatusMsg(null);
+    setConfirmDeleteOpen(false);
+    setDeleteError(null);
     void loadInvoice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceId, executor, refreshTick]);
+
+  const handleDeleteInvoice = async () => {
+    if (!invoice) return;
+    setDeleteError(null);
+    setBusy(true);
+    try {
+      await new InvoicesRepository(executor).delete(invoice.id, fileBridge);
+      await onDataChanged();
+      setConfirmDeleteOpen(false);
+      onBack();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  };
 
   const runAction = async (fn: () => Promise<void>, successMessage?: string) => {
     setErrorMsg(null);
@@ -163,6 +188,13 @@ export function InvoiceDetailView({
   const isOverdue = invoice.status === "vencido";
   const deductedTotalCents =
     invoice.advance_deducted_base_cents + invoice.advance_deducted_vat_cents;
+  const baseFiscalNote =
+    "Se borrará el PDF generado y se recalcularán los totales de tu Hucha Fiscal.";
+  const sentOrPaidPrefix =
+    isPaid || invoice.sent_at_iso
+      ? `Atención: esta factura ya figura como ${isPaid ? "cobrada" : "enviada"}. Si ya se la entregaste al cliente, en facturación oficial corresponde emitir una rectificativa; elimínala solo si fue un error de registro. `
+      : "";
+  const invoiceWarningNote = `${sentOrPaidPrefix}${baseFiscalNote}`;
 
   return (
     <div
@@ -520,6 +552,41 @@ export function InvoiceDetailView({
           </button>
         </div>
       </section>
+
+      {/* Zona de borrado */}
+      <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4">
+        <button
+          type="button"
+          data-testid="invoice-detail-delete-btn"
+          disabled={busy}
+          onClick={() => {
+            setDeleteError(null);
+            setConfirmDeleteOpen(true);
+          }}
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-coral-alert/30 bg-surface-container-lowest font-semibold text-coral-alert cursor-pointer disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4 shrink-0" />
+          <span>Eliminar factura</span>
+        </button>
+      </section>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteOpen}
+        title={`¿Eliminar factura ${invoice.invoice_number}?`}
+        description="Se eliminará el registro de esta factura y su archivo PDF. Esta acción no se puede deshacer."
+        warningNote={invoiceWarningNote}
+        errorMsg={deleteError}
+        busy={busy}
+        confirmTestId="invoice-detail-confirm-delete-btn"
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!busy) {
+            setConfirmDeleteOpen(false);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleDeleteInvoice}
+      />
     </div>
   );
 }
