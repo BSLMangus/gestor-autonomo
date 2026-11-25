@@ -401,8 +401,10 @@ export class ResetService {
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
           default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
           default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
+          emitter_email, emitter_registry_number, emitter_tech_name, emitter_tech_dni,
+          emitter_installer_card, emitter_signature_data_url, default_acta_warranty_months,
           updated_at_ms
-        ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', 30, '["transferencia"]', '[]', '["303","130","390","347","100"]', ?)
+        ) VALUES (1, '', '', '', '', '', NULL, NULL, NULL, 1, NULL, 21, 20, 3800, 'clean', 30, '["transferencia"]', '[]', '["303","130","390","347","100"]', '', '', '', '', '', NULL, 24, ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = '',
           emitter_nif = '',
@@ -422,12 +424,19 @@ export class ResetService {
           default_payment_methods_json = '["transferencia"]',
           default_payment_schedule_json = '[]',
           active_tax_models_json = '["303","130","390","347","100"]',
+          emitter_email = '',
+          emitter_registry_number = '',
+          emitter_tech_name = '',
+          emitter_tech_dni = '',
+          emitter_installer_card = '',
+          emitter_signature_data_url = NULL,
+          default_acta_warranty_months = 24,
           updated_at_ms = excluded.updated_at_ms`,
         [now]
       );
 
       if (seedSequences) {
-        const seriesList: SeriesType[] = ["PRE", "ANT", "FAC", "OBR"];
+        const seriesList: SeriesType[] = ["PRE", "ANT", "FAC", "OBR", "ACT"];
         for (const series of seriesList) {
           const val = seedSequences[series];
           if (val !== undefined) {

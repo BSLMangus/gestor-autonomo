@@ -53,7 +53,12 @@ const workerOcrMock: OcrPort = {
 
 const workerPdfMock: PdfPort = {
   async buildDocumentPdf(input) {
-    const label = input.kind === "quote" ? input.quoteCode : input.invoiceNumber;
+    const label =
+      input.kind === "quote"
+        ? input.quoteCode
+        : input.kind === "invoice"
+          ? input.invoiceNumber
+          : input.codigoActa;
     return {
       pdfBytes: new TextEncoder().encode(`%PDF-1.4\n%EVAL ${label}\n%%EOF`),
       fileName: `${label}.pdf`,

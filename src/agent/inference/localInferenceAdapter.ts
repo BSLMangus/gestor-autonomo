@@ -181,4 +181,35 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       return null;
     }
   }
+
+  async runStructuredJsonPrompt<T>(params: {
+    prompt: string;
+    schema: z.ZodType<T>;
+    timeoutMs?: number;
+  }): Promise<{ data: T; engine_used: InferenceEngine } | null> {
+    if (!this.llmRunner) {
+      return null;
+    }
+
+    const timeout = params.timeoutMs ?? 10_000;
+    try {
+      const runner = this.llmRunner;
+      const rawResponse = await Promise.race<string>([
+        runner(params.prompt),
+        new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error("LLM_TIMEOUT")), timeout)
+        ),
+      ]);
+      const jsonMatch = /\{[\s\S]*\}/.exec(rawResponse);
+      if (!jsonMatch) return null;
+      const parsed = params.schema.safeParse(JSON.parse(jsonMatch[0]));
+      if (!parsed.success) return null;
+      return {
+        data: parsed.data,
+        engine_used: "mediapipe_local_llm",
+      };
+    } catch {
+      return null;
+    }
+  }
 }

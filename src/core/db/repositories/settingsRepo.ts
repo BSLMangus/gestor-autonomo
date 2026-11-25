@@ -1,6 +1,7 @@
 import {
   AdminLlmConfigInputSchema,
   EmitterProfileInputSchema,
+  InstallerActaProfileInputSchema,
   PricingSettingsInputSchema,
   QuoteDefaultsInputSchema,
   TaxModelCodeSchema,
@@ -17,6 +18,7 @@ import type {
   AdminLlmConfigRecord,
   AppSettingsRecord,
   EmitterProfileInput,
+  InstallerActaProfileInput,
   LlmStrategyOverride,
   PendingCameraContext,
   QuoteDefaultsInput,
@@ -51,6 +53,13 @@ interface RawAppSettingsRow extends Record<string, unknown> {
   default_payment_methods_json?: string;
   default_payment_schedule_json?: string;
   active_tax_models_json?: string;
+  emitter_email?: string;
+  emitter_registry_number?: string;
+  emitter_tech_name?: string;
+  emitter_tech_dni?: string;
+  emitter_installer_card?: string;
+  emitter_signature_data_url?: string | null;
+  default_acta_warranty_months?: number;
   updated_at_ms: number;
 }
 
@@ -122,6 +131,13 @@ function mapSettingsRow(row: RawAppSettingsRow): AppSettingsRecord {
         : parseQuotePaymentMethodsJson(row.default_payment_methods_json),
     default_payment_schedule: parseQuotePaymentScheduleJson(row.default_payment_schedule_json),
     active_tax_models: parseActiveTaxModelsJson(row.active_tax_models_json),
+    emitter_email: row.emitter_email ?? "",
+    emitter_registry_number: row.emitter_registry_number ?? "",
+    emitter_tech_name: row.emitter_tech_name ?? "",
+    emitter_tech_dni: row.emitter_tech_dni ?? "",
+    emitter_installer_card: row.emitter_installer_card ?? "",
+    emitter_signature_data_url: row.emitter_signature_data_url ?? null,
+    default_acta_warranty_months: Number(row.default_acta_warranty_months ?? 24),
     updated_at_ms: row.updated_at_ms,
   };
 }
@@ -174,7 +190,7 @@ function extractNumericSuffix(code: string, prefix: string): number {
 
 export async function rewindSequenceIfLatest(
   tx: Pick<SqliteExecutor, "query" | "run">,
-  seriesType: Extract<SeriesType, "PRE" | "ANT" | "FAC">,
+  seriesType: Extract<SeriesType, "PRE" | "ANT" | "FAC" | "ACT">,
   fiscalYear: number,
   deletedCode: string,
   nowMs = Date.now()
@@ -199,6 +215,14 @@ export async function rewindSequenceIfLatest(
     );
     for (const r of rows) {
       maxRemaining = Math.max(maxRemaining, extractNumericSuffix(r.quote_code, prefix));
+    }
+  } else if (seriesType === "ACT") {
+    const rows = await tx.query<{ codigo_acta: string }>(
+      `SELECT codigo_acta FROM actas_puesta_en_marcha WHERE codigo_acta LIKE ?`,
+      [`${prefix}%`]
+    );
+    for (const r of rows) {
+      maxRemaining = Math.max(maxRemaining, extractNumericSuffix(r.codigo_acta, prefix));
     }
   } else {
     const rows = await tx.query<{ invoice_number: string }>(
@@ -428,6 +452,59 @@ export class SettingsRepository {
     });
   }
 
+  async updateInstallerActaProfile(input: InstallerActaProfileInput): Promise<AppSettingsRecord> {
+    const parsed = InstallerActaProfileInputSchema.parse(input);
+    const now = Date.now();
+    await this.getAppSettings();
+
+    const setClauses: string[] = [
+      "emitter_email = ?",
+      "emitter_registry_number = ?",
+      "emitter_tech_name = ?",
+      "emitter_tech_dni = ?",
+      "emitter_installer_card = ?",
+      "default_acta_warranty_months = ?",
+    ];
+    const params: unknown[] = [
+      parsed.emitter_email,
+      parsed.emitter_registry_number,
+      parsed.emitter_tech_name,
+      parsed.emitter_tech_dni,
+      parsed.emitter_installer_card,
+      parsed.default_acta_warranty_months,
+    ];
+
+    if (parsed.emitter_signature_data_url !== undefined) {
+      setClauses.push("emitter_signature_data_url = ?");
+      params.push(parsed.emitter_signature_data_url);
+    }
+    if (parsed.emitter_name !== undefined) {
+      setClauses.push("emitter_name = ?");
+      params.push(parsed.emitter_name);
+    }
+    if (parsed.emitter_nif !== undefined) {
+      setClauses.push("emitter_nif = ?");
+      params.push(parsed.emitter_nif);
+    }
+    if (parsed.emitter_fiscal_address !== undefined) {
+      setClauses.push("emitter_fiscal_address = ?");
+      params.push(parsed.emitter_fiscal_address);
+    }
+    if (parsed.emitter_phone !== undefined) {
+      setClauses.push("emitter_phone = ?");
+      params.push(parsed.emitter_phone);
+    }
+
+    setClauses.push("updated_at_ms = ?");
+    params.push(now);
+
+    await this.executor.run(
+      `UPDATE app_settings SET ${setClauses.join(", ")} WHERE id = 1`,
+      params
+    );
+    return this.getAppSettings();
+  }
+
   async setLastActiveThreadId(threadId: string | null): Promise<void> {
     await this.getAppSettings();
     await this.executor.run(
@@ -579,6 +656,14 @@ export class SettingsRepository {
       );
       for (const r of rows) {
         maxVal = Math.max(maxVal, extractNumericSuffix(r.quote_code, prefix));
+      }
+    } else if (seriesType === "ACT") {
+      const rows = await this.executor.query<{ codigo_acta: string }>(
+        `SELECT codigo_acta FROM actas_puesta_en_marcha WHERE codigo_acta LIKE ?`,
+        [`${prefix}%`]
+      );
+      for (const r of rows) {
+        maxVal = Math.max(maxVal, extractNumericSuffix(r.codigo_acta, prefix));
       }
     } else {
       const rows = await this.executor.query<{ invoice_number: string }>(

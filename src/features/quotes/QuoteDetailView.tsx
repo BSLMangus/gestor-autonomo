@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Send, Share2, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardCheck, FileText, Pencil, Send, Share2, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   ActionType,
@@ -44,6 +44,11 @@ interface QuoteDetailViewProps {
   onOpenClient: (clientId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
   onStartJobQuote: (jobId: string) => Promise<void>;
+  onCreateActa?: (params: {
+    jobId: string;
+    quoteId: string;
+    clientId: string | null;
+  }) => Promise<void>;
   onRunQuoteLifecycleAction: (params: {
     action_type: Extract<
       ActionType,
@@ -93,6 +98,7 @@ export function QuoteDetailView({
   onOpenClient,
   onOpenInvoice,
   onStartJobQuote,
+  onCreateActa,
   onRunQuoteLifecycleAction,
   onDataChanged,
 }: QuoteDetailViewProps) {
@@ -865,6 +871,25 @@ export function QuoteDetailView({
                     </button>
                   )}
                 </>
+              )}
+
+              {onCreateActa && (
+                <button
+                  type="button"
+                  data-testid="quote-detail-create-acta-btn"
+                  disabled={busy}
+                  onClick={() =>
+                    void onCreateActa({
+                      jobId: quote.job_id,
+                      quoteId: quote.id,
+                      clientId: quote.client_id,
+                    })
+                  }
+                  className="col-span-2 inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-terracotta/40 bg-terracotta-soft px-3 font-semibold text-on-primary-container cursor-pointer disabled:opacity-50"
+                >
+                  <ClipboardCheck className="h-4 w-4 shrink-0" />
+                  <span>Crear Acta de Puesta en Marcha</span>
+                </button>
               )}
             </>
           )}

@@ -7,7 +7,16 @@ export const JobStatusSchema = z.enum(["pendiente", "en_curso", "finalizado", "c
 export const QuoteStatusSchema = z.enum(["borrador", "enviado", "aceptado", "rechazado"]);
 export const InvoiceStatusSchema = z.enum(["pendiente_cobro", "pagado", "vencido"]);
 export const InvoiceKindSchema = z.enum(["advance_40", "final", "full"]);
-export const SeriesTypeSchema = z.enum(["PRE", "ANT", "FAC", "OBR"]);
+export const SeriesTypeSchema = z.enum(["PRE", "ANT", "FAC", "OBR", "ACT"]);
+export const EspecialidadActaSchema = z.enum(["electricidad", "fontaneria", "mixta"]);
+export const TipoActuacionActaSchema = z.enum([
+  "obra_nueva",
+  "reforma_integral",
+  "modificacion_parcial",
+  "reparacion_sustitucion",
+]);
+export const EstadoActaSchema = z.enum(["borrador", "completada", "firmada"]);
+export const RedFontaneriaSchema = z.enum(["AFCH", "ACS", "Retorno", "Saneamiento"]);
 export const BillingSubIntentSchema = z.enum(["advance_40", "final_invoice", "share", "overview"]);
 export const SiteLogCategorySchema = z.enum(["antes", "despues", "nota"]);
 export const CatalogCategorySchema = z.enum([
@@ -608,9 +617,10 @@ export const TraceStateSchema = z.object({
 
 // --- BRIDGE & BACKUP SCHEMAS (docs/03_CONTRATOS_API_Y_SEED.json) ---
 export const PendingCameraContextSchema = z.object({
-  source: z.enum(["chat", "scan_ticket", "site_log", "global_camera"]),
+  source: z.enum(["chat", "scan_ticket", "site_log", "global_camera", "acta_photo"]),
   thread_id: z.string().min(1).nullable(),
   active_job_id: z.string().min(1).nullable(),
+  acta_id: z.string().min(1).nullable().optional(),
   started_at_ms: z.number().int().nonnegative(),
 });
 
@@ -662,6 +672,58 @@ export const EmitterProfileInputSchema = z.object({
     )
     .nullable()
     .optional(),
+});
+
+export const InstallerActaProfileInputSchema = z.object({
+  emitter_email: z
+    .string()
+    .trim()
+    .max(TEXT_LIMITS.EMAIL)
+    .refine(
+      (v) => v === "" || z.string().email().safeParse(v).success,
+      "Correo electrónico inválido"
+    )
+    .optional()
+    .default(""),
+  emitter_registry_number: z.string().trim().max(TEXT_LIMITS.SHORT_LABEL).optional().default(""),
+  emitter_tech_name: z.string().trim().max(TEXT_LIMITS.NAME).optional().default(""),
+  emitter_tech_dni: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(TEXT_LIMITS.TAX_ID)
+    .refine(
+      (v) => v === "" || validateSpanishTaxId(v),
+      "DNI/NIE/NIF inválido según dígito de control"
+    )
+    .optional()
+    .default(""),
+  emitter_installer_card: z.string().trim().max(TEXT_LIMITS.SHORT_LABEL).optional().default(""),
+  default_acta_warranty_months: z.number().int().min(1).max(120).optional().default(24),
+  emitter_signature_data_url: z
+    .string()
+    .max(450_000)
+    .refine(
+      (v) =>
+        v.startsWith("data:image/png;base64,") ||
+        v.startsWith("data:image/jpeg;base64,") ||
+        v.startsWith("data:image/webp;base64,"),
+      "Formato de firma inválido (usa PNG, JPG o WebP)"
+    )
+    .nullable()
+    .optional(),
+  emitter_name: z.string().trim().max(TEXT_LIMITS.NAME).optional(),
+  emitter_nif: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine(
+      (v) => v === "" || validateSpanishTaxId(v),
+      "NIF/NIE/CIF inválido según dígito de control"
+    )
+    .optional(),
+  emitter_fiscal_address: z.string().trim().max(TEXT_LIMITS.ADDRESS).optional(),
+  emitter_phone: z.string().trim().max(TEXT_LIMITS.PHONE).optional(),
 });
 
 export const RegisterAccountInputSchema = z.object({
@@ -898,8 +960,113 @@ export const TaxAlertDismissalRowSchema = z.object({
   dismissed_at_ms: z.number().int().nonnegative(),
 });
 
+export const CircuitoElectricoSchema = z.object({
+  nombre: z.string().max(TEXT_LIMITS.SHORT_LABEL),
+  calibre_a: z.number().nonnegative(),
+  seccion_mm2: z.number().nonnegative(),
+});
+
+export const FotoAnexoActaSchema = z.object({
+  id: z.string().min(1),
+  uri: z.string().min(1).max(1024),
+  pie_foto: z.string().max(TEXT_LIMITS.SHORT_LABEL),
+  timestamp: z.string().min(1),
+});
+
+export const MemoriaElectricidadActaSchema = z.object({
+  tension_nominal: z.enum(["230V Monofásica", "400V Trifásica"]),
+  iga_amperios: z.number().nonnegative(),
+  protector_sobretensiones: z.boolean(),
+  diferencial_calibre: z.string().max(TEXT_LIMITS.SHORT_LABEL),
+  circuitos: z.array(CircuitoElectricoSchema),
+  receptores_conectados: z.string().max(TEXT_LIMITS.DESCRIPTION),
+});
+
+export const MemoriaFontaneriaActaSchema = z.object({
+  redes_intervenidas: z.array(RedFontaneriaSchema),
+  material_tuberias: z.string().max(TEXT_LIMITS.TITLE),
+  diametros_mm: z.string().max(TEXT_LIMITS.TITLE),
+  ubicacion_llaves_corte: z.string().max(TEXT_LIMITS.DESCRIPTION),
+  equipos_sanitarios: z.string().max(TEXT_LIMITS.DESCRIPTION),
+});
+
+export const PruebasElectricidadActaSchema = z.object({
+  inspeccion_visual_bornes_etiquetado: z.boolean(),
+  continuidad_proteccion_equipotencial: z.boolean(),
+  resistencia_aislamiento_mohm: z.number().nonnegative().nullable(),
+  resistencia_tierra_ohm: z.number().nonnegative().nullable(),
+  disparo_diferencial_ms: z.number().nonnegative().nullable(),
+  tension_comprobada_v: z.number().nonnegative().nullable(),
+  resultado_apto: z.boolean(),
+});
+
+export const PruebasFontaneriaActaSchema = z.object({
+  presion_prueba_bar: z.number().nonnegative().nullable(),
+  duracion_prueba_min: z.number().nonnegative().nullable(),
+  estanqueidad_sin_fugas: z.boolean(),
+  presion_servicio_bar: z.number().nonnegative().nullable(),
+  comprobacion_desagues_valvulas: z.boolean(),
+  temperatura_consigna_acs_c: z.number().nonnegative().nullable().optional(),
+  resultado_apto: z.boolean(),
+});
+
+export const ActaPuestaEnMarchaDataSchema = z.object({
+  titulo_documento: z.string().max(TEXT_LIMITS.TITLE),
+  codigo_acta: z.string().min(1).max(40),
+  fecha_emision: IsoDateSchema,
+  especialidad: EspecialidadActaSchema,
+  tipo_actuacion: TipoActuacionActaSchema,
+  alcance_ubicacion: z.string().max(TEXT_LIMITS.DESCRIPTION),
+  instalador: z.object({
+    nombre_razon_social: z.string().max(TEXT_LIMITS.NAME),
+    nif_cif: z.string().max(TEXT_LIMITS.TAX_ID),
+    domicilio_fiscal: z.string().max(TEXT_LIMITS.ADDRESS),
+    telefono: z.string().max(TEXT_LIMITS.PHONE),
+    email: z.string().max(TEXT_LIMITS.EMAIL),
+    num_registro_empresa: z.string().max(TEXT_LIMITS.SHORT_LABEL).optional(),
+    tecnico_nombre: z.string().max(TEXT_LIMITS.NAME),
+    tecnico_dni: z.string().max(TEXT_LIMITS.TAX_ID),
+    num_carne_instalador: z.string().max(TEXT_LIMITS.SHORT_LABEL).optional(),
+  }),
+  cliente: z.object({
+    nombre_razon_social: z.string().max(TEXT_LIMITS.NAME),
+    nif_cif: z.string().max(TEXT_LIMITS.TAX_ID),
+    direccion_emplazamiento: z.string().max(TEXT_LIMITS.ADDRESS),
+    telefono: z.string().max(TEXT_LIMITS.PHONE).optional(),
+    email: z.string().max(TEXT_LIMITS.EMAIL).optional(),
+  }),
+  memoria_electricidad: MemoriaElectricidadActaSchema.optional(),
+  memoria_fontaneria: MemoriaFontaneriaActaSchema.optional(),
+  pruebas_electricidad: PruebasElectricidadActaSchema.optional(),
+  pruebas_fontaneria: PruebasFontaneriaActaSchema.optional(),
+  fotos: z.array(FotoAnexoActaSchema).max(4),
+  instrucciones_mantenimiento: z.string().max(TEXT_LIMITS.NOTES),
+  plazo_garantia_meses: z.number().int().min(1).max(120),
+  clausula_conformidad: z.string().max(TEXT_LIMITS.NOTES),
+  clausula_recepcion_cliente: z.string().max(TEXT_LIMITS.NOTES),
+});
+
+export const ActaRowSchema = z.object({
+  id: z.string().min(1),
+  codigo_acta: z.string().min(1),
+  job_id: z.string().min(1).nullable(),
+  quote_id: z.string().min(1).nullable(),
+  client_id: z.string().min(1).nullable(),
+  especialidad: EspecialidadActaSchema,
+  tipo_actuacion: TipoActuacionActaSchema,
+  estado: EstadoActaSchema,
+  fecha_emision_iso: IsoDateSchema,
+  datos_json: z.string().min(2),
+  firma_cliente_base64: z.string().nullable(),
+  firma_instalador_base64: z.string().nullable(),
+  pdf_uri: z.string().nullable(),
+  created_at_ms: z.number().int().nonnegative(),
+  updated_at_ms: z.number().int().nonnegative(),
+});
+
 export const SymmetricBackupPlaintextSchema = z.object({
   app_settings_emitter: EmitterProfileInputSchema,
+  app_settings_installer_acta: InstallerActaProfileInputSchema.optional(),
   app_settings_tax: TaxSettingsInputSchema.optional(),
   app_settings_pricing: PricingSettingsInputSchema.optional(),
   app_settings_quote_defaults: QuoteDefaultsInputSchema.optional(),
@@ -918,6 +1085,7 @@ export const SymmetricBackupPlaintextSchema = z.object({
   schedule_entries: z.array(ScheduleEntryRowSchema).optional(),
   tax_obligation_states: z.array(TaxObligationStateRowSchema).optional(),
   tax_alert_dismissals: z.array(TaxAlertDismissalRowSchema).optional(),
+  actas_puesta_en_marcha: z.array(ActaRowSchema).optional(),
 });
 
 export const SymmetricBackupEnvelopeSchema = z.discriminatedUnion("encrypted", [

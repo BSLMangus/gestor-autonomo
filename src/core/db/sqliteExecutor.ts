@@ -156,6 +156,33 @@ export function splitSqlStatements(sql: string): string[] {
   return statements;
 }
 
+async function rebuildLegacySequencesTable(executor: SqliteExecutor): Promise<void> {
+  await executor.inTransaction(async (tx) => {
+    await tx.run(`DROP TABLE IF EXISTS sequences_migrated;`);
+    await tx.run(
+      `CREATE TABLE sequences_migrated (
+        series_type TEXT NOT NULL CHECK (series_type IN ('PRE', 'ANT', 'FAC', 'OBR', 'ACT')),
+        fiscal_year INTEGER NOT NULL CHECK (fiscal_year BETWEEN 2020 AND 2100),
+        last_seq INTEGER NOT NULL DEFAULT 0 CHECK (last_seq >= 0),
+        updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
+        PRIMARY KEY (series_type, fiscal_year)
+      );`
+    );
+    await tx.run(
+      `INSERT INTO sequences_migrated (series_type, fiscal_year, last_seq, updated_at_ms)
+       SELECT series_type, fiscal_year, last_seq, updated_at_ms FROM sequences;`
+    );
+    await tx.run(`DROP TABLE sequences;`);
+    await tx.run(`ALTER TABLE sequences_migrated RENAME TO sequences;`);
+    const fkViolations = await tx.query<Record<string, unknown>>(`PRAGMA foreign_key_check;`);
+    if (fkViolations.length > 0) {
+      throw new Error(
+        `SQLITE_QUERY_ERROR: Violación FK tras migrar sequences (${JSON.stringify(fkViolations[0])})`
+      );
+    }
+  });
+}
+
 async function rebuildLegacyQuotesTable(
   executor: SqliteExecutor,
   quoteCols: Array<{ name: string; notnull: number }>
@@ -245,6 +272,14 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
   for (const stmt of statements) {
     await executor.run(stmt);
   }
+  const seqTableRows = await executor.query<{ sql: string | null }>(
+    `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sequences'`
+  );
+  const seqTableSql = seqTableRows[0]?.sql;
+  if (typeof seqTableSql === "string" && !seqTableSql.includes("'ACT'")) {
+    await rebuildLegacySequencesTable(executor);
+  }
+
   const cols = await executor.query<{ name: string }>(`PRAGMA table_info(app_settings)`);
   if (cols.length > 0) {
     if (!cols.some((c) => c.name === "default_vat_rate")) {
@@ -300,6 +335,41 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
     if (!cols.some((c) => c.name === "active_tax_models_json")) {
       await executor.run(
         `ALTER TABLE app_settings ADD COLUMN active_tax_models_json TEXT NOT NULL DEFAULT '["303","130","390","347","100"]';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_email")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_email TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_registry_number")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_registry_number TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_tech_name")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_tech_name TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_tech_dni")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_tech_dni TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_installer_card")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_installer_card TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!cols.some((c) => c.name === "emitter_signature_data_url")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_signature_data_url TEXT;`
+      );
+    }
+    if (!cols.some((c) => c.name === "default_acta_warranty_months")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN default_acta_warranty_months INTEGER NOT NULL DEFAULT 24 CHECK (default_acta_warranty_months BETWEEN 1 AND 120);`
       );
     }
   }

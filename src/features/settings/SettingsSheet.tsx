@@ -29,6 +29,7 @@ import type { MediaPipeLlmAdapter } from "../llm/mediaPipeAdapter";
 import { PricingCatalogPanel } from "../pricing/PricingCatalogPanel";
 import { UpdateBanner } from "../updates/UpdateBanner";
 import { QuoteDefaultsCard } from "./QuoteDefaultsCard";
+import { InstallerActaSettingsCard } from "./InstallerActaSettingsCard";
 import { isUsingDevSuperAdminPin, verifySuperAdminPin } from "./superAdminAuth";
 import { SuperAdminLlmPanel } from "./SuperAdminLlmPanel";
 import { TaxCalendarSettingsCard } from "./TaxCalendarSettingsCard";
@@ -93,6 +94,7 @@ export function SettingsSheet({
   const [seqANT, setSeqANT] = useState("0");
   const [seqFAC, setSeqFAC] = useState("0");
   const [seqOBR, setSeqOBR] = useState("0");
+  const [seqACT, setSeqACT] = useState("0");
 
   const [backupPassword, setBackupPassword] = useState("");
 
@@ -176,6 +178,7 @@ export function SettingsSheet({
     setSeqANT(String(mapSeq.get("ANT") ?? 0));
     setSeqFAC(String(mapSeq.get("FAC") ?? 0));
     setSeqOBR(String(mapSeq.get("OBR") ?? 0));
+    setSeqACT(String(mapSeq.get("ACT") ?? 0));
   };
 
   useEffect(() => {
@@ -270,6 +273,7 @@ export function SettingsSheet({
         ANT: Number.parseInt(seqANT, 10) || 0,
         FAC: Number.parseInt(seqFAC, 10) || 0,
         OBR: Number.parseInt(seqOBR, 10) || 0,
+        ACT: Number.parseInt(seqACT, 10) || 0,
       });
       setStatusMsg(`Contadores de serie ${fiscalYear} actualizados.`);
     } catch (err) {
@@ -335,7 +339,7 @@ export function SettingsSheet({
     setStatusMsg(null);
     setBusy(true);
     try {
-      await new ResetService(executor).startFromScratch({ PRE: 0, ANT: 0, FAC: 0, OBR: 0 });
+      await new ResetService(executor).startFromScratch({ PRE: 0, ANT: 0, FAC: 0, OBR: 0, ACT: 0 });
       await loadSettings();
       await onDataRebuilt({ resetRoute: true });
       setStatusMsg("Base de datos reiniciada en limpio con contadores a 0.");
@@ -595,6 +599,17 @@ export function SettingsSheet({
         }}
       />
 
+      <InstallerActaSettingsCard
+        executor={executor}
+        settings={loadedSettings}
+        activeAccountEmail={activeAccount?.email ?? ""}
+        registerBackHandler={registerBackHandler}
+        onSettingsUpdated={async (updated) => {
+          setLoadedSettings(updated);
+          await onDataRebuilt({ resetRoute: false });
+        }}
+      />
+
       <TaxCalendarSettingsCard
         executor={executor}
         settings={loadedSettings}
@@ -694,6 +709,13 @@ export function SettingsSheet({
               desc: `Trabajos abiertos (OBR-${fiscalYear}-001)`,
               val: seqOBR,
               set: setSeqOBR,
+            },
+            {
+              code: "ACT",
+              name: "Actas técnicas",
+              desc: `Puesta en marcha (ACT-${fiscalYear}-001)`,
+              val: seqACT,
+              set: setSeqACT,
             },
           ].map((s) => (
             <div

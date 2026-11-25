@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import type { LocalFileBridge } from "../contracts/types";
 import type { PdfPort } from "../ports/mediaPorts";
+import type { ActasRepository } from "../db/repositories/actasRepo";
 import type { InvoicesRepository } from "../db/repositories/invoicesRepo";
 import type { QuotesRepository } from "../db/repositories/quotesRepo";
 
@@ -9,7 +10,8 @@ export class DocumentOpenerService {
   constructor(
     private readonly fileBridge: LocalFileBridge,
     private readonly quotesRepo: QuotesRepository,
-    private readonly invoicesRepo: InvoicesRepository
+    private readonly invoicesRepo: InvoicesRepository,
+    private readonly actasRepo?: ActasRepository
   ) {}
 
   /**
@@ -18,13 +20,18 @@ export class DocumentOpenerService {
    */
   async openPdf(
     pdfUri: string | null,
-    docKind: "quote" | "invoice",
+    docKind: "quote" | "invoice" | "acta",
     docId: string,
-    pdfPort: PdfPort
+    pdfPort: PdfPort,
+    options?: { forceRegenerate?: boolean }
   ): Promise<string> {
     const defaultName =
-      docKind === "quote" ? `presupuesto_${docId}.pdf` : `factura_${docId}.pdf`;
-    let resolvedUri = pdfUri;
+      docKind === "quote"
+        ? `presupuesto_${docId}.pdf`
+        : docKind === "invoice"
+          ? `factura_${docId}.pdf`
+          : `acta_${docId}.pdf`;
+    let resolvedUri = options?.forceRegenerate ? null : pdfUri;
     let file: File | null = null;
 
     if (resolvedUri) {
@@ -42,10 +49,20 @@ export class DocumentOpenerService {
 
     let targetFile: File;
     if (!resolvedUri || !file) {
-      resolvedUri =
-        docKind === "quote"
-          ? await this.quotesRepo.regeneratePdfOnDemand(docId, pdfPort, this.fileBridge)
-          : await this.invoicesRepo.regeneratePdfOnDemand(docId, pdfPort, this.fileBridge);
+      if (docKind === "quote") {
+        resolvedUri = await this.quotesRepo.regeneratePdfOnDemand(docId, pdfPort, this.fileBridge);
+      } else if (docKind === "invoice") {
+        resolvedUri = await this.invoicesRepo.regeneratePdfOnDemand(
+          docId,
+          pdfPort,
+          this.fileBridge
+        );
+      } else {
+        if (!this.actasRepo) {
+          throw new Error("PDF_BUILD_ERROR: ActasRepository no configurado en DocumentOpenerService");
+        }
+        resolvedUri = await this.actasRepo.regeneratePdfOnDemand(docId, pdfPort, this.fileBridge);
+      }
       targetFile = await this.fileBridge.readAsFile(
         resolvedUri,
         resolveFileName(resolvedUri),

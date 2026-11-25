@@ -57,7 +57,12 @@ export class MockPdfPort implements PdfPort {
     if (this.shouldFailWith) {
       throw this.shouldFailWith;
     }
-    const label = input.kind === "quote" ? input.quoteCode : input.invoiceNumber;
+    const label =
+      input.kind === "quote"
+        ? input.quoteCode
+        : input.kind === "invoice"
+          ? input.invoiceNumber
+          : input.codigoActa;
     const pdfBytes = new TextEncoder().encode(`%PDF-1.4\n%MOCK ${label}\n%%EOF`);
     return {
       pdfBytes,

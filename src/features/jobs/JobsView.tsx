@@ -47,6 +47,8 @@ interface JobsViewProps {
   onOpenQuote: (quoteId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
   onOpenTicket: (ticketId: string) => void;
+  onOpenActa: (actaId: string) => void;
+  onCreateJobActa: (jobId: string, clientId: string | null) => Promise<void>;
   onDataChanged: () => Promise<void>;
   registerBackHandler: (priority: number, handler: () => boolean) => () => void;
 }
@@ -71,6 +73,8 @@ export function JobsView({
   onOpenQuote,
   onOpenInvoice,
   onOpenTicket,
+  onOpenActa,
+  onCreateJobActa,
   onDataChanged,
   registerBackHandler,
 }: JobsViewProps) {
@@ -531,6 +535,14 @@ export function JobsView({
         onOpenTicket={(tid) => {
           setSelectedJobId(null);
           onOpenTicket(tid);
+        }}
+        onOpenActa={(aid) => {
+          setSelectedJobId(null);
+          onOpenActa(aid);
+        }}
+        onCreateJobActa={async (jid, cid) => {
+          setSelectedJobId(null);
+          await onCreateJobActa(jid, cid);
         }}
         onStartJobQuote={onStartJobQuote}
         onDataChanged={async () => {

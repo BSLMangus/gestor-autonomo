@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import type {
+  ActaPuestaEnMarchaData,
+  EstadoActa,
   QuotePaymentInstallment,
   QuotePaymentMethod,
 } from "../contracts/types";
@@ -100,7 +102,21 @@ export interface PdfInvoiceDocumentInput {
   notes: string;
 }
 
-export type PdfBuildInput = PdfQuoteDocumentInput | PdfInvoiceDocumentInput;
+export interface PdfActaDocumentInput {
+  kind: "acta";
+  codigoActa: string;
+  estado: EstadoActa;
+  data: ActaPuestaEnMarchaData;
+  emitterLogoDataUrl?: string | null;
+  firmaInstaladorDataUrl?: string | null;
+  firmaClienteDataUrl?: string | null;
+  resolvedFotos: Array<{ dataUrl: string; pieFoto: string }>;
+}
+
+export type PdfBuildInput =
+  | PdfQuoteDocumentInput
+  | PdfInvoiceDocumentInput
+  | PdfActaDocumentInput;
 
 export interface PdfPort {
   buildDocumentPdf(input: PdfBuildInput): Promise<{ pdfBytes: Uint8Array; fileName: string }>;

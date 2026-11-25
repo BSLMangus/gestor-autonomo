@@ -4,6 +4,7 @@ import {
   Calculator,
   CalendarDays,
   ChevronRight,
+  ClipboardCheck,
   FileText,
   Home,
   LogOut,
@@ -47,6 +48,7 @@ const DRAWER_MODULES: Array<{
   { id: "jobs", label: "Obras", route: { name: "jobs" }, icon: Briefcase },
   { id: "calendar", label: "Agenda y Calendario", route: { name: "calendar" }, icon: CalendarDays, badge: "Hoy" },
   { id: "quotes", label: "Presupuestos", route: { name: "quotes" }, icon: FileText },
+  { id: "actas", label: "Actas técnicas", route: { name: "actas" }, icon: ClipboardCheck },
   { id: "clients", label: "Clientes", route: { name: "clients" }, icon: Users },
   { id: "fiscal", label: "Hucha Fiscal", route: { name: "fiscal" }, icon: Calculator },
   { id: "pricing", label: "Personalización y Tarifario", route: { name: "pricing" }, icon: Sliders },
@@ -114,6 +116,7 @@ export function AppNavigationDrawer({
                 isSameRoute(currentRoute, item.route) ||
                 (item.id === "clients" && currentRoute.name === "client_detail") ||
                 (item.id === "quotes" && currentRoute.name === "quote_detail") ||
+                (item.id === "actas" && currentRoute.name === "acta_detail") ||
                 (item.id === "fiscal" &&
                   (currentRoute.name === "invoice_detail" ||
                     currentRoute.name === "ticket_detail"));

@@ -14,7 +14,10 @@ export class MemoryFileBridge implements LocalFileBridge {
     return uri;
   }
 
-  async commitMedia(tempUri: string, folder: "tickets" | "sitelogs"): Promise<string | null> {
+  async commitMedia(
+    tempUri: string,
+    folder: "tickets" | "sitelogs" | "actas"
+  ): Promise<string | null> {
     if (isSeedVirtualUri(tempUri)) {
       return null;
     }

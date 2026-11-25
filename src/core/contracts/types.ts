@@ -1,11 +1,14 @@
 import type { z } from "zod";
 import type {
+  ActaPuestaEnMarchaDataSchema,
+  ActaRowSchema,
   ActionTypeSchema,
   ActiveWidgetEnvelopeSchema,
   BillingSubIntentSchema,
   CatalogCategorySchema,
   CatalogItemRowSchema,
   CatalogPricingModeSchema,
+  CircuitoElectricoSchema,
   ClientProfileCommitSchema,
   ClientRowSchema,
   DailyWorkLogInputSchema,
@@ -13,8 +16,11 @@ import type {
   DisambiguationChoiceSchema,
   EmitterProfileInputSchema,
   ErrorCodeSchema,
+  EspecialidadActaSchema,
+  EstadoActaSchema,
   ExpenseTicketRowSchema,
   FeedbackCorrectionRowSchema,
+  FotoAnexoActaSchema,
   Gate1QuoteCommitPayloadSchema,
   Gate1QuoteDraftPayloadSchema,
   Gate2TicketCommitPayloadSchema,
@@ -26,6 +32,7 @@ import type {
   HumanDecisionSchema,
   InferenceEngineSchema,
   InputPayloadSchema,
+  InstallerActaProfileInputSchema,
   InvoiceKindSchema,
   InvoiceRowSchema,
   InvoiceStatusSchema,
@@ -47,6 +54,7 @@ import type {
   QuoteStatusSchema,
   QuoteVatRateSchema,
   RagSnippetSchema,
+  RedFontaneriaSchema,
   ResolvedTargetSchema,
   ScheduleEntryRowSchema,
   ScheduleStatusSchema,
@@ -65,6 +73,7 @@ import type {
   SymmetricBackupEnvelopeSchema,
   SymmetricBackupPlaintextSchema,
   TicketVatRateSchema,
+  TipoActuacionActaSchema,
   TraceStateSchema,
   UiWidgetTypeSchema,
   WorkScheduleDefaultsSchema,
@@ -75,6 +84,15 @@ export type QuoteStatus = z.infer<typeof QuoteStatusSchema>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusSchema>;
 export type InvoiceKind = z.infer<typeof InvoiceKindSchema>;
 export type SeriesType = z.infer<typeof SeriesTypeSchema>;
+export type EspecialidadActa = z.infer<typeof EspecialidadActaSchema>;
+export type TipoActuacionActa = z.infer<typeof TipoActuacionActaSchema>;
+export type EstadoActa = z.infer<typeof EstadoActaSchema>;
+export type RedFontaneria = z.infer<typeof RedFontaneriaSchema>;
+export type CircuitoElectrico = z.infer<typeof CircuitoElectricoSchema>;
+export type FotoAnexoActa = z.infer<typeof FotoAnexoActaSchema>;
+export type ActaPuestaEnMarchaData = z.infer<typeof ActaPuestaEnMarchaDataSchema>;
+export type ActaRow = z.infer<typeof ActaRowSchema>;
+export type InstallerActaProfileInput = z.input<typeof InstallerActaProfileInputSchema>;
 export type BillingSubIntent = z.infer<typeof BillingSubIntentSchema>;
 export type SiteLogCategory = z.infer<typeof SiteLogCategorySchema>;
 export type CatalogCategory = z.infer<typeof CatalogCategorySchema>;
@@ -262,6 +280,13 @@ export interface AppSettingsRecord {
   default_payment_methods: QuotePaymentMethod[];
   default_payment_schedule: QuotePaymentInstallment[];
   active_tax_models: TaxModelCode[];
+  emitter_email: string;
+  emitter_registry_number: string;
+  emitter_tech_name: string;
+  emitter_tech_dni: string;
+  emitter_installer_card: string;
+  emitter_signature_data_url: string | null;
+  default_acta_warranty_months: number;
   updated_at_ms: number;
 }
 
@@ -500,7 +525,7 @@ export interface SqliteExecutor {
 
 export interface LocalFileBridge {
   saveTempMedia(bytes: Uint8Array, ext: "jpg" | "png"): Promise<string>;
-  commitMedia(tempUri: string, folder: "tickets" | "sitelogs"): Promise<string | null>;
+  commitMedia(tempUri: string, folder: "tickets" | "sitelogs" | "actas"): Promise<string | null>;
   rollbackCommittedMedia(committedUri: string, restoreTempUri?: string): Promise<void>;
   deleteCommittedMedia(uri: string | null): Promise<void>;
   resolveDisplayUrl(uri: string | null): Promise<{ url: string; revoke: () => void } | null>;

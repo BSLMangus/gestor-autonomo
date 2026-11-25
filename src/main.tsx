@@ -30,6 +30,7 @@ import {
   WebVoiceInputAdapter,
 } from "./core/hardware/voiceAdapter";
 import { LocalMemoryCoordinator } from "./core/memory/memoryCoordinator";
+import { ActasRepository } from "./core/db/repositories/actasRepo";
 import { QuotesRepository } from "./core/db/repositories/quotesRepo";
 import { InvoicesRepository } from "./core/db/repositories/invoicesRepo";
 import { CapacitorLlmAdapter } from "./features/llm/capacitorLlmAdapter";
@@ -53,6 +54,23 @@ async function collectProtectedMediaUris(executor: SqliteExecutor): Promise<Set<
         }
       } catch {
         // ignore invalid draft json
+      }
+    }
+  } catch {
+    // ignore sweep helper error
+  }
+  try {
+    const actaRows = await executor.query<{ datos_json: string }>(
+      `SELECT datos_json FROM actas_puesta_en_marcha`
+    );
+    for (const r of actaRows) {
+      try {
+        const parsed = JSON.parse(r.datos_json) as { fotos?: Array<{ uri?: string }> };
+        for (const f of parsed.fotos ?? []) {
+          if (f.uri) uris.add(f.uri);
+        }
+      } catch {
+        // ignore invalid acta json
       }
     }
   } catch {
@@ -120,7 +138,8 @@ async function bootstrapRuntime(): Promise<AppRuntime> {
   const settingsRepo = new SettingsRepository(executor);
   const quotesRepo = new QuotesRepository(executor, memoryCoordinator);
   const invoicesRepo = new InvoicesRepository(executor, memoryCoordinator);
-  const documentOpener = new DocumentOpenerService(fileBridge, quotesRepo, invoicesRepo);
+  const actasRepo = new ActasRepository(executor, memoryCoordinator);
+  const documentOpener = new DocumentOpenerService(fileBridge, quotesRepo, invoicesRepo, actasRepo);
   const cameraAdapter = new CameraAdapter(fileBridge, settingsRepo);
   const voiceAdapter = isNative ? new CapacitorVoiceInputAdapter() : new WebVoiceInputAdapter();
 

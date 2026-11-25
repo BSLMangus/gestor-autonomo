@@ -2,12 +2,14 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
+  ActaRow,
   ClientRow,
   InvoiceRow,
   JobRow,
   QuoteRow,
   SqliteExecutor,
 } from "../../core/contracts/types";
+import { ActasRepository } from "../../core/db/repositories/actasRepo";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
@@ -20,6 +22,8 @@ interface ClientProfileViewProps {
   onOpenJob: (jobId: string) => void;
   onOpenQuote: (quoteId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
+  onOpenActa?: (actaId: string) => void;
+  onCreateClientActa?: (clientId: string) => Promise<void>;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onOpenEditWidget: (client: ClientRow) => void;
   onDataChanged: () => Promise<void>;
@@ -33,6 +37,8 @@ export function ClientProfileView({
   onOpenJob,
   onOpenQuote,
   onOpenInvoice,
+  onOpenActa,
+  onCreateClientActa,
   onStartJobQuote,
   onOpenEditWidget,
   onDataChanged,
@@ -42,6 +48,7 @@ export function ClientProfileView({
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [actas, setActas] = useState<ActaRow[]>([]);
 
   const [newJobTitle, setNewJobTitle] = useState("");
   const [showNewJobForm, setShowNewJobForm] = useState(false);
@@ -52,17 +59,22 @@ export function ClientProfileView({
   const loadPortfolio = async () => {
     setLoading(true);
     try {
-      const portfolio = await new ClientsRepository(executor).getClientPortfolio(clientId);
+      const [portfolio, clientActas] = await Promise.all([
+        new ClientsRepository(executor).getClientPortfolio(clientId),
+        new ActasRepository(executor).listByClientId(clientId),
+      ]);
       if (!portfolio) {
         setClient(null);
         setJobs([]);
         setQuotes([]);
         setInvoices([]);
+        setActas([]);
       } else {
         setClient(portfolio.client);
         setJobs(portfolio.jobs);
         setQuotes(portfolio.quotes);
         setInvoices(portfolio.invoices);
+        setActas(clientActas);
       }
     } finally {
       setLoading(false);
@@ -349,6 +361,50 @@ export function ClientProfileView({
           ))}
           {quotes.length === 0 && invoices.length === 0 && (
             <div className="text-slate-500">Sin presupuestos ni facturas para este cliente.</div>
+          )}
+        </div>
+      </section>
+
+      {/* Actas de puesta en marcha */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
+          <h3 className="text-sm font-extrabold text-slate-900">
+            Actas de puesta en marcha ({actas.length})
+          </h3>
+          {onCreateClientActa && (
+            <button
+              type="button"
+              data-testid="client-profile-create-acta-btn"
+              disabled={busy}
+              onClick={() => void onCreateClientActa(client.id)}
+              className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-800 cursor-pointer"
+            >
+              + Crear Acta
+            </button>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          {actas.map((acta) => (
+            <button
+              key={acta.id}
+              type="button"
+              data-testid={`client-open-acta-${acta.id}`}
+              onClick={() => onOpenActa?.(acta.id)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:border-terracotta transition-colors cursor-pointer"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="font-mono font-bold text-slate-900">{acta.codigo_acta}</div>
+                <div className="text-[11px] text-slate-500">
+                  {acta.especialidad} · {acta.fecha_emision_iso} · {acta.estado}
+                </div>
+              </div>
+              <span className="shrink-0 text-[11px] font-semibold text-on-primary-container">
+                Abrir →
+              </span>
+            </button>
+          ))}
+          {actas.length === 0 && (
+            <div className="text-slate-500">Sin actas técnicas para este cliente.</div>
           )}
         </div>
       </section>

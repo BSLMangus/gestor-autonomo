@@ -82,12 +82,14 @@ export class CameraAdapter {
   async captureOrPick(
     source: PendingCameraContext["source"],
     threadId: string | null = null,
-    activeJobId: string | null = null
+    activeJobId: string | null = null,
+    actaId: string | null = null
   ): Promise<CameraCaptureResult> {
     const context: PendingCameraContext = {
       source,
       thread_id: threadId,
       active_job_id: activeJobId,
+      ...(actaId ? { acta_id: actaId } : {}),
       started_at_ms: Date.now(),
     };
 

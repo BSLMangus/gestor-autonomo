@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
   default_payment_methods_json TEXT NOT NULL DEFAULT '["transferencia"]',
   default_payment_schedule_json TEXT NOT NULL DEFAULT '[]',
   active_tax_models_json TEXT NOT NULL DEFAULT '["303","130","390","347","100"]',
+  emitter_email TEXT NOT NULL DEFAULT '',
+  emitter_registry_number TEXT NOT NULL DEFAULT '',
+  emitter_tech_name TEXT NOT NULL DEFAULT '',
+  emitter_tech_dni TEXT NOT NULL DEFAULT '',
+  emitter_installer_card TEXT NOT NULL DEFAULT '',
+  emitter_signature_data_url TEXT,
+  default_acta_warranty_months INTEGER NOT NULL DEFAULT 24 CHECK (default_acta_warranty_months BETWEEN 1 AND 120),
   updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
 );
 
@@ -51,7 +58,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 -- 2. Series Correlativas Fiscales y de Expediente Independientes por Año
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sequences (
-  series_type TEXT NOT NULL CHECK (series_type IN ('PRE', 'ANT', 'FAC', 'OBR')),
+  series_type TEXT NOT NULL CHECK (series_type IN ('PRE', 'ANT', 'FAC', 'OBR', 'ACT')),
   fiscal_year INTEGER NOT NULL CHECK (fiscal_year BETWEEN 2020 AND 2100),
   last_seq INTEGER NOT NULL DEFAULT 0 CHECK (last_seq >= 0),
   updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
@@ -555,3 +562,28 @@ CREATE TABLE IF NOT EXISTS tax_alert_dismissals (
   alert_key TEXT PRIMARY KEY,
   dismissed_at_ms INTEGER NOT NULL CHECK (dismissed_at_ms >= 0)
 );
+
+-- -----------------------------------------------------------------------------
+-- 14. Actas de Puesta en Marcha y Certificación Interna de Instalación
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS actas_puesta_en_marcha (
+  id TEXT PRIMARY KEY,
+  codigo_acta TEXT NOT NULL UNIQUE,
+  job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  quote_id TEXT REFERENCES quotes(id) ON DELETE SET NULL,
+  client_id TEXT REFERENCES clients(id) ON DELETE RESTRICT,
+  especialidad TEXT NOT NULL CHECK (especialidad IN ('electricidad', 'fontaneria', 'mixta')),
+  tipo_actuacion TEXT NOT NULL CHECK (tipo_actuacion IN ('obra_nueva', 'reforma_integral', 'modificacion_parcial', 'reparacion_sustitucion')),
+  estado TEXT NOT NULL DEFAULT 'borrador' CHECK (estado IN ('borrador', 'completada', 'firmada')),
+  fecha_emision_iso TEXT NOT NULL CHECK (fecha_emision_iso GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  datos_json TEXT NOT NULL,
+  firma_cliente_base64 TEXT,
+  firma_instalador_base64 TEXT,
+  pdf_uri TEXT,
+  created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
+  updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_actas_updated ON actas_puesta_en_marcha(updated_at_ms DESC);
+CREATE INDEX IF NOT EXISTS idx_actas_job ON actas_puesta_en_marcha(job_id);
+CREATE INDEX IF NOT EXISTS idx_actas_client ON actas_puesta_en_marcha(client_id);

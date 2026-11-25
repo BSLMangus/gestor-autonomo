@@ -65,7 +65,10 @@ export class WebOpfsFileBridge implements LocalFileBridge {
     }
   }
 
-  async commitMedia(tempUri: string, folder: "tickets" | "sitelogs"): Promise<string | null> {
+  async commitMedia(
+    tempUri: string,
+    folder: "tickets" | "sitelogs" | "actas"
+  ): Promise<string | null> {
     if (isSeedVirtualUri(tempUri)) {
       return null;
     }

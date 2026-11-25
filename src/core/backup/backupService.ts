@@ -3,6 +3,7 @@ import {
   SymmetricBackupPlaintextSchema,
 } from "../contracts/schemas";
 import type {
+  ActaRow,
   CatalogItemRow,
   ClientRow,
   ExpenseTicketRow,
@@ -86,6 +87,7 @@ export async function purgeDomainAndCheckpointsInTx(
   await tx.run(`DELETE FROM work_schedule_defaults`);
   await tx.run(`DELETE FROM tax_alert_dismissals`);
   await tx.run(`DELETE FROM tax_obligation_states`);
+  await tx.run(`DELETE FROM actas_puesta_en_marcha`);
   await tx.run(`DELETE FROM expense_tickets`);
   await tx.run(`DELETE FROM quote_items`);
   await tx.run(`DELETE FROM invoices`);
@@ -133,6 +135,9 @@ export class BackupService {
     const taxAlertDismissals = await this.executor.query<TaxAlertDismissalRow>(
       `SELECT * FROM tax_alert_dismissals`
     );
+    const actasPuestaEnMarcha = await this.executor.query<ActaRow>(
+      `SELECT * FROM actas_puesta_en_marcha ORDER BY created_at_ms ASC`
+    );
 
     const plaintext: SymmetricBackupPlaintext = SymmetricBackupPlaintextSchema.parse({
       app_settings_emitter: {
@@ -142,6 +147,15 @@ export class BackupService {
         emitter_phone: settings.emitter_phone,
         emitter_iban: settings.emitter_iban,
         emitter_logo_data_url: settings.emitter_logo_data_url,
+      },
+      app_settings_installer_acta: {
+        emitter_email: settings.emitter_email,
+        emitter_registry_number: settings.emitter_registry_number,
+        emitter_tech_name: settings.emitter_tech_name,
+        emitter_tech_dni: settings.emitter_tech_dni,
+        emitter_installer_card: settings.emitter_installer_card,
+        default_acta_warranty_months: settings.default_acta_warranty_months,
+        emitter_signature_data_url: settings.emitter_signature_data_url,
       },
       app_settings_tax: {
         default_vat_rate: settings.default_vat_rate,
@@ -170,6 +184,7 @@ export class BackupService {
       schedule_entries: scheduleEntries,
       tax_obligation_states: taxObligationStates,
       tax_alert_dismissals: taxAlertDismissals,
+      actas_puesta_en_marcha: actasPuestaEnMarcha,
     });
 
     const trimmedPass = password?.trim() ?? "";
@@ -265,8 +280,10 @@ export class BackupService {
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
           default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
           default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
+          emitter_email, emitter_registry_number, emitter_tech_name, emitter_tech_dni,
+          emitter_installer_card, emitter_signature_data_url, default_acta_warranty_months,
           updated_at_ms
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?, ?, ?, ?, ?)
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = excluded.emitter_name,
           emitter_nif = excluded.emitter_nif,
@@ -286,6 +303,13 @@ export class BackupService {
           default_payment_methods_json = excluded.default_payment_methods_json,
           default_payment_schedule_json = excluded.default_payment_schedule_json,
           active_tax_models_json = excluded.active_tax_models_json,
+          emitter_email = excluded.emitter_email,
+          emitter_registry_number = excluded.emitter_registry_number,
+          emitter_tech_name = excluded.emitter_tech_name,
+          emitter_tech_dni = excluded.emitter_tech_dni,
+          emitter_installer_card = excluded.emitter_installer_card,
+          emitter_signature_data_url = excluded.emitter_signature_data_url,
+          default_acta_warranty_months = excluded.default_acta_warranty_months,
           updated_at_ms = excluded.updated_at_ms`,
         [
           plaintext.app_settings_emitter.emitter_name,
@@ -303,6 +327,13 @@ export class BackupService {
           ),
           JSON.stringify(plaintext.app_settings_quote_defaults?.default_payment_schedule ?? []),
           JSON.stringify(plaintext.app_settings_tax_models ?? ["303", "130", "390", "347", "100"]),
+          plaintext.app_settings_installer_acta?.emitter_email ?? "",
+          plaintext.app_settings_installer_acta?.emitter_registry_number ?? "",
+          plaintext.app_settings_installer_acta?.emitter_tech_name ?? "",
+          plaintext.app_settings_installer_acta?.emitter_tech_dni ?? "",
+          plaintext.app_settings_installer_acta?.emitter_installer_card ?? "",
+          plaintext.app_settings_installer_acta?.emitter_signature_data_url ?? null,
+          plaintext.app_settings_installer_acta?.default_acta_warranty_months ?? 24,
           now,
         ]
       );
@@ -627,6 +658,33 @@ export class BackupService {
           [d.alert_key, d.dismissed_at_ms]
         );
       }
+
+      for (const act of plaintext.actas_puesta_en_marcha ?? []) {
+        await tx.run(
+          `INSERT INTO actas_puesta_en_marcha (
+            id, codigo_acta, job_id, quote_id, client_id, especialidad, tipo_actuacion,
+            estado, fecha_emision_iso, datos_json, firma_cliente_base64,
+            firma_instalador_base64, pdf_uri, created_at_ms, updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            act.id,
+            act.codigo_acta,
+            act.job_id,
+            act.quote_id,
+            act.client_id,
+            act.especialidad,
+            act.tipo_actuacion,
+            act.estado,
+            act.fecha_emision_iso,
+            act.datos_json,
+            act.firma_cliente_base64,
+            act.firma_instalador_base64,
+            act.pdf_uri,
+            act.created_at_ms,
+            act.updated_at_ms,
+          ]
+        );
+      }
     });
 
     return {
@@ -643,6 +701,7 @@ export class BackupService {
         site_logs: plaintext.site_logs.length,
         feedback_corrections: plaintext.feedback_corrections.length,
         schedule_entries: plaintext.schedule_entries?.length ?? 0,
+        actas_puesta_en_marcha: plaintext.actas_puesta_en_marcha?.length ?? 0,
       },
     };
   }

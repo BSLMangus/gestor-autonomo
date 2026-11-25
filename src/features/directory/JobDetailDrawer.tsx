@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
 import { extractFlexibleDateRange, extractFlexibleSpanishDateIso } from "../../agent/inference/spanishFormParsers";
 import type {
+  ActaRow,
   ClientRow,
   ExpenseTicketRow,
   InvoiceRow,
@@ -13,6 +14,7 @@ import type {
   SiteLogRecord,
   WorkScheduleDefaults,
 } from "../../core/contracts/types";
+import { ActasRepository } from "../../core/db/repositories/actasRepo";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { InvoicesRepository } from "../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
@@ -51,6 +53,8 @@ interface JobDetailDrawerProps {
   onOpenQuote: (quoteId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
   onOpenTicket: (ticketId: string) => void;
+  onOpenActa?: (actaId: string) => void;
+  onCreateJobActa?: (jobId: string, clientId: string | null) => Promise<void>;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onDataChanged: () => Promise<void>;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
@@ -114,6 +118,8 @@ export function JobDetailDrawer({
   onOpenQuote,
   onOpenInvoice,
   onOpenTicket,
+  onOpenActa,
+  onCreateJobActa,
   onStartJobQuote,
   onDataChanged,
   registerBackHandler,
@@ -124,6 +130,7 @@ export function JobDetailDrawer({
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [tickets, setTickets] = useState<ExpenseTicketRow[]>([]);
   const [siteLogs, setSiteLogs] = useState<SiteLogRecord[]>([]);
+  const [actas, setActas] = useState<ActaRow[]>([]);
   const [scheduleSummary, setScheduleSummary] = useState<JobScheduleDeviationSummary | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
@@ -149,6 +156,7 @@ export function JobDetailDrawer({
     const siteLogsRepo = new SiteLogsRepository(executor);
     const clientsRepo = new ClientsRepository(executor);
     const scheduleRepo = new ScheduleRepository(executor);
+    const actasRepo = new ActasRepository(executor);
 
     const j = await jobsRepo.getById(targetId);
     setJob(j);
@@ -157,7 +165,7 @@ export function JobDetailDrawer({
     setEditStartDate(j.start_date_iso ?? "");
     setEditEndDate(j.end_date_iso ?? "");
 
-    const [cl, qList, iList, tRes, slList, schedSum, defaults, jobEntries] = await Promise.all([
+    const [cl, qList, iList, tRes, slList, schedSum, defaults, jobEntries, jobActas] = await Promise.all([
       j.client_id ? clientsRepo.getById(j.client_id) : Promise.resolve(null),
       quotesRepo.listByJobId(j.id),
       invoicesRepo.listByJobId(j.id),
@@ -166,12 +174,14 @@ export function JobDetailDrawer({
       scheduleRepo.getJobScheduleDeviationSummary(j.id),
       scheduleRepo.getWorkScheduleDefaults(),
       scheduleRepo.listEntriesByJob(j.id),
+      actasRepo.listByJobId(j.id),
     ]);
     setClient(cl);
     setQuotes(qList);
     setInvoices(iList);
     setTickets(tRes.items);
     setSiteLogs(slList);
+    setActas(jobActas);
     setScheduleSummary(schedSum);
     setScheduleDefaults(defaults);
     if (jobEntries.length === 1 && j.start_date_iso && j.start_date_iso === (j.end_date_iso ?? j.start_date_iso)) {
@@ -535,6 +545,49 @@ export function JobDetailDrawer({
                   ))}
                   {quotes.length === 0 && (
                     <div className="text-slate-500">Sin presupuestos emitidos aún.</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <h4 className="font-bold text-slate-800">
+                    Actas de puesta en marcha ({actas.length})
+                  </h4>
+                  {onCreateJobActa && (
+                    <button
+                      type="button"
+                      data-testid="job-detail-create-acta-btn"
+                      disabled={busy}
+                      onClick={() => void onCreateJobActa(job.id, job.client_id)}
+                      className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-800 cursor-pointer"
+                    >
+                      + Crear Acta
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {actas.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      data-testid={`job-acta-${a.id}`}
+                      onClick={() => onOpenActa?.(a.id)}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-terracotta transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono font-bold text-slate-900">{a.codigo_acta}</div>
+                        <div className="text-[11px] text-slate-500">
+                          {a.especialidad} · {a.fecha_emision_iso} · <strong>{a.estado}</strong>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-[10px] font-semibold text-on-primary-container">
+                        Abrir →
+                      </div>
+                    </button>
+                  ))}
+                  {actas.length === 0 && (
+                    <div className="text-slate-500">Sin actas técnicas emitidas para esta obra.</div>
                   )}
                 </div>
               </div>

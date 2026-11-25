@@ -11,6 +11,8 @@ export type AppRoute =
   | { name: "calendar"; focusDateIso?: string; tab?: CalendarRouteTab }
   | { name: "quotes" }
   | { name: "quote_detail"; quoteId: string }
+  | { name: "actas" }
+  | { name: "acta_detail"; actaId: string; initialMode?: "guided" | "free" }
   | { name: "invoice_detail"; invoiceId: string }
   | { name: "ticket_detail"; ticketId: string }
   | { name: "clients" }
@@ -66,6 +68,22 @@ export function parseHashToRoute(rawHash: string): AppRoute {
       return { name: "quote_detail", quoteId };
     }
     return { name: "quotes" };
+  }
+  if (normalized === "/actas") {
+    return { name: "actas" };
+  }
+  if (normalized.startsWith("/actas/")) {
+    const [pathPart, query] = normalized.split("?");
+    const actaId = decodeURIComponent((pathPart ?? "").slice("/actas/".length)).trim();
+    if (!actaId) {
+      return { name: "actas" };
+    }
+    const params = query ? new URLSearchParams(query) : null;
+    const rawMode = params?.get("mode");
+    const initialMode = rawMode === "guided" || rawMode === "free" ? rawMode : undefined;
+    return initialMode
+      ? { name: "acta_detail", actaId, initialMode }
+      : { name: "acta_detail", actaId };
   }
   if (normalized.startsWith("/facturas/")) {
     const invoiceId = decodeURIComponent(
@@ -134,6 +152,12 @@ export function routeToHash(route: AppRoute): string {
       return "#/presupuestos";
     case "quote_detail":
       return `#/presupuestos/${encodeURIComponent(route.quoteId)}`;
+    case "actas":
+      return "#/actas";
+    case "acta_detail":
+      return route.initialMode
+        ? `#/actas/${encodeURIComponent(route.actaId)}?mode=${route.initialMode}`
+        : `#/actas/${encodeURIComponent(route.actaId)}`;
     case "invoice_detail":
       return `#/facturas/${encodeURIComponent(route.invoiceId)}`;
     case "ticket_detail":
@@ -159,6 +183,9 @@ export function isSameRoute(a: AppRoute, b: AppRoute): boolean {
   if (a.name !== b.name) return false;
   if (a.name === "quote_detail" && b.name === "quote_detail") {
     return a.quoteId === b.quoteId;
+  }
+  if (a.name === "acta_detail" && b.name === "acta_detail") {
+    return a.actaId === b.actaId && a.initialMode === b.initialMode;
   }
   if (a.name === "invoice_detail" && b.name === "invoice_detail") {
     return a.invoiceId === b.invoiceId;
@@ -195,6 +222,10 @@ export function getRouteTitle(route: AppRoute): string {
       return "Presupuestos";
     case "quote_detail":
       return "Detalle de Presupuesto";
+    case "actas":
+      return "Actas técnicas";
+    case "acta_detail":
+      return "Acta de Puesta en Marcha";
     case "invoice_detail":
       return "Detalle de Factura";
     case "ticket_detail":

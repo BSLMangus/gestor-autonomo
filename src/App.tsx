@@ -9,6 +9,7 @@ import type {
   ChatMessageRecord,
   ChatThreadRecord,
   DocumentImportReviewDraft,
+  EspecialidadActa,
   HumanDecision,
   InterruptPayload,
   LocalAccountRecord,
@@ -21,6 +22,7 @@ import type {
   SqliteExecutor,
   TurnExecutionResult,
 } from "./core/contracts/types";
+import { ActasRepository } from "./core/db/repositories/actasRepo";
 import { AuthRepository } from "./core/db/repositories/authRepo";
 import { ChatRepository } from "./core/db/repositories/chatRepo";
 import { SettingsRepository } from "./core/db/repositories/settingsRepo";
@@ -57,6 +59,8 @@ import { OnboardingWizard } from "./features/onboarding/OnboardingWizard";
 import { PricingCatalogView } from "./features/pricing/PricingCatalogView";
 import { QuoteDetailView } from "./features/quotes/QuoteDetailView";
 import { QuotesView } from "./features/quotes/QuotesView";
+import { ActasView } from "./features/actas/ActasView";
+import { ActaPuestaEnMarchaView } from "./features/actas/ActaPuestaEnMarchaView";
 import { SettingsSheet } from "./features/settings/SettingsSheet";
 import type { SiteLogService } from "./features/sitelog/siteLogService";
 import { UpdateBanner } from "./features/updates/UpdateBanner";
@@ -100,7 +104,7 @@ interface ToastNotification {
   message: string;
   pdfAction?: {
     pdfUri: string | null;
-    docKind: "quote" | "invoice";
+    docKind: "quote" | "invoice" | "acta";
     docId: string;
   };
 }
@@ -629,11 +633,41 @@ export function App({ runtime }: { runtime: AppRuntime }) {
         openDirectSiteLogWidget(mediaUri, context.active_job_id);
         return;
       }
+      if (context.source === "acta_photo" && context.acta_id) {
+        try {
+          const repo = new ActasRepository(executor, memoryCoordinator);
+          const loaded = await repo.getById(context.acta_id);
+          if (loaded && loaded.data.fotos.length < 4) {
+            const committed = await fileBridge.commitMedia(mediaUri, "actas");
+            if (committed) {
+              const nextFotos = [
+                ...loaded.data.fotos,
+                {
+                  id: `foto_${crypto.randomUUID().slice(0, 8)}`,
+                  uri: committed,
+                  pie_foto: `Foto ${loaded.data.fotos.length + 1}`,
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+              await repo.saveDraft(context.acta_id, {
+                data: { ...loaded.data, fotos: nextFotos },
+              });
+              setRefreshTick((t) => t + 1);
+            }
+          } else {
+            await fileBridge.deleteIfTemp(mediaUri).catch(() => undefined);
+          }
+          navigate({ name: "acta_detail", actaId: context.acta_id });
+        } catch (err) {
+          setUiError(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
       if (context.source === "scan_ticket" || context.source === "chat") {
         await handleScanTicketWithUri(mediaUri, context.thread_id, context.active_job_id);
       }
     },
-    [openDirectSiteLogWidget, handleScanTicketWithUri]
+    [openDirectSiteLogWidget, handleScanTicketWithUri, executor, memoryCoordinator, fileBridge, navigate]
   );
 
   // Consome restauraciones tempranas de Process Death y suscribe futuras
@@ -718,6 +752,28 @@ export function App({ runtime }: { runtime: AppRuntime }) {
       threadTitleIfNew: "Alta manual de ticket",
     });
   };
+
+  const handleCreateActaFromContext = useCallback(
+    async (params?: {
+      jobId?: string | null;
+      quoteId?: string | null;
+      clientId?: string | null;
+      especialidad?: EspecialidadActa;
+    }) => {
+      setUiError(null);
+      try {
+        const created = await new ActasRepository(executor).createDraftFromContext({
+          ...params,
+          activeAccountEmail: activeAccount?.email ?? null,
+        });
+        setRefreshTick((t) => t + 1);
+        navigate({ name: "acta_detail", actaId: created.row.id, initialMode: "free" });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, activeAccount, navigate]
+  );
 
   const handleResumeDecision = async (
     decision: HumanDecision
@@ -1198,6 +1254,10 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenQuote={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onOpenTicket={(tid) => navigate({ name: "ticket_detail", ticketId: tid })}
+            onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onCreateJobActa={async (jid, cid) => {
+              await handleCreateActaFromContext({ jobId: jid, clientId: cid });
+            }}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
             }}
@@ -1257,6 +1317,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenClient={(cid) => navigate({ name: "client_detail", clientId: cid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onStartJobQuote={handleStartJobQuote}
+            onCreateActa={async ({ jobId, quoteId, clientId }) => {
+              await handleCreateActaFromContext({ jobId, quoteId, clientId });
+            }}
             onRunQuoteLifecycleAction={async (params) => {
               await runTurnAndOpenOverlay({
                 text: "",
@@ -1268,6 +1331,36 @@ export function App({ runtime }: { runtime: AppRuntime }) {
                 billing_sub_intent: params.billing_sub_intent,
               });
             }}
+            onDataChanged={async () => {
+              setRefreshTick((t) => t + 1);
+            }}
+          />
+        )}
+
+        {route.name === "actas" && (
+          <ActasView
+            executor={executor}
+            refreshTick={refreshTick}
+            onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onCreateActa={handleCreateActaFromContext}
+          />
+        )}
+
+        {route.name === "acta_detail" && (
+          <ActaPuestaEnMarchaView
+            actaId={route.actaId}
+            initialMode={route.initialMode ?? "free"}
+            executor={executor}
+            fileBridge={fileBridge}
+            cameraAdapter={cameraAdapter}
+            pdfPort={pdfPort}
+            documentOpener={documentOpener}
+            memoryCoordinator={memoryCoordinator}
+            voiceAdapter={voiceAdapter}
+            inferenceAdapter={inferenceAdapter}
+            refreshTick={refreshTick}
+            registerBackHandler={registerBackHandler}
+            onBack={() => navigate({ name: "actas" })}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
             }}
@@ -1364,6 +1457,10 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenJob={(jobId) => navigate({ name: "jobs", focusJobId: jobId })}
             onOpenQuote={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
+            onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onCreateClientActa={async (cid) => {
+              await handleCreateActaFromContext({ clientId: cid });
+            }}
             onStartJobQuote={handleStartJobQuote}
             onOpenEditWidget={(cl) =>
               openWidgetInOverlay({
