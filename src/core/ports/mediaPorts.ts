@@ -2,6 +2,8 @@ import type { z } from "zod";
 import type {
   ActaPuestaEnMarchaData,
   EstadoActa,
+  QuoteAttachment,
+  QuoteDurationUnit,
   QuotePaymentInstallment,
   QuotePaymentMethod,
 } from "../contracts/types";
@@ -53,18 +55,34 @@ export interface PdfQuoteDocumentInput {
     nif: string;
     fiscalAddress: string;
     phone: string;
+    email?: string;
     iban?: string;
+    bankName?: string;
     logoDataUrl?: string | null;
   };
-  client: { name: string; nif: string; fiscalAddress: string; phone: string };
+  client: {
+    name: string;
+    nif: string;
+    fiscalAddress: string;
+    phone: string;
+    email?: string;
+  };
   jobTitle: string;
+  generalDescription?: string;
+  estimatedDurationValue?: number | null;
+  estimatedDurationUnit?: QuoteDurationUnit;
   vatRate: number;
   subtotalCents: number;
   vatCents: number;
   totalCents: number;
   paymentMethods?: QuotePaymentMethod[];
   paymentSchedule?: QuotePaymentInstallment[];
+  paymentTermsText?: string;
+  ibanOverride?: string;
+  bankName?: string;
+  showIban?: boolean;
   notes: string;
+  attachments?: QuoteAttachment[];
   lines: Array<{
     description: string;
     unit: string;
@@ -86,10 +104,18 @@ export interface PdfInvoiceDocumentInput {
     nif: string;
     fiscalAddress: string;
     phone: string;
+    email?: string;
     iban?: string;
+    bankName?: string;
     logoDataUrl?: string | null;
   };
-  client: { name: string; nif: string; fiscalAddress: string; phone: string };
+  client: {
+    name: string;
+    nif: string;
+    fiscalAddress: string;
+    phone: string;
+    email?: string;
+  };
   jobCode: string;
   jobTitle: string;
   quoteCode: string;
@@ -100,6 +126,54 @@ export interface PdfInvoiceDocumentInput {
   advanceDeductedBaseCents: number;
   advanceDeductedVatCents: number;
   notes: string;
+  isRectificative?: boolean;
+  rectifiedInvoiceNumber?: string;
+  rectificationReason?: string;
+  irpfRate?: number;
+  irpfCents?: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  legalNotice?: string;
+}
+
+export interface PdfWorkOrderDocumentInput {
+  kind: "work_order";
+  documentType: "parte_trabajo" | "albaran";
+  documentCode: string;
+  issuedDateIso: string;
+  hoursWorkedLabel?: string;
+  emitter: {
+    name: string;
+    nif: string;
+    fiscalAddress: string;
+    phone: string;
+    email?: string;
+    logoDataUrl?: string | null;
+  };
+  client: {
+    name: string;
+    nif: string;
+    fiscalAddress: string;
+    phone: string;
+    email?: string;
+  };
+  jobCode?: string;
+  jobTitle: string;
+  quoteCode?: string;
+  showPrices?: boolean;
+  items: Array<{
+    description: string;
+    kind?: "tarea" | "material";
+    quantityLabel: string;
+    unitPriceCents?: number;
+    lineSubtotalCents?: number;
+  }>;
+  subtotalCents?: number;
+  notes?: string;
+  receiverName?: string;
+  receiverNif?: string;
+  firmaProfesionalDataUrl?: string | null;
+  firmaClienteDataUrl?: string | null;
 }
 
 export interface PdfActaDocumentInput {
@@ -116,7 +190,8 @@ export interface PdfActaDocumentInput {
 export type PdfBuildInput =
   | PdfQuoteDocumentInput
   | PdfInvoiceDocumentInput
-  | PdfActaDocumentInput;
+  | PdfActaDocumentInput
+  | PdfWorkOrderDocumentInput;
 
 export interface PdfPort {
   buildDocumentPdf(input: PdfBuildInput): Promise<{ pdfBytes: Uint8Array; fileName: string }>;

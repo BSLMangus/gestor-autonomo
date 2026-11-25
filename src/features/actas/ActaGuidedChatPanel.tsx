@@ -222,24 +222,24 @@ export function ActaGuidedChatPanel({
   return (
     <div
       data-testid="acta-guided-chat-panel"
-      className="flex flex-1 flex-col min-h-0 bg-surface"
+      className="flex flex-1 flex-col min-h-0 cotton-paper bg-[#F9F7F2] text-[#2C2621] font-sans"
     >
       {/* Indicador visual de los 5 pasos */}
-      <div className="shrink-0 border-b border-outline-variant bg-surface-container-lowest px-3 py-2.5 space-y-2">
+      <div className="shrink-0 border-b border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 space-y-2">
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span
             data-testid="acta-guided-step-label"
-            className="inline-flex items-center gap-1 font-bold text-on-surface"
+            className="inline-flex items-center gap-1 font-bold text-[#2C2621]"
           >
-            <Sparkles className="h-3.5 w-3.5 text-terracotta shrink-0" />
+            <Sparkles className="h-3.5 w-3.5 text-[#EA580C] shrink-0" />
             <span>
-              Paso {activeStepMeta.index} de 5 · {activeStepMeta.label}
+              Paso <span className="font-mono-nums">{activeStepMeta.index}</span> de 5 · {activeStepMeta.label}
             </span>
           </span>
           <button
             type="button"
             onClick={onSwitchToFreeMode}
-            className="font-semibold text-on-primary-container cursor-pointer"
+            className="font-semibold text-[#D04B00] cursor-pointer"
           >
             Ver formulario completo
           </button>
@@ -258,10 +258,10 @@ export function ActaGuidedChatPanel({
                 onClick={() => handleJumpStep(st)}
                 className={`min-h-[30px] rounded-lg px-1 text-[10px] font-semibold truncate cursor-pointer ${
                   isCurrent
-                    ? "bg-terracotta text-white"
+                    ? "bg-[#EA580C] text-white"
                     : isPast
-                      ? "bg-success-container text-on-success-container"
-                      : "bg-surface-container text-on-surface-variant"
+                      ? "status-emerald"
+                      : "bg-[#EFECE4] text-[#6B6860]"
                 }`}
               >
                 {meta.index}. {meta.shortTitle}
@@ -279,10 +279,10 @@ export function ActaGuidedChatPanel({
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed shadow-xs space-y-1.5 ${
+              className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed space-y-1.5 ${
                 msg.role === "user"
-                  ? "bg-secondary text-on-secondary rounded-br-sm"
-                  : "border border-outline-variant bg-surface-container-lowest text-on-surface rounded-bl-sm"
+                  ? "bg-[#FFD6B0] border border-[#EA580C]/25 text-[#2C2621] rounded-br-sm"
+                  : "paper-sheet border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] rounded-bl-sm"
               }`}
             >
               <div className="whitespace-pre-wrap break-words">{msg.content}</div>
@@ -291,7 +291,7 @@ export function ActaGuidedChatPanel({
                   {msg.appliedLabels.map((lbl) => (
                     <span
                       key={lbl}
-                      className="inline-flex items-center gap-1 rounded-full bg-success-container px-2 py-0.5 text-[10px] font-semibold text-on-success-container"
+                      className="inline-flex items-center gap-1 rounded-full status-emerald px-2 py-0.5 text-[10px] font-semibold"
                     >
                       <Check className="h-3 w-3 shrink-0" />
                       <span>{lbl}</span>
@@ -304,15 +304,15 @@ export function ActaGuidedChatPanel({
         ))}
 
         {currentStep === "STEP_2_INTERVINIENTES" && !installerSaved && (
-          <div className="rounded-2xl border border-amber-300 bg-warning-container p-3 space-y-2">
-            <div className="text-[11px] font-semibold text-on-warning-container">
+          <div className="postit-note postit-yellow border border-[#D97706]/30 p-3 space-y-2">
+            <div className="text-[11px] font-semibold text-[#3E3300]">
               Aún no tienes guardada tu ficha habitual de instalador. Si acabas de rellenarla, guárdala aquí para próximas actas.
             </div>
             {installerSaveErr && (
-              <div className="text-[11px] font-semibold text-coral-alert">{installerSaveErr}</div>
+              <div className="text-[11px] font-semibold text-[#DC2626]">{installerSaveErr}</div>
             )}
             {installerSaveMsg && (
-              <div className="text-[11px] font-semibold text-on-success-container">
+              <div className="text-[11px] font-semibold text-[#1B3A24]">
                 {installerSaveMsg}
               </div>
             )}
@@ -321,7 +321,7 @@ export function ActaGuidedChatPanel({
               data-testid="acta-guided-save-installer-btn"
               disabled={savingInstaller}
               onClick={() => void handleSaveInstallerInline()}
-              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-white px-3 text-[11px] font-bold text-on-surface border border-outline-variant cursor-pointer"
+              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl bg-[#FFFDF7] px-3 text-[11px] font-bold text-[#2C2621] border border-[#E5DFD2] cursor-pointer"
             >
               <Save className="h-3.5 w-3.5" />
               <span>
@@ -336,9 +336,9 @@ export function ActaGuidedChatPanel({
         {currentStep === "STEP_5_FOTOS_Y_FIRMA" && (
           <div
             data-testid="acta-guided-closure-panel"
-            className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-3.5 space-y-3"
+            className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-3"
           >
-            <div className="text-[13px] font-bold text-on-surface">
+            <div className="text-[13px] font-bold text-[#2C2621]">
               Paso final: Evidencia fotográfica y firma táctil
             </div>
 
@@ -356,7 +356,7 @@ export function ActaGuidedChatPanel({
                 type="button"
                 data-testid="acta-guided-installer-sig-btn"
                 onClick={onOpenInstallerSignature}
-                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[12px] font-semibold text-on-surface cursor-pointer"
+                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-[12px] font-semibold text-[#2C2621] cursor-pointer"
               >
                 <PenTool className="h-3.5 w-3.5" />
                 <span>
@@ -369,7 +369,7 @@ export function ActaGuidedChatPanel({
                   type="button"
                   data-testid="acta-guided-client-sig-btn"
                   onClick={onOpenClientSignature}
-                  className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-terracotta/40 bg-terracotta-soft px-3 text-[12px] font-bold text-on-primary-container cursor-pointer"
+                  className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#EA580C]/40 bg-[#FFD6B0] px-3 text-[12px] font-bold text-[#4A2500] cursor-pointer"
                 >
                   <PenTool className="h-3.5 w-3.5" />
                   <span>
@@ -380,7 +380,7 @@ export function ActaGuidedChatPanel({
                   <button
                     type="button"
                     onClick={onClearClientSignature}
-                    className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-2.5 text-[11px] font-semibold text-coral-alert cursor-pointer"
+                    className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 text-[11px] font-semibold text-[#DC2626] cursor-pointer"
                   >
                     Borrar
                   </button>
@@ -393,7 +393,7 @@ export function ActaGuidedChatPanel({
               data-testid="acta-guided-generate-pdf-btn"
               disabled={pdfBusy}
               onClick={() => void onGenerateAndSharePdf()}
-              className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-4 text-[13px] font-bold text-white shadow-sm disabled:opacity-50 cursor-pointer"
+              className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-[13px] font-bold text-white shadow-sm disabled:opacity-50 cursor-pointer transition-colors"
             >
               <Share2 className="h-4 w-4 shrink-0" />
               <span>{pdfBusy ? "Generando PDF A4..." : "Generar y Compartir PDF"}</span>
@@ -405,7 +405,7 @@ export function ActaGuidedChatPanel({
       </div>
 
       {/* Chips rápidos + barra inferior dual voz/texto */}
-      <div className="shrink-0 border-t border-outline-variant bg-surface-container-lowest px-3 py-2.5 pb-safe space-y-2">
+      <div className="shrink-0 border-t border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2.5 pb-safe space-y-2">
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
           {quickChips.map((chip) => (
             <button
@@ -413,7 +413,7 @@ export function ActaGuidedChatPanel({
               type="button"
               disabled={submitting}
               onClick={() => void submitTurn(chip)}
-              className="shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-3 py-1.5 text-[11px] font-semibold text-on-surface hover:border-terracotta disabled:opacity-45 cursor-pointer"
+              className="shrink-0 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 text-[11px] font-semibold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-45 cursor-pointer"
             >
               {chip}
             </button>
@@ -434,7 +434,7 @@ export function ActaGuidedChatPanel({
               disabled={submitting}
               onClick={() => setVoiceOpen(true)}
               aria-label="Dictar por voz"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-terracotta text-white shadow-xs disabled:opacity-45 cursor-pointer"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#EA580C] hover:bg-[#D04B00] text-white shadow-xs disabled:opacity-45 cursor-pointer"
             >
               <Mic className="h-5 w-5" />
             </button>
@@ -447,7 +447,7 @@ export function ActaGuidedChatPanel({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Escribe o dicta los datos de este paso..."
-            className="min-h-[44px] min-w-0 flex-1 rounded-full border border-outline-variant bg-surface-container-low px-4 text-xs text-on-surface"
+            className="min-h-[44px] min-w-0 flex-1 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           <button
@@ -455,7 +455,7 @@ export function ActaGuidedChatPanel({
             data-testid="acta-guided-send-btn"
             disabled={submitting || !inputText.trim()}
             aria-label="Enviar respuesta"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-on-secondary disabled:opacity-45 cursor-pointer"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4B7094] text-[#FFFDF9] disabled:opacity-45 cursor-pointer"
           >
             <Send className="h-4 w-4" />
           </button>

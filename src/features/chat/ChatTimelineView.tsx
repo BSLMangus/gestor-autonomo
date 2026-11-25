@@ -47,16 +47,16 @@ export function ChatTimelineView({
   return (
     <div
       data-testid="chat-timeline"
-      className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-3 bg-surface"
+      className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-3 bg-[#F9F7F2] cotton-paper text-[#2C2621] font-sans"
     >
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-[12px] font-semibold uppercase tracking-wide text-on-surface-variant">
+        <h2 className="text-[12px] font-semibold uppercase tracking-wide text-[#6B6860]">
           {threadTitle}
         </h2>
         {checkpointStatus === "interrupted" && activeInterrupt && (
           <span
             data-testid="active-hitl-pill"
-            className="rounded-full bg-terracotta-soft border border-outline-variant px-2.5 py-0.5 text-[11px] font-semibold text-on-primary-container"
+            className="rounded-full status-tangerine px-2.5 py-0.5 text-[11px] font-semibold"
           >
             Pendiente de tu confirmación
           </span>
@@ -66,12 +66,12 @@ export function ChatTimelineView({
       {messages.length === 0 ? (
         <article
           data-testid="assistant-empty-state"
-          className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 text-[14px] leading-relaxed text-on-surface shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
+          className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 text-[14px] leading-relaxed text-[#2C2621]"
         >
-          <p className="font-semibold text-on-surface">
+          <p className="font-semibold text-[#2C2621]">
             Conversación lista. Escribe abajo, pulsa el micrófono para dictar o usa la cámara para escanear un documento.
           </p>
-          <p className="mt-1.5 text-[12px] text-on-surface-variant">
+          <p className="mt-1.5 text-[12px] text-[#6B6860]">
             Cuando generes un presupuesto, parte de agenda, ticket, ficha de cliente o entrada de diario se abrirá directamente en pantalla completa para que lo revises y confirmes.
           </p>
         </article>
@@ -103,22 +103,26 @@ export function ChatTimelineView({
               className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
             >
               <div
-                className={`max-w-[92%] rounded-[20px] px-4 py-3 text-[14px] leading-relaxed shadow-[0_2px_10px_rgba(15,23,42,0.04)] ${
+                className={`max-w-[92%] rounded-[20px] px-4 py-3 text-[14px] leading-relaxed ${
                   isUser
-                    ? "bg-secondary text-on-secondary rounded-br-sm"
-                    : "bg-surface-container-lowest border border-outline-variant text-on-surface rounded-bl-sm w-full"
+                    ? "bg-[#FFD6B0] border border-[#E5DFD2] text-[#2C2621] rounded-br-sm shadow-[0_2px_8px_rgba(44,38,33,0.06)]"
+                    : "paper-sheet bg-[#FFFDF7] border border-[#E5DFD2] text-[#2C2621] rounded-bl-sm w-full"
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
 
                 {/* Resumen compacto clicable en el historial: despliega la tarjeta en vista protagonista */}
                 {msg.widget_json && widgetMeta && (
-                  <div className="mt-3 flex items-center justify-between gap-2.5 rounded-2xl border border-outline-variant bg-surface-warm-card px-3.5 py-2.5">
+                  <div className="mt-3 flex items-center justify-between gap-2.5 rounded-2xl border border-[#E5DFD2] bg-[#F5F1E6] px-3.5 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-on-primary-container">
+                      <div
+                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          isThisActiveGate ? "status-tangerine" : "status-cobalt"
+                        }`}
+                      >
                         {widgetMeta.badge}
                       </div>
-                      <div className="truncate text-[13px] font-semibold text-on-surface">
+                      <div className="mt-0.5 truncate text-[13px] font-semibold text-[#2C2621]">
                         {widgetMeta.title}
                       </div>
                     </div>
@@ -132,7 +136,7 @@ export function ChatTimelineView({
                           activePendingGate: isThisActiveGate ? activeGateId : null,
                         })
                       }
-                      className="min-h-[40px] shrink-0 rounded-xl bg-primary hover:bg-terracotta px-3.5 text-xs font-semibold text-white cursor-pointer"
+                      className="min-h-[40px] shrink-0 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-3.5 text-xs font-semibold text-white cursor-pointer transition-colors"
                     >
                       {isThisActiveGate ? "Revisar" : "Abrir"}
                     </button>
@@ -149,7 +153,7 @@ export function ChatTimelineView({
                         data-testid={`quick-action-${qa.id}`}
                         disabled={isSubmitting || checkpointStatus === "interrupted"}
                         onClick={() => void onQuickAction(qa)}
-                        className="min-h-[42px] rounded-xl border border-outline-variant bg-terracotta-soft px-3.5 py-1.5 text-xs font-semibold text-on-primary-container hover:border-terracotta disabled:opacity-50 cursor-pointer"
+                        className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFD6B0] px-3.5 py-1.5 text-xs font-semibold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-50 cursor-pointer transition-colors"
                       >
                         {qa.label}
                       </button>

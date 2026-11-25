@@ -75,15 +75,15 @@ export function QuoteDefaultsCard({
   return (
     <div
       data-testid="quote-defaults-card"
-      className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm space-y-3"
+      className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-3 font-sans"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-600 flex items-center gap-1.5">
-            <CalendarClock className="h-3.5 w-3.5 text-orange-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wide text-[#2C2621] flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5 text-[#EA580C]" />
             <span>Presupuestos: validez y pagos por defecto</span>
           </h3>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-[#6B6860]">
             Se aplicará automáticamente al crear cada presupuesto nuevo (editable en cada presupuesto).
           </p>
         </div>
@@ -104,14 +104,14 @@ export function QuoteDefaultsCard({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800"
+          className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-xs font-semibold text-[#5A121C]"
         >
           {errorMsg}
         </div>
       )}
 
       {savedMsg && (
-        <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+        <div className="flex items-center gap-1.5 rounded-xl status-emerald px-3 py-2 text-xs font-semibold">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
           <span>{savedMsg}</span>
         </div>
@@ -122,7 +122,7 @@ export function QuoteDefaultsCard({
         data-testid="save-quote-defaults-btn"
         disabled={saving || !isScheduleSumValid(paymentSchedule)}
         onClick={() => void handleSave()}
-        className="min-h-[42px] w-full rounded-xl bg-slate-900 px-3 text-xs font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
+        className="min-h-[44px] w-full rounded-xl bg-[#4B7094] px-3 text-xs font-bold text-[#FFFDF9] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
       >
         <Save className="h-3.5 w-3.5" />
         <span>{saving ? "Guardando..." : "Guardar validez y pagos predeterminados"}</span>

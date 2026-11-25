@@ -72,23 +72,28 @@ export function AppNavigationDrawer({
   return (
     <div
       data-testid="app-navigation-drawer"
-      className="fixed inset-0 z-50 flex bg-secondary/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex bg-[#4B7094]/40 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-label="Menú principal y conversaciones"
     >
-      <aside className="flex h-full w-[312px] max-w-[85vw] flex-col bg-surface-container-lowest border-r border-outline-variant shadow-2xl overflow-hidden">
+      <aside className="relative flex h-full w-[312px] max-w-[85vw] flex-col ruled-notebook border-r border-[#E5DFD2] bg-[#FFFDF7] shadow-2xl overflow-hidden pl-3">
+        {/* Agujeros decorativos de archivador */}
+        <span className="pointer-events-none absolute left-2 top-16 h-2.5 w-2.5 rounded-full paper-hole border" aria-hidden="true" />
+        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full paper-hole border" aria-hidden="true" />
+        <span className="pointer-events-none absolute left-2 bottom-16 h-2.5 w-2.5 rounded-full paper-hole border" aria-hidden="true" />
+
         {/* Cabecera del menú */}
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-outline-variant px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#E5DFD2] px-4 pl-5">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shrink-0 shadow-xs">
               <Wrench className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <div className="text-[16px] leading-[22px] font-semibold text-on-surface">
+              <div className="text-[16px] leading-[22px] font-semibold text-[#2C2621]">
                 Gestor Autónomo
               </div>
-              <div className="text-[11px] leading-[14px] font-semibold text-on-success-container">
+              <div className="text-[11px] leading-[14px] font-semibold text-[#1B3A24]">
                 100% Local · Sin nube
               </div>
             </div>
@@ -98,7 +103,7 @@ export function AppNavigationDrawer({
             data-testid="drawer-close-btn"
             onClick={onClose}
             aria-label="Cerrar menú"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container cursor-pointer"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#6B6860] hover:bg-[#EFECE4] cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -108,7 +113,7 @@ export function AppNavigationDrawer({
         <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
           <nav
             aria-label="Módulos de la aplicación"
-            className="p-3 space-y-1 border-b border-outline-variant"
+            className="p-3 pl-5 space-y-1 border-b border-[#E5DFD2]"
           >
             {DRAWER_MODULES.map((item) => {
               const Icon = item.icon;
@@ -131,20 +136,20 @@ export function AppNavigationDrawer({
                   }}
                   className={`flex min-h-[48px] w-full items-center justify-between gap-2.5 rounded-2xl px-3 text-left text-[14px] transition-colors cursor-pointer ${
                     isActive
-                      ? "bg-terracotta-soft text-on-primary-container font-semibold"
-                      : "text-on-surface hover:bg-surface-container font-normal"
+                      ? "postit-peach border border-[#EA580C]/30 text-[#4A2500] font-semibold shadow-xs"
+                      : "text-[#2C2621] hover:bg-[#EFECE4] font-normal"
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
                     <Icon
                       className={`h-5 w-5 shrink-0 ${
-                        isActive ? "text-on-primary-container" : "text-on-surface-variant"
+                        isActive ? "text-[#4A2500]" : "text-[#6B6860]"
                       }`}
                     />
                     <span className="truncate">{item.label}</span>
                   </span>
                   {item.badge && (
-                    <span className="shrink-0 rounded-full bg-terracotta-soft px-2 py-0.5 text-[11px] font-semibold text-on-primary-container">
+                    <span className="shrink-0 rounded-full status-cobalt px-2 py-0.5 text-[11px] font-semibold">
                       {item.badge}
                     </span>
                   )}
@@ -154,9 +159,9 @@ export function AppNavigationDrawer({
           </nav>
 
           {/* Conversaciones (Hilos e Inboxes) */}
-          <div className="p-3 space-y-2.5">
+          <div className="p-3 pl-5 space-y-2.5">
             <div className="flex items-center justify-between px-1">
-              <span className="text-[12px] font-semibold text-on-surface-variant">
+              <span className="text-[12px] font-semibold text-[#6B6860]">
                 Conversaciones ({threads.length})
               </span>
             </div>
@@ -165,7 +170,7 @@ export function AppNavigationDrawer({
               type="button"
               data-testid="drawer-new-thread-btn"
               onClick={() => void onCreateThread()}
-              className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-2xl bg-secondary px-3 text-[14px] font-semibold text-on-secondary hover:bg-secondary/90 transition-colors cursor-pointer"
+              className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-2xl bg-[#4B7094] px-3 text-[14px] font-semibold text-[#FFFDF9] hover:bg-[#3F6080] shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="h-[18px] w-[18px]" aria-hidden="true" />
               <span>Nueva conversación</span>
@@ -190,24 +195,24 @@ export function AppNavigationDrawer({
                     onClick={() => void onSelectThread(thr.thread_id)}
                     className={`w-full rounded-2xl border p-3 text-left transition-colors cursor-pointer ${
                       thr.status === "interrupted"
-                        ? "border-outline-variant bg-warning-container"
+                        ? "postit-note postit-yellow tilt-subtle-left border-[#E6B84C]/50"
                         : isActive
-                          ? "border-terracotta bg-terracotta-soft"
-                          : "border-transparent bg-surface-container-lowest hover:bg-surface-container"
+                          ? "border-[#EA580C]/50 bg-[#FFD6B0]/85"
+                          : "border-transparent bg-[#FFFDF7]/90 hover:bg-[#F5F1E6]"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[14px] font-semibold text-on-surface">
+                      <span className="truncate text-[14px] font-semibold text-[#2C2621]">
                         {formatDisplayThreadTitle(thr.title)}
                       </span>
                       {thr.status === "interrupted" && (
-                        <span className="shrink-0 rounded-full bg-amber-tax px-2 py-0.5 text-[10px] font-semibold text-white">
+                        <span className="shrink-0 rounded-full status-tangerine px-2 py-0.5 text-[10px] font-semibold">
                           Pendiente
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-on-surface-variant">
-                      <span className={thr.status === "interrupted" ? "text-on-warning-container" : ""}>
+                    <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-[#6B6860]">
+                      <span className={thr.status === "interrupted" ? "text-[#3E3300]" : ""}>
                         {statusLabel}
                       </span>
                       <span>{thr.active_job_id ? "Con obra vinculada" : "General"}</span>
@@ -216,7 +221,7 @@ export function AppNavigationDrawer({
                 );
               })}
               {threads.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-outline-variant p-3 text-center text-[12px] text-on-surface-variant">
+                <div className="rounded-2xl border border-dashed border-[#E5DFD2] bg-[#FFFDF7]/80 p-3 text-center text-[12px] text-[#6B6860]">
                   Sin conversaciones recientes.
                 </div>
               )}
@@ -225,14 +230,14 @@ export function AppNavigationDrawer({
         </div>
 
         {/* Ajustes y cuenta anclados al final del menú lateral */}
-        <div className="mt-auto shrink-0 border-t border-outline-variant bg-surface-container-lowest p-3 space-y-1.5">
+        <div className="mt-auto shrink-0 border-t border-[#E2DDD0] nav-cream p-3 pl-5 space-y-1.5">
           {activeAccount && (
             <div className="flex items-center justify-between gap-2 px-3 py-1">
               <div className="min-w-0">
-                <div className="truncate text-[12px] font-semibold text-on-surface">
+                <div className="truncate text-[12px] font-semibold text-[#2C2621]">
                   {activeAccount.display_name}
                 </div>
-                <div className="truncate text-[10px] text-on-surface-variant">
+                <div className="truncate text-[10px] text-[#6B6860]">
                   {activeAccount.email}
                 </div>
               </div>
@@ -247,15 +252,15 @@ export function AppNavigationDrawer({
             }}
             className={`flex min-h-[48px] w-full items-center justify-between rounded-2xl px-3 text-[14px] font-semibold transition-colors cursor-pointer ${
               currentRoute.name === "settings"
-                ? "bg-terracotta-soft text-on-primary-container"
-                : "text-on-surface hover:bg-surface-container"
+                ? "bg-[#FFD6B0] text-[#4A2500]"
+                : "text-[#2C2621] hover:bg-[#EFECE4]"
             }`}
           >
             <span className="flex items-center gap-3">
-              <Settings className="h-5 w-5 text-on-surface-variant" aria-hidden="true" />
+              <Settings className="h-5 w-5 text-[#6B6860]" aria-hidden="true" />
               <span>Ajustes y datos fiscales</span>
             </span>
-            <ChevronRight className="h-[18px] w-[18px] text-outline" aria-hidden="true" />
+            <ChevronRight className="h-[18px] w-[18px] text-[#6B6860]" aria-hidden="true" />
           </button>
           {onLogout && (
             <button
@@ -265,7 +270,7 @@ export function AppNavigationDrawer({
                 onClose();
                 void onLogout();
               }}
-              className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 text-[13px] font-semibold text-coral-alert hover:bg-error-container transition-colors cursor-pointer"
+              className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 text-[13px] font-semibold text-[#DC2626] hover:bg-[#FAD2D8]/70 transition-colors cursor-pointer"
             >
               <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span>Cerrar sesión</span>

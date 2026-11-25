@@ -44,15 +44,15 @@ interface ActaPuestaEnMarchaViewProps {
 const ESTADO_LABELS: Record<EstadoActa, { label: string; cls: string }> = {
   borrador: {
     label: "Borrador",
-    cls: "bg-terracotta-soft text-on-primary-container",
+    cls: "paper-stamp status-tangerine",
   },
   completada: {
     label: "Completada",
-    cls: "bg-info-container text-on-info-container",
+    cls: "paper-stamp status-cobalt",
   },
   firmada: {
     label: "Firmada",
-    cls: "bg-success-container text-on-success-container",
+    cls: "paper-stamp status-emerald",
   },
 };
 
@@ -301,7 +301,7 @@ export function ActaPuestaEnMarchaView({
 
   if (loading && !formData) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6 text-xs text-on-surface-variant">
+      <div className="flex flex-1 items-center justify-center p-6 text-xs font-sans cotton-paper bg-[#F9F7F2] text-[#6B6860]">
         Cargando acta de puesta en marcha...
       </div>
     );
@@ -311,16 +311,16 @@ export function ActaPuestaEnMarchaView({
     return (
       <div
         data-testid="acta-not-found-view"
-        className="flex flex-1 flex-col items-center justify-center p-6 text-center space-y-3"
+        className="flex flex-1 flex-col items-center justify-center p-6 text-center space-y-3 font-sans cotton-paper bg-[#F9F7F2]"
       >
-        <p className="text-sm font-bold text-on-surface">Acta no encontrada</p>
-        <p className="text-xs text-on-surface-variant">
+        <p className="text-sm font-bold text-[#2C2621]">Acta no encontrada</p>
+        <p className="text-xs text-[#6B6860]">
           Es posible que se haya eliminado o restaurado la base de datos.
         </p>
         <button
           type="button"
           onClick={onBack}
-          className="min-h-[44px] rounded-xl bg-secondary px-4 text-xs font-semibold text-on-secondary cursor-pointer"
+          className="min-h-[44px] rounded-xl bg-[#4B7094] px-4 text-xs font-semibold text-[#FFFDF9] cursor-pointer"
         >
           Volver a Actas
         </button>
@@ -338,16 +338,16 @@ export function ActaPuestaEnMarchaView({
   return (
     <div
       data-testid="acta-editor-view"
-      className="flex flex-1 flex-col w-full max-w-full overflow-hidden bg-surface text-xs"
+      className="flex flex-1 flex-col w-full max-w-full overflow-hidden cotton-paper bg-[#F9F7F2] text-[#2C2621] text-xs font-sans"
     >
       {/* Cabecera fija con selector de modo */}
-      <div className="shrink-0 border-b border-outline-variant bg-surface-container-lowest px-4 py-3 space-y-2.5">
+      <div className="shrink-0 border-b border-[#E5DFD2] bg-[#F5F1E6] px-4 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             data-testid="acta-back-btn"
             onClick={() => void handleBack()}
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-outline-variant bg-white px-3 text-[12px] font-semibold text-on-surface cursor-pointer"
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[12px] font-semibold text-[#2C2621] cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Actas</span>
@@ -356,11 +356,11 @@ export function ActaPuestaEnMarchaView({
           <div className="flex items-center gap-1.5 min-w-0">
             <span
               data-testid="acta-header-code"
-              className="font-mono text-[13px] font-bold text-on-surface truncate"
+              className="font-mono-nums text-[13px] font-bold text-[#2C2621] truncate"
             >
               {actaRow.codigo_acta}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${badge.cls}`}>
               {badge.label}
             </span>
           </div>
@@ -372,7 +372,7 @@ export function ActaPuestaEnMarchaView({
               disabled={pdfBusy}
               onClick={() => void handlePreviewPdf()}
               aria-label="Vista previa PDF"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant bg-white text-on-surface disabled:opacity-50 cursor-pointer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] disabled:opacity-50 cursor-pointer"
             >
               <FileText className="h-4 w-4" />
             </button>
@@ -384,7 +384,7 @@ export function ActaPuestaEnMarchaView({
                 setConfirmDeleteOpen(true);
               }}
               aria-label="Eliminar acta"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-coral-alert/30 bg-white text-coral-alert cursor-pointer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#DC2626]/30 bg-[#FFFDF7] text-[#DC2626] cursor-pointer"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -394,7 +394,7 @@ export function ActaPuestaEnMarchaView({
         {/* Segmented Control */}
         <div
           data-testid="acta-mode-segmented"
-          className="grid grid-cols-2 gap-1 rounded-full border border-outline-variant bg-surface-container-low p-1"
+          className="grid grid-cols-2 gap-1 rounded-full border border-[#E5DFD2] bg-[#EFECE4] p-1"
         >
           <button
             type="button"
@@ -402,8 +402,8 @@ export function ActaPuestaEnMarchaView({
             onClick={() => void handleModeSwitch("guided")}
             className={`min-h-[38px] rounded-full text-[12px] font-semibold transition-colors cursor-pointer ${
               mode === "guided"
-                ? "bg-secondary text-on-secondary"
-                : "text-on-surface-variant"
+                ? "bg-[#4B7094] text-[#FFFDF9]"
+                : "text-[#6B6860]"
             }`}
           >
             Modo Guiado (Asistente)
@@ -414,8 +414,8 @@ export function ActaPuestaEnMarchaView({
             onClick={() => void handleModeSwitch("free")}
             className={`min-h-[38px] rounded-full text-[12px] font-semibold transition-colors cursor-pointer ${
               mode === "free"
-                ? "bg-secondary text-on-secondary"
-                : "text-on-surface-variant"
+                ? "bg-[#4B7094] text-[#FFFDF9]"
+                : "text-[#6B6860]"
             }`}
           >
             Rellenar Libremente
@@ -425,15 +425,15 @@ export function ActaPuestaEnMarchaView({
         {/* Indicador de progreso y autoguardado */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[11px]">
-            <span data-testid="acta-progress-label" className="font-semibold text-on-surface">
-              {completion.completedBlocks}/{completion.totalBlocks} bloques completados
+            <span data-testid="acta-progress-label" className="font-semibold text-[#2C2621]">
+              <span className="font-mono-nums">{completion.completedBlocks}/{completion.totalBlocks}</span> bloques completados
             </span>
             <button
               type="button"
               data-testid="acta-save-now-btn"
               disabled={saving}
               onClick={() => void flushSave(true)}
-              className="inline-flex items-center gap-1 font-semibold text-on-primary-container cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1 font-semibold text-[#D04B00] cursor-pointer disabled:opacity-50"
             >
               <Save className="h-3 w-3" />
               <span>
@@ -441,9 +441,9 @@ export function ActaPuestaEnMarchaView({
               </span>
             </button>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFECE4]">
             <div
-              className="h-full rounded-full bg-terracotta transition-all duration-300"
+              className="h-full rounded-full bg-[#EA580C] transition-all duration-300"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -458,13 +458,13 @@ export function ActaPuestaEnMarchaView({
               {errorMsg && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-coral-alert/30 bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container"
+                  className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-xs font-semibold text-[#5A121C]"
                 >
                   {errorMsg}
                 </div>
               )}
               {statusMsg && (
-                <div className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant bg-success-container px-3 py-2 text-xs font-semibold text-on-success-container">
+                <div className="flex items-center justify-between gap-2 rounded-xl status-emerald px-3 py-2 text-xs font-semibold">
                   <span className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span>{statusMsg}</span>
@@ -518,13 +518,13 @@ export function ActaPuestaEnMarchaView({
           {errorMsg && (
             <div
               role="alert"
-              className="rounded-xl border border-coral-alert/30 bg-error-container px-3 py-2 text-xs font-semibold text-on-error-container"
+              className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-xs font-semibold text-[#5A121C]"
             >
               {errorMsg}
             </div>
           )}
           {statusMsg && (
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant bg-success-container px-3 py-2 text-xs font-semibold text-on-success-container">
+            <div className="flex items-center justify-between gap-2 rounded-xl status-emerald px-3 py-2 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                 <span>{statusMsg}</span>

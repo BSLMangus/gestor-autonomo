@@ -115,13 +115,13 @@ export function QuotePaymentValidityEditor({
   const activeCount = Math.min(4, paymentSchedule.length) as 0 | 1 | 2 | 3 | 4;
 
   return (
-    <div className="space-y-3" data-testid={`${testIdPrefix}-editor`}>
+    <div className="space-y-3 font-sans text-[#2C2621]" data-testid={`${testIdPrefix}-editor`}>
       {/* Validez en días */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <label
             htmlFor={`${testIdPrefix}-validity-input`}
-            className="text-xs font-semibold text-slate-700"
+            className="text-xs font-semibold text-[#6B6860]"
           >
             Validez del presupuesto (días)
           </label>
@@ -133,10 +133,10 @@ export function QuotePaymentValidityEditor({
                 disabled={disabled}
                 data-testid={`${testIdPrefix}-validity-${days}`}
                 onClick={() => onChangeValidityDays(days)}
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold cursor-pointer ${
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold cursor-pointer transition-colors ${
                   validityDays === days
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
+                    ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                    : "border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#EA580C]"
                 }`}
               >
                 {days} d
@@ -157,13 +157,13 @@ export function QuotePaymentValidityEditor({
             const val = Math.max(1, Math.min(365, Math.round(Number(e.target.value) || 30)));
             onChangeValidityDays(val);
           }}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono"
+          className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs font-mono font-mono-nums tabular-nums text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
         />
       </div>
 
       {/* Métodos de pago aceptados */}
       <div className="space-y-1.5">
-        <div className="text-xs font-semibold text-slate-700">Métodos de pago aceptados</div>
+        <div className="text-xs font-semibold text-[#6B6860]">Métodos de pago aceptados</div>
         <div className="flex flex-wrap gap-1.5">
           {PAYMENT_METHOD_OPTIONS.map((opt) => {
             const active = paymentMethods.includes(opt.id);
@@ -174,10 +174,10 @@ export function QuotePaymentValidityEditor({
                 disabled={disabled}
                 data-testid={`${testIdPrefix}-method-${opt.id}`}
                 onClick={() => toggleMethod(opt.id)}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold cursor-pointer ${
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold cursor-pointer transition-colors ${
                   active
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-700"
+                    ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                    : "border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#EA580C]"
                 }`}
               >
                 {active && <Check className="h-3 w-3" />}
@@ -187,14 +187,14 @@ export function QuotePaymentValidityEditor({
           })}
         </div>
         {paymentMethods.includes("transferencia") && !emitterIban.trim() && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
+          <div className="status-gold rounded-xl px-2.5 py-1.5 text-[11px]">
             Nota: No has configurado tu IBAN todavía; puedes añadirlo en Configuración o en tu perfil fiscal.
           </div>
         )}
         {paymentMethods.includes("efectivo") &&
           totalCentsForPreview !== undefined &&
           totalCentsForPreview >= 100_000 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
+            <div className="status-gold rounded-xl px-2.5 py-1.5 text-[11px]">
               Aviso legal (Ley 11/2021): para pagos entre empresario y profesional/particular recuerda el límite de pago en efectivo aplicable en operaciones con empresarios/profesionales (1.000 €).
             </div>
           )}
@@ -203,14 +203,14 @@ export function QuotePaymentValidityEditor({
       {/* Pagos fraccionados 1..4 */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-1.5">
-          <span className="text-xs font-semibold text-slate-700">Forma de cobro (1 a 4 pagos)</span>
+          <span className="text-xs font-semibold text-[#6B6860]">Forma de cobro (1 a 4 pagos)</span>
           {paymentSchedule.length > 0 && (
             <span
               data-testid={`${testIdPrefix}-schedule-sum`}
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold font-mono tabular-nums ${
                 scheduleValid
-                  ? "bg-emerald-100 text-emerald-800"
-                  : "bg-rose-100 text-rose-800"
+                  ? "status-emerald"
+                  : "status-tangerine"
               }`}
             >
               Suma: {formatPercentEs(sumPct)}
@@ -234,10 +234,10 @@ export function QuotePaymentValidityEditor({
               disabled={disabled}
               data-testid={`${testIdPrefix}-count-${opt.count}`}
               onClick={() => applyTemplateCount(opt.count)}
-              className={`min-h-[34px] rounded-xl border px-1 text-[10px] font-semibold cursor-pointer ${
+              className={`min-h-[34px] rounded-xl border px-1 text-[10px] font-semibold cursor-pointer transition-colors ${
                 activeCount === opt.count
-                  ? "border-orange-600 bg-orange-600 text-white"
-                  : "border-slate-300 bg-white text-slate-700"
+                  ? "border-[#EA580C] bg-[#EA580C] text-white"
+                  : "border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#EA580C]"
               }`}
             >
               {opt.label}
@@ -256,7 +256,7 @@ export function QuotePaymentValidityEditor({
                   { label: "Al finalizar la obra", percentage: 50 },
                 ])
               }
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-700 cursor-pointer"
+              className="rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2 py-1 text-[10px] font-semibold text-[#3D352E] cursor-pointer hover:border-[#EA580C]"
             >
               Preset 50 % / 50 %
             </button>
@@ -269,7 +269,7 @@ export function QuotePaymentValidityEditor({
                   { label: "Al finalizar la obra", percentage: 60 },
                 ])
               }
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-700 cursor-pointer"
+              className="rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2 py-1 text-[10px] font-semibold text-[#3D352E] cursor-pointer hover:border-[#EA580C]"
             >
               Preset 40 % / 60 %
             </button>
@@ -281,7 +281,7 @@ export function QuotePaymentValidityEditor({
             {paymentSchedule.map((item, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/70 p-2"
+                className="flex items-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2"
               >
                 <input
                   type="text"
@@ -291,7 +291,7 @@ export function QuotePaymentValidityEditor({
                   value={item.label}
                   onChange={(e) => updateInstallment(idx, { label: e.target.value })}
                   placeholder={`Concepto pago ${idx + 1}`}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                  className="min-w-0 flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   <input
@@ -307,12 +307,12 @@ export function QuotePaymentValidityEditor({
                         percentage: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
                       })
                     }
-                    className="w-16 rounded-lg border border-slate-300 bg-white px-2 py-1 text-right text-xs font-mono"
+                    className="w-16 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-right text-xs font-mono font-mono-nums tabular-nums text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
-                  <span className="text-xs font-semibold text-slate-600">%</span>
+                  <span className="text-xs font-semibold text-[#6B6860]">%</span>
                 </div>
                 {amountsPreview?.[idx] && (
-                  <span className="w-20 text-right font-mono text-[11px] font-bold text-slate-900 tabular-nums shrink-0">
+                  <span className="w-20 text-right font-mono font-mono-nums text-[11px] font-bold text-[#2C2621] tabular-nums shrink-0">
                     {formatCentsEs(amountsPreview[idx]!.amount_cents)}
                   </span>
                 )}
@@ -320,7 +320,7 @@ export function QuotePaymentValidityEditor({
             ))}
 
             {!scheduleValid && (
-              <div className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-800">
+              <div className="flex items-center gap-1.5 rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-2.5 py-1.5 text-[11px] font-semibold text-[#5A121C]">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 <span>
                   Cada pago debe ser mayor que 0 % y los porcentajes deben sumar exactamente 100 %.

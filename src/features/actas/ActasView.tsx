@@ -31,15 +31,15 @@ interface ActasViewProps {
 const STATUS_BADGE: Record<EstadoActa, { label: string; cls: string }> = {
   borrador: {
     label: "Borrador",
-    cls: "bg-terracotta-soft text-on-primary-container border-outline-variant",
+    cls: "paper-stamp status-tangerine",
   },
   completada: {
     label: "Completada",
-    cls: "bg-info-container text-on-info-container border-info/20",
+    cls: "paper-stamp status-cobalt",
   },
   firmada: {
     label: "Firmada",
-    cls: "bg-success-container text-on-success-container border-emerald-free/20",
+    cls: "paper-stamp status-emerald",
   },
 };
 
@@ -135,14 +135,14 @@ export function ActasView({
   return (
     <div
       data-testid="actas-view"
-      className="flex flex-1 flex-col w-full max-w-full overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-3.5 text-xs bg-surface"
+      className="flex flex-1 flex-col w-full max-w-full overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-3.5 text-xs font-sans cotton-paper bg-[#F9F7F2] text-[#2C2621]"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-[16px] font-bold text-on-surface">
-            Actas de Puesta en Marcha ({totalCount})
+          <h2 className="text-[16px] font-bold text-[#2C2621]">
+            Actas de Puesta en Marcha (<span className="font-mono-nums">{totalCount}</span>)
           </h2>
-          <p className="text-[11px] text-on-surface-variant">
+          <p className="text-[11px] text-[#6B6860]">
             Certificación interna, mediciones reglamentarias y garantía de obra.
           </p>
         </div>
@@ -150,7 +150,7 @@ export function ActasView({
           type="button"
           data-testid="actas-new-btn"
           onClick={() => setShowCreatePanel((v) => !v)}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full bg-terracotta px-4 text-[12px] font-semibold text-white shadow-xs cursor-pointer"
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full bg-[#EA580C] hover:bg-[#D04B00] px-4 text-[12px] font-semibold text-white shadow-xs cursor-pointer transition-colors"
         >
           <Plus className="h-4 w-4 shrink-0" />
           <span>Nueva Acta</span>
@@ -161,14 +161,14 @@ export function ActasView({
         <form
           onSubmit={(e) => void handleConfirmCreate(e)}
           data-testid="actas-create-panel"
-          className="rounded-2xl border border-terracotta/30 bg-surface-container-lowest p-3.5 space-y-3 shadow-xs"
+          className="ruled-notebook rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-3"
         >
-          <div className="text-[13px] font-bold text-on-surface">
+          <div className="text-[13px] font-bold text-[#2C2621]">
             Preparar nueva acta (pre-rellenado automático)
           </div>
 
           <div className="space-y-1">
-            <span className="block text-[11px] font-semibold text-on-surface-variant">
+            <span className="block text-[11px] font-semibold text-[#6B6860]">
               Especialidad técnica
             </span>
             <div className="grid grid-cols-3 gap-1.5">
@@ -180,8 +180,8 @@ export function ActasView({
                   onClick={() => setSelectedEsp(esp)}
                   className={`min-h-[42px] rounded-xl border px-2 text-[12px] font-semibold cursor-pointer ${
                     selectedEsp === esp
-                      ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                      : "border-outline-variant bg-surface-container-low text-on-surface"
+                      ? "border-[#EA580C] bg-[#FFD6B0] text-[#4A2500]"
+                      : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                   }`}
                 >
                   {ESPECIALIDAD_LABELS[esp]}
@@ -192,7 +192,7 @@ export function ActasView({
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="space-y-1">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Vincular a Obra (opcional)
               </span>
               <select
@@ -206,7 +206,7 @@ export function ActasView({
                     setSelectedClientId(found.client_id);
                   }
                 }}
-                className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-2.5 text-xs text-on-surface"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               >
                 <option value="">Sin obra vinculada</option>
                 {jobs.map((j) => (
@@ -218,14 +218,14 @@ export function ActasView({
             </label>
 
             <label className="space-y-1">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Titular / Cliente (opcional)
               </span>
               <select
                 data-testid="actas-new-client-select"
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
-                className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-2.5 text-xs text-on-surface"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               >
                 <option value="">Sin cliente (podrás crearlo dentro)</option>
                 {clients.map((c) => (
@@ -242,7 +242,7 @@ export function ActasView({
             <button
               type="button"
               onClick={() => setShowCreatePanel(false)}
-              className="min-h-[44px] flex-1 rounded-xl border border-outline-variant bg-surface-container-low font-semibold text-on-surface cursor-pointer"
+              className="min-h-[44px] flex-1 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-semibold text-[#2C2621] cursor-pointer"
             >
               Cancelar
             </button>
@@ -250,7 +250,7 @@ export function ActasView({
               type="submit"
               data-testid="actas-confirm-create-btn"
               disabled={creating}
-              className="min-h-[44px] flex-[2] rounded-xl bg-secondary font-semibold text-on-secondary disabled:opacity-50 cursor-pointer"
+              className="min-h-[44px] flex-[2] rounded-xl bg-[#4B7094] font-semibold text-[#FFFDF9] disabled:opacity-50 cursor-pointer"
             >
               {creating ? "Creando acta..." : "Crear y rellenar acta"}
             </button>
@@ -259,14 +259,14 @@ export function ActasView({
       )}
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6860]" />
         <input
           type="search"
           data-testid="actas-search-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por código ACT, obra, cliente o ubicación..."
-          className="min-h-[44px] w-full rounded-2xl border border-outline-variant bg-surface-container-lowest pl-9 pr-3 text-xs text-on-surface"
+          className="min-h-[44px] w-full rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] pl-9 pr-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
       </div>
 
@@ -276,10 +276,10 @@ export function ActasView({
             key={f.value || "all"}
             type="button"
             onClick={() => setStatusFilter(f.value)}
-            className={`min-h-[36px] rounded-full border px-3 text-[11px] font-semibold cursor-pointer ${
+            className={`min-h-[36px] rounded-full border px-3 text-[11px] font-semibold cursor-pointer transition-colors ${
               statusFilter === f.value
-                ? "border-secondary bg-secondary text-on-secondary"
-                : "border-outline-variant bg-surface-container-lowest text-on-surface-variant"
+                ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                : "border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860]"
             }`}
           >
             {f.label}
@@ -288,21 +288,21 @@ export function ActasView({
       </div>
 
       {loading && actas.length === 0 ? (
-        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 text-center text-on-surface-variant">
+        <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-6 text-center text-[#6B6860]">
           Cargando actas técnicas...
         </div>
       ) : actas.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center space-y-2">
-          <ClipboardCheck className="mx-auto h-7 w-7 text-on-surface-variant/60" />
-          <div className="text-[13px] font-semibold text-on-surface">
+        <div className="paper-sheet rounded-2xl border border-dashed border-[#E5DFD2] bg-[#FFFDF7] p-6 text-center space-y-2">
+          <ClipboardCheck className="mx-auto h-7 w-7 text-[#6B6860]/70" />
+          <div className="text-[13px] font-semibold text-[#2C2621]">
             Todavía no hay actas registradas
           </div>
-          <p className="text-[11px] text-on-surface-variant">
+          <p className="text-[11px] text-[#6B6860]">
             Crea un acta desde aquí, desde el detalle de una Obra/Presupuesto o desde la ficha de un Cliente.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {actas.map((acta) => {
             const badge = STATUS_BADGE[acta.estado];
             let progressLabel = "";
@@ -322,33 +322,33 @@ export function ActasView({
                 type="button"
                 data-testid={`acta-list-item-${acta.id}`}
                 onClick={() => onOpenActa(acta.id)}
-                className="w-full rounded-2xl border border-outline-variant bg-surface-container-lowest p-3.5 text-left hover:border-terracotta transition-colors cursor-pointer space-y-1.5"
+                className="paper-sheet w-full rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer space-y-1.5"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[13px] font-bold text-on-surface">
+                    <span className="font-mono-nums text-[13px] font-bold text-[#2C2621]">
                       {acta.codigo_acta}
                     </span>
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant">
+                    <span className="rounded-full border border-[#E5DFD2] bg-[#EFECE4] px-2 py-0.5 text-[10px] font-semibold text-[#6B6860]">
                       {ESPECIALIDAD_LABELS[acta.especialidad]}
                     </span>
                   </div>
                   <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${badge.cls}`}
                   >
                     {badge.label}
                   </span>
                 </div>
-                <div className="truncate text-[12px] font-semibold text-on-surface">
+                <div className="truncate text-[12px] font-semibold text-[#2C2621]">
                   {acta.client_name || acta.job_title || "Sin cliente ni obra asignada"}
                 </div>
-                <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
-                  <span>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-[#6B6860]">
+                  <span className="font-mono-nums">
                     {acta.fecha_emision_iso}
                     {acta.job_code ? ` · ${acta.job_code}` : ""}
                   </span>
                   {progressLabel && (
-                    <span className="font-semibold text-on-primary-container">{progressLabel}</span>
+                    <span className="font-mono-nums font-semibold text-[#4A2500]">{progressLabel}</span>
                   )}
                 </div>
               </button>

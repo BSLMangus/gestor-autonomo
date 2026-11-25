@@ -366,28 +366,28 @@ export function GlobalVoiceOverlay({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className={`fixed inset-0 ${zIndexClass} flex flex-col justify-end bg-secondary/45 backdrop-blur-[1px]`}
+      className={`fixed inset-0 ${zIndexClass} flex flex-col justify-end bg-[#2C2621]/45 backdrop-blur-[1px]`}
     >
       <div
         style={maxSheetHeightPx ? { maxHeight: `${maxSheetHeightPx}px` } : undefined}
-        className="mx-auto w-full max-w-md max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-t-[24px] border-t border-outline-variant bg-surface-container-lowest p-4 pb-6 shadow-2xl space-y-3"
+        className="clipboard-panel mx-auto w-full max-w-md max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-t-[24px] border-t border-[#DFD9CA] bg-[#FFFDF7] p-4 pb-6 space-y-3"
       >
-        <div className="mx-auto h-1.5 w-10 rounded-full bg-outline-variant" />
+        <div className="mx-auto h-1.5 w-10 rounded-full bg-[#E5DFD2]" />
 
-        <div className="flex items-center justify-between border-b border-outline-variant pb-3">
+        <div className="flex items-center justify-between border-b border-[#E5DFD2] pb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
                 phase === "listening"
                   ? "animate-pulse bg-terracotta text-white shadow-sm"
-                  : "bg-secondary text-white"
+                  : "bg-[#4B7094] text-[#FFFDF9]"
               }`}
             >
               {phase === "listening" ? <Mic className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
             </span>
             <div className="min-w-0">
-              <h3 className="truncate text-[16px] font-semibold text-on-surface">{title}</h3>
-              <p className="truncate text-[12px] font-semibold text-on-success-container">
+              <h3 className="truncate text-[16px] font-semibold text-[#2C2621]">{title}</h3>
+              <p className="truncate text-[12px] font-semibold text-[#1B3A24]">
                 {subtitle}
               </p>
             </div>
@@ -397,21 +397,21 @@ export function GlobalVoiceOverlay({
             data-testid={`${prefix}-close-btn`}
             aria-label="Cerrar micrófono"
             onClick={handleClose}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container cursor-pointer"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#6B6860] hover:bg-[#EFECE4] cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="rounded-2xl border border-outline-variant bg-surface-warm-card px-3.5 py-2.5 text-center">
-          <p data-testid={`${prefix}-status`} className="text-[12px] leading-relaxed text-on-surface">
+        <div className="rounded-2xl border border-[#E5DFD2] bg-[#F5F1E6] px-3.5 py-2.5 text-center">
+          <p data-testid={`${prefix}-status`} className="text-[12px] leading-relaxed text-[#2C2621]">
             {statusMessage}
           </p>
         </div>
 
         {examples.length > 0 && !hasText && (
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold text-on-surface-variant">Ejemplos rápidos</div>
+            <div className="text-[11px] font-semibold text-[#6B6860]">Ejemplos rápidos</div>
             <div className="flex flex-col gap-1.5">
               {examples.map((ex) => (
                 <button
@@ -419,7 +419,7 @@ export function GlobalVoiceOverlay({
                   type="button"
                   disabled={locked}
                   onClick={() => void handleExampleClick(ex)}
-                  className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-left text-[12px] font-medium text-on-surface hover:border-terracotta transition-colors cursor-pointer disabled:opacity-50"
+                  className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-left text-[12px] font-medium text-[#2C2621] hover:border-terracotta transition-colors cursor-pointer disabled:opacity-50"
                 >
                   “{ex}”
                 </button>
@@ -465,7 +465,7 @@ export function GlobalVoiceOverlay({
               }
             }}
             placeholder={placeholder}
-            className="w-full min-h-[88px] resize-y rounded-xl border border-outline-variant bg-surface-container-low px-3.5 py-2.5 text-[14px] leading-relaxed text-on-surface placeholder:text-outline focus:border-terracotta focus:outline-none disabled:opacity-60"
+            className="w-full min-h-[88px] resize-y rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 py-2.5 text-[14px] leading-relaxed text-[#2C2621] placeholder:text-[#6B6860] focus:border-terracotta focus:outline-none disabled:opacity-60"
           />
 
           <div className="flex items-center gap-2">
@@ -478,8 +478,8 @@ export function GlobalVoiceOverlay({
               onClick={handleToggleMic}
               className={`inline-flex min-h-[46px] shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 text-[12px] font-semibold transition-colors cursor-pointer disabled:opacity-45 ${
                 phase === "listening"
-                  ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                  : "border-outline-variant bg-surface-container-lowest text-on-surface hover:border-terracotta"
+                  ? "border-terracotta bg-[#FFD6B0] text-[#4A2500]"
+                  : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621] hover:border-terracotta"
               }`}
             >
               {phase === "listening" ? (
@@ -501,7 +501,7 @@ export function GlobalVoiceOverlay({
               aria-label="Limpiar texto dictado"
               disabled={locked || !hasText}
               onClick={handleClear}
-              className="inline-flex min-h-[46px] shrink-0 items-center justify-center gap-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-[12px] font-semibold text-on-surface-variant hover:text-on-surface disabled:opacity-40 cursor-pointer"
+              className="inline-flex min-h-[46px] shrink-0 items-center justify-center gap-1 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-[12px] font-semibold text-[#6B6860] hover:text-[#2C2621] disabled:opacity-40 cursor-pointer"
             >
               <Trash2 className="h-4 w-4 shrink-0" />
               <span>Limpiar</span>

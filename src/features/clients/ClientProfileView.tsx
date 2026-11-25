@@ -117,7 +117,7 @@ export function ClientProfileView({
 
   if (loading && !client) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6 text-xs text-slate-500">
+      <div className="flex flex-1 items-center justify-center p-6 text-xs text-[#6B6860] cotton-paper">
         Cargando ficha de cliente...
       </div>
     );
@@ -125,13 +125,18 @@ export function ClientProfileView({
 
   if (!client) {
     return (
-      <div data-testid="client-not-found-view" className="flex flex-1 flex-col items-center justify-center p-6 text-center space-y-3">
-        <p className="text-sm font-bold text-slate-800">Cliente no encontrado</p>
-        <p className="text-xs text-slate-500">Es posible que se haya eliminado o restaurado el catálogo.</p>
+      <div
+        data-testid="client-not-found-view"
+        className="flex flex-1 flex-col items-center justify-center p-6 text-center space-y-3 cotton-paper"
+      >
+        <p className="text-sm font-bold text-[#2C2621]">Cliente no encontrado</p>
+        <p className="text-xs text-[#6B6860]">
+          Es posible que se haya eliminado o restaurado el catálogo.
+        </p>
         <button
           type="button"
           onClick={onBackToClients}
-          className="min-h-11 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white"
+          className="min-h-11 rounded-xl bg-[#4B7094] px-4 text-xs font-bold text-[#FFFDF9] cursor-pointer"
         >
           Volver a Clientes
         </button>
@@ -150,17 +155,26 @@ export function ClientProfileView({
     .filter((i) => i.status === "pendiente_cobro" || i.status === "vencido")
     .reduce((acc, i) => acc + i.total_cents, 0);
 
+  const clientParts = client.name.trim().split(/\s+/).filter(Boolean);
+  const clientInitials =
+    clientParts.length === 0
+      ? "CL"
+      : clientParts.length === 1
+        ? clientParts[0]!.slice(0, 2).toUpperCase()
+        : `${clientParts[0]![0] ?? ""}${clientParts[1]![0] ?? ""}`.toUpperCase();
+  const tabLetter = (client.name.trim()[0] ?? "C").toUpperCase();
+
   return (
     <div
       data-testid="client-profile-view"
-      className="flex flex-1 flex-col w-full max-w-full overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-4 text-xs bg-surface"
+      className="flex flex-1 flex-col w-full max-w-full overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-4 text-xs cotton-paper text-[#2C2621]"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
         <button
           type="button"
           data-testid="back-to-clients-btn"
           onClick={onBackToClients}
-          className="inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3.5 text-[12px] font-semibold text-on-surface cursor-pointer"
+          className="inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 text-[12px] font-semibold text-[#2C2621] shadow-xs cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Clientes</span>
@@ -169,86 +183,114 @@ export function ClientProfileView({
           type="button"
           data-testid="edit-client-profile-btn"
           onClick={() => onOpenEditWidget(client)}
-          className="min-h-[42px] rounded-full bg-secondary px-4 text-[12px] font-semibold text-on-secondary cursor-pointer"
+          className="min-h-[42px] rounded-full bg-[#4B7094] hover:bg-[#3F5F7E] px-4 text-[12px] font-semibold text-[#FFFDF9] cursor-pointer transition-colors"
         >
           Editar datos
         </button>
       </div>
 
       {errorMsg && (
-        <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-rose-800">
+        <div
+          role="alert"
+          className="paper-sheet rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-[#5A121C] font-medium"
+        >
           {errorMsg}
         </div>
       )}
       {statusMsg && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 font-semibold text-emerald-900">
+        <div className="paper-sheet rounded-2xl border border-[#1E8E5A]/30 bg-[#D4EDDA] p-3 font-semibold text-[#1B3A24]">
           {statusMsg}
         </div>
       )}
 
-      {/* Cabecera de datos fiscales */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-1.5">
-        <h2 className="min-w-0 text-base font-extrabold text-slate-900 break-words [overflow-wrap:anywhere]">
-          {client.name}
-        </h2>
-        <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
-          <span className="font-semibold">NIF/CIF:</span> {client.nif || "No especificado"} ·{" "}
-          <span className="font-semibold">Tel:</span> {client.phone || "No especificado"}
+      {/* Cabecera de datos fiscales estilo ficha Rolodex */}
+      <section className="relative ruled-index border border-[#E5DFD2] rounded-2xl overflow-hidden flex">
+        <div
+          className="w-8 postit-lavender border-r border-[#E5DFD2] flex items-center justify-center shrink-0"
+          aria-hidden="true"
+        >
+          <span className="font-mono text-[12px] font-bold text-[#4C1D95]">{tabLetter}</span>
         </div>
-        {client.fiscal_address && (
-          <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
-            <span className="font-semibold">Dirección:</span> {client.fiscal_address}
+        <div className="flex-1 min-w-0 p-3.5 space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full postit-peach border border-[#E5DFD2] text-[#4A2500] font-sans text-[15px] font-bold flex items-center justify-center shrink-0">
+              {clientInitials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="min-w-0 text-base font-bold text-[#2C2621] break-words [overflow-wrap:anywhere]">
+                {client.name}
+              </h2>
+              <div className="font-mono text-[11px] text-[#6B6860] tabular-nums break-words [overflow-wrap:anywhere]">
+                <span className="font-semibold text-[#2C2621]">NIF/CIF:</span>{" "}
+                {client.nif || "No especificado"} ·{" "}
+                <span className="font-semibold text-[#2C2621]">Tel:</span>{" "}
+                {client.phone || "No especificado"}
+              </div>
+            </div>
           </div>
-        )}
-        {client.email && (
-          <div className="text-slate-600 break-words [overflow-wrap:anywhere]">
-            <span className="font-semibold">Email:</span> {client.email}
-          </div>
-        )}
-        {client.notes && (
-          <div className="rounded-xl bg-slate-50 p-2 text-[11px] text-slate-600">
-            {client.notes}
-          </div>
-        )}
+          {client.fiscal_address && (
+            <div className="text-[#6B6860] break-words [overflow-wrap:anywhere]">
+              <span className="font-semibold text-[#2C2621]">Dirección:</span>{" "}
+              {client.fiscal_address}
+            </div>
+          )}
+          {client.email && (
+            <div className="text-[#6B6860] break-words [overflow-wrap:anywhere]">
+              <span className="font-semibold text-[#2C2621]">Email:</span> {client.email}
+            </div>
+          )}
+          {client.notes && (
+            <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2 text-[11px] text-[#6B6860]">
+              {client.notes}
+            </div>
+          )}
+        </div>
       </section>
 
-      {/* Resumen económico */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-2.5">
-          <div className="text-[11px] font-medium text-slate-500">Presupuestado</div>
-          <div className="mt-0.5 text-sm font-extrabold text-slate-900">
+      {/* Resumen económico en Post-its */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="postit-note postit-blue tilt-subtle-left p-3">
+          <div className="text-[11px] font-semibold text-[#143552]">Presupuestado</div>
+          <div className="mt-0.5 font-mono text-[15px] font-bold text-[#143552] tabular-nums">
             {formatCentsEs(totalQuotedCents)}
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-2.5">
-          <div className="text-[11px] font-medium text-slate-500">Facturado total</div>
-          <div className="mt-0.5 text-sm font-extrabold text-slate-900">
+        <div className="postit-note postit-lavender tilt-subtle-right p-3">
+          <div className="text-[11px] font-semibold text-[#4C1D95]">Facturado total</div>
+          <div className="mt-0.5 font-mono text-[15px] font-bold text-[#4C1D95] tabular-nums">
             {formatCentsEs(totalInvoicedCents)}
           </div>
         </div>
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5">
-          <div className="text-[11px] font-medium text-emerald-900">Cobrado</div>
-          <div className="mt-0.5 text-sm font-extrabold text-emerald-950">
+        <div className="postit-note postit-green tilt-subtle-right p-3">
+          <div className="text-[11px] font-semibold text-[#1B3A24]">Cobrado</div>
+          <div className="mt-0.5 font-mono text-[15px] font-bold text-[#14532D] tabular-nums">
             {formatCentsEs(totalCollectedCents)}
           </div>
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-          <div className="text-[11px] font-medium text-amber-900">Pendiente cobro</div>
-          <div className="mt-0.5 text-sm font-extrabold text-amber-950">
+        <div className="postit-note postit-yellow tilt-subtle-left p-3">
+          <div className="text-[11px] font-semibold text-[#3E3300]">Pendiente cobro</div>
+          <div className="mt-0.5 font-mono text-[15px] font-bold text-[#713F12] tabular-nums">
             {formatCentsEs(totalPendingCents)}
           </div>
         </div>
       </div>
 
       {/* Obras asociadas */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <section className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-9 space-y-2.5">
+        <div
+          className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
-          <h3 className="text-sm font-extrabold text-slate-900">Obras asociadas ({jobs.length})</h3>
+          <h3 className="text-sm font-bold text-[#2C2621]">Obras asociadas ({jobs.length})</h3>
           <button
             type="button"
             data-testid="client-profile-new-job-btn"
             onClick={() => setShowNewJobForm((v) => !v)}
-            className="rounded-lg bg-orange-600 px-2.5 py-1 text-[11px] font-bold text-white"
+            className="rounded-lg bg-[#EA580C] hover:bg-[#D04B00] px-2.5 py-1 text-[11px] font-bold text-[#FFFDF9] cursor-pointer transition-colors"
           >
             + Nueva obra
           </button>
@@ -257,7 +299,7 @@ export function ClientProfileView({
         {showNewJobForm && (
           <form
             onSubmit={(e) => void handleCreateJobForClient(e)}
-            className="flex w-full min-w-0 gap-1.5 rounded-xl border border-orange-200 bg-orange-50/70 p-2"
+            className="flex w-full min-w-0 gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFD6B0]/50 p-2"
           >
             <input
               type="text"
@@ -265,12 +307,12 @@ export function ClientProfileView({
               value={newJobTitle}
               onChange={(e) => setNewJobTitle(e.target.value)}
               placeholder="Título de la obra (ej. Reforma baño)"
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+              className="min-w-0 flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <button
               type="submit"
               disabled={busy}
-              className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+              className="shrink-0 rounded-lg bg-[#4B7094] px-3 py-1.5 text-xs font-bold text-[#FFFDF9] cursor-pointer"
             >
               Crear
             </button>
@@ -278,33 +320,48 @@ export function ClientProfileView({
         )}
 
         {jobs.length === 0 ? (
-          <div className="text-slate-500">Este cliente aún no tiene obras registradas.</div>
+          <div className="text-[#6B6860]">Este cliente aún no tiene obras registradas.</div>
         ) : (
           <div className="space-y-2">
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5"
+                className="flex items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5"
               >
                 <button
                   type="button"
                   data-testid={`client-open-job-${job.id}`}
                   onClick={() => onOpenJob(job.id)}
-                  className="min-w-0 flex-1 text-left"
+                  className="min-w-0 flex-1 text-left cursor-pointer"
                 >
-                  <div className="text-[11px] font-extrabold text-orange-700">
-                    {job.job_code} · {job.status}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono text-[11px] font-bold text-[#D04B00] tabular-nums">
+                      {job.job_code}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        job.status === "finalizado"
+                          ? "status-emerald"
+                          : job.status === "en_curso"
+                            ? "status-gold"
+                            : job.status === "cancelado"
+                              ? "status-tangerine"
+                              : "status-cobalt"
+                      }`}
+                    >
+                      {job.status}
+                    </span>
                   </div>
-                  <div className="truncate font-bold text-slate-900">{job.title}</div>
+                  <div className="mt-0.5 truncate font-bold text-[#2C2621]">{job.title}</div>
                   {job.address && (
-                    <div className="truncate text-[10px] text-slate-500">{job.address}</div>
+                    <div className="truncate text-[10px] text-[#6B6860]">{job.address}</div>
                   )}
                 </button>
                 {job.status !== "cancelado" && (
                   <button
                     type="button"
                     onClick={() => void onStartJobQuote(job.id)}
-                    className="shrink-0 rounded-lg border border-orange-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-orange-800"
+                    className="shrink-0 rounded-lg border border-[#E5DFD2] bg-[#FFD6B0] px-2.5 py-1.5 text-[11px] font-bold text-[#4A2500] cursor-pointer"
                   >
                     + Presupuesto
                   </button>
@@ -316,8 +373,15 @@ export function ClientProfileView({
       </section>
 
       {/* Presupuestos y Facturas vinculados */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
-        <h3 className="text-sm font-extrabold text-slate-900">
+      <section className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-9 space-y-2">
+        <div
+          className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+        </div>
+        <h3 className="text-sm font-bold text-[#2C2621]">
           Presupuestos y Facturas ({quotes.length + invoices.length})
         </h3>
         <div className="space-y-1.5">
@@ -327,15 +391,21 @@ export function ClientProfileView({
               type="button"
               data-testid={`client-open-quote-${q.id}`}
               onClick={() => onOpenQuote(q.id)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:border-terracotta transition-colors cursor-pointer"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
-                <div className="font-mono font-bold text-slate-900">{q.quote_code}</div>
-                <div className="text-[11px] text-slate-500">
-                  Presupuesto · {formatCentsEs(q.total_cents)} · {q.status}
+                <div className="font-mono font-bold text-[#2C2621] tabular-nums">
+                  {q.quote_code}
+                </div>
+                <div className="text-[11px] text-[#6B6860]">
+                  Presupuesto ·{" "}
+                  <span className="font-mono font-semibold text-[#2C2621] tabular-nums">
+                    {formatCentsEs(q.total_cents)}
+                  </span>{" "}
+                  · {q.status}
                 </div>
               </div>
-              <span className="shrink-0 text-[11px] font-semibold text-on-primary-container">
+              <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
                 Abrir →
               </span>
             </button>
@@ -346,29 +416,42 @@ export function ClientProfileView({
               type="button"
               data-testid={`client-open-invoice-${inv.id}`}
               onClick={() => onOpenInvoice(inv.id)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:border-terracotta transition-colors cursor-pointer"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
-                <div className="font-mono font-bold text-slate-900">{inv.invoice_number}</div>
-                <div className="text-[11px] text-slate-500">
-                  Factura · {formatCentsEs(inv.total_cents)} · {inv.status.replace("_", " ")}
+                <div className="font-mono font-bold text-[#2C2621] tabular-nums">
+                  {inv.invoice_number}
+                </div>
+                <div className="text-[11px] text-[#6B6860]">
+                  Factura ·{" "}
+                  <span className="font-mono font-semibold text-[#2C2621] tabular-nums">
+                    {formatCentsEs(inv.total_cents)}
+                  </span>{" "}
+                  · {inv.status.replace("_", " ")}
                 </div>
               </div>
-              <span className="shrink-0 text-[11px] font-semibold text-on-primary-container">
+              <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
                 Abrir →
               </span>
             </button>
           ))}
           {quotes.length === 0 && invoices.length === 0 && (
-            <div className="text-slate-500">Sin presupuestos ni facturas para este cliente.</div>
+            <div className="text-[#6B6860]">Sin presupuestos ni facturas para este cliente.</div>
           )}
         </div>
       </section>
 
       {/* Actas de puesta en marcha */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <section className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-9 space-y-2.5">
+        <div
+          className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
-          <h3 className="text-sm font-extrabold text-slate-900">
+          <h3 className="text-sm font-bold text-[#2C2621]">
             Actas de puesta en marcha ({actas.length})
           </h3>
           {onCreateClientActa && (
@@ -377,7 +460,7 @@ export function ClientProfileView({
               data-testid="client-profile-create-acta-btn"
               disabled={busy}
               onClick={() => void onCreateClientActa(client.id)}
-              className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-800 cursor-pointer"
+              className="rounded-lg border border-[#E5DFD2] bg-[#FFD6B0] px-2.5 py-1 text-[11px] font-bold text-[#4A2500] cursor-pointer"
             >
               + Crear Acta
             </button>
@@ -390,21 +473,23 @@ export function ClientProfileView({
               type="button"
               data-testid={`client-open-acta-${acta.id}`}
               onClick={() => onOpenActa?.(acta.id)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:border-terracotta transition-colors cursor-pointer"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
-                <div className="font-mono font-bold text-slate-900">{acta.codigo_acta}</div>
-                <div className="text-[11px] text-slate-500">
+                <div className="font-mono font-bold text-[#2C2621] tabular-nums">
+                  {acta.codigo_acta}
+                </div>
+                <div className="text-[11px] text-[#6B6860]">
                   {acta.especialidad} · {acta.fecha_emision_iso} · {acta.estado}
                 </div>
               </div>
-              <span className="shrink-0 text-[11px] font-semibold text-on-primary-container">
+              <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
                 Abrir →
               </span>
             </button>
           ))}
           {actas.length === 0 && (
-            <div className="text-slate-500">Sin actas técnicas para este cliente.</div>
+            <div className="text-[#6B6860]">Sin actas técnicas para este cliente.</div>
           )}
         </div>
       </section>

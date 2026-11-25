@@ -71,7 +71,7 @@ export function SubDayDurationPicker({
   };
 
   return (
-    <div className="space-y-2" data-testid="subday-duration-picker">
+    <div className="space-y-2 font-sans text-[#2C2621]" data-testid="subday-duration-picker">
       <div className="flex flex-wrap gap-1.5">
         {DURATION_PRESETS.map((preset) => {
           const active = !isFullDay && rawDiffMin === preset.minutes;
@@ -84,8 +84,8 @@ export function SubDayDurationPicker({
               onClick={() => handlePresetClick(preset.minutes)}
               className={`min-h-[36px] rounded-full border px-2.5 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50 ${
                 active
-                  ? "border-primary bg-primary text-white"
-                  : "border-outline-variant bg-surface-container-low text-on-surface"
+                  ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                  : "border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#EA580C]"
               }`}
             >
               {preset.label}
@@ -99,8 +99,8 @@ export function SubDayDurationPicker({
           onClick={handleFullDayClick}
           className={`min-h-[36px] rounded-full border px-2.5 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50 ${
             isFullDay
-              ? "border-primary bg-primary text-white"
-              : "border-outline-variant bg-surface-container-low text-on-surface"
+              ? "border-[#D04B00] bg-[#D04B00] text-white"
+              : "border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#EA580C]"
           }`}
         >
           Jornada completa ({computeHoursLabel(fullDayThousandths)})
@@ -109,7 +109,7 @@ export function SubDayDurationPicker({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+          <label className="block text-[11px] font-semibold text-[#6B6860] mb-1">
             Hora inicio
           </label>
           <input
@@ -137,11 +137,11 @@ export function SubDayDurationPicker({
                 isFullDay: fullDay,
               });
             }}
-            className="min-h-[40px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-[13px] font-semibold"
+            className="min-h-[40px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[13px] font-semibold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+          <label className="block text-[11px] font-semibold text-[#6B6860] mb-1">
             Hora fin
           </label>
           <input
@@ -163,14 +163,14 @@ export function SubDayDurationPicker({
                 isFullDay: fullDay,
               });
             }}
-            className="min-h-[40px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-2.5 text-[13px] font-semibold"
+            className="min-h-[40px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[13px] font-semibold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </div>
       </div>
 
-      <div className="text-[11px] font-medium text-on-surface-variant">
+      <div className="text-[11px] font-medium text-[#6B6860]">
         Duración prevista:{" "}
-        <strong className="text-on-surface">
+        <strong className="highlighter-yellow font-mono tabular-nums text-[#2C2621]">
           {rawDiffMin <= 0
             ? "Hora fin debe ser posterior a inicio"
             : computeHoursLabel(effectiveHoursThousandths)}

@@ -68,30 +68,30 @@ export function AuthScreen({
   return (
     <div
       data-testid="auth-screen"
-      className="min-h-dvh w-full bg-surface flex flex-col justify-center px-4 py-8 overflow-x-hidden"
+      className="min-h-dvh w-full cotton-paper text-[#2C2621] flex flex-col justify-center px-4 py-8 overflow-x-hidden"
     >
-      <div className="mx-auto w-full max-w-md rounded-[28px] border border-outline-variant bg-surface-container-lowest p-6 shadow-[0_12px_40px_rgba(15,23,42,0.08)] space-y-5">
+      <div className="clipboard-panel mx-auto w-full max-w-md rounded-[28px] border border-[#E5DFD2] bg-[#FFFDF7] p-6 space-y-5">
         {/* Cabecera identidad */}
         <div className="flex flex-col items-center text-center space-y-2.5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-terracotta text-white shadow-sm">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EA580C] text-[#FFFDF9] shadow-sm">
             <Wrench className="h-7 w-7" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-[22px] font-bold tracking-[-0.35px] text-on-surface">
+            <h1 className="font-sans text-[22px] font-bold tracking-[-0.35px] text-[#2C2621]">
               Gestor Autónomo
             </h1>
-            <p className="mt-0.5 text-[13px] text-on-surface-variant">
+            <p className="mt-0.5 text-[13px] text-[#6B6860]">
               Presupuestos, obras y facturas en tu bolsillo
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-success-container px-3 py-1 text-[11px] font-semibold text-on-success-container">
+          <span className="status-emerald inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold">
             <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
             <span>100% Local · Tus datos en tu dispositivo</span>
           </span>
         </div>
 
         {/* Selector Iniciar sesión / Crear cuenta */}
-        <div className="grid grid-cols-2 gap-1.5 rounded-full border border-outline-variant bg-surface-container-low p-1">
+        <div className="grid grid-cols-2 gap-1.5 rounded-full border border-[#E5DFD2] bg-[#F5F1E6] p-1">
           <button
             type="button"
             data-testid="auth-tab-login"
@@ -101,8 +101,8 @@ export function AuthScreen({
             }}
             className={`min-h-[42px] rounded-full text-xs font-semibold transition-colors cursor-pointer ${
               mode === "login"
-                ? "bg-secondary text-on-secondary"
-                : "text-on-surface-variant hover:text-on-surface"
+                ? "bg-[#4B7094] text-[#FFFDF9]"
+                : "text-[#6B6860] hover:text-[#2C2621]"
             }`}
           >
             Iniciar sesión
@@ -116,8 +116,8 @@ export function AuthScreen({
             }}
             className={`min-h-[42px] rounded-full text-xs font-semibold transition-colors cursor-pointer ${
               mode === "register"
-                ? "bg-secondary text-on-secondary"
-                : "text-on-surface-variant hover:text-on-surface"
+                ? "bg-[#4B7094] text-[#FFFDF9]"
+                : "text-[#6B6860] hover:text-[#2C2621]"
             }`}
           >
             Crear cuenta
@@ -128,7 +128,7 @@ export function AuthScreen({
           <div
             role="alert"
             data-testid="auth-error-banner"
-            className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 text-xs font-medium text-on-error-container break-words"
+            className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-xs font-medium text-[#5A121C] break-words"
           >
             {errorMsg}
           </div>
@@ -139,12 +139,12 @@ export function AuthScreen({
             <div>
               <label
                 htmlFor="auth-name"
-                className="block text-xs font-semibold text-on-surface-variant mb-1"
+                className="block text-xs font-semibold text-[#6B6860] mb-1"
               >
                 Tu nombre o empresa *
               </label>
-              <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-low px-3.5 focus-within:border-terracotta">
-                <User className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
+              <div className="flex items-center gap-2 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 focus-within:border-[#EA580C]">
+                <User className="h-4 w-4 shrink-0 text-[#6B6860]" aria-hidden="true" />
                 <input
                   id="auth-name"
                   data-testid="auth-name-input"
@@ -154,7 +154,7 @@ export function AuthScreen({
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Ej: Instalaciones Morales"
-                  className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-on-surface placeholder:text-outline focus:outline-none"
+                  className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:outline-none"
                 />
               </div>
             </div>
@@ -163,12 +163,12 @@ export function AuthScreen({
           <div>
             <label
               htmlFor="auth-email"
-              className="block text-xs font-semibold text-on-surface-variant mb-1"
+              className="block text-xs font-semibold text-[#6B6860] mb-1"
             >
               Correo electrónico *
             </label>
-            <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-low px-3.5 focus-within:border-terracotta">
-              <Mail className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
+            <div className="flex items-center gap-2 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 focus-within:border-[#EA580C]">
+              <Mail className="h-4 w-4 shrink-0 text-[#6B6860]" aria-hidden="true" />
               <input
                 id="auth-email"
                 data-testid="auth-email-input"
@@ -178,7 +178,7 @@ export function AuthScreen({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@correo.es"
-                className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-on-surface placeholder:text-outline focus:outline-none"
+                className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:outline-none"
               />
             </div>
           </div>
@@ -186,12 +186,12 @@ export function AuthScreen({
           <div>
             <label
               htmlFor="auth-password"
-              className="block text-xs font-semibold text-on-surface-variant mb-1"
+              className="block text-xs font-semibold text-[#6B6860] mb-1"
             >
               Contraseña *
             </label>
-            <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-low px-3.5 focus-within:border-terracotta">
-              <Lock className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
+            <div className="flex items-center gap-2 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 focus-within:border-[#EA580C]">
+              <Lock className="h-4 w-4 shrink-0 text-[#6B6860]" aria-hidden="true" />
               <input
                 id="auth-password"
                 data-testid="auth-password-input"
@@ -201,13 +201,13 @@ export function AuthScreen({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-on-surface placeholder:text-outline focus:outline-none"
+                className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:outline-none"
               />
               <button
                 type="button"
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 onClick={() => setShowPassword((v) => !v)}
-                className="p-1.5 text-outline hover:text-on-surface cursor-pointer"
+                className="p-1.5 text-[#6B6860] hover:text-[#2C2621] cursor-pointer"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -218,12 +218,12 @@ export function AuthScreen({
             <div>
               <label
                 htmlFor="auth-password-confirm"
-                className="block text-xs font-semibold text-on-surface-variant mb-1"
+                className="block text-xs font-semibold text-[#6B6860] mb-1"
               >
                 Repetir contraseña *
               </label>
-              <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-low px-3.5 focus-within:border-terracotta">
-                <Lock className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
+              <div className="flex items-center gap-2 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 focus-within:border-[#EA580C]">
+                <Lock className="h-4 w-4 shrink-0 text-[#6B6860]" aria-hidden="true" />
                 <input
                   id="auth-password-confirm"
                   data-testid="auth-password-confirm-input"
@@ -233,7 +233,7 @@ export function AuthScreen({
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repite tu contraseña"
-                  className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-on-surface placeholder:text-outline focus:outline-none"
+                  className="min-h-[46px] w-full min-w-0 bg-transparent text-[14px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:outline-none"
                 />
               </div>
             </div>
@@ -243,7 +243,7 @@ export function AuthScreen({
             type="submit"
             data-testid="auth-submit-btn"
             disabled={busy}
-            className="min-h-[50px] w-full rounded-2xl bg-primary hover:bg-terracotta text-[14px] font-semibold text-white shadow-sm disabled:opacity-50 cursor-pointer"
+            className="min-h-[50px] w-full rounded-2xl bg-[#D04B00] hover:bg-[#EA580C] text-[14px] font-semibold text-[#FFFDF9] shadow-sm disabled:opacity-50 cursor-pointer transition-colors"
           >
             {busy
               ? "Accediendo..."
@@ -253,7 +253,7 @@ export function AuthScreen({
           </button>
         </form>
 
-        <p className="text-center text-[11px] leading-relaxed text-on-surface-variant">
+        <p className="text-center text-[11px] leading-relaxed text-[#6B6860]">
           Tu cuenta y todos tus presupuestos, clientes y facturas se guardan cifrados y en local dentro de este dispositivo.
         </p>
       </div>

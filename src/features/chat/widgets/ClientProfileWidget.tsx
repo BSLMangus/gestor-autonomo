@@ -150,26 +150,26 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
   return (
     <section
       data-testid="client-profile-widget"
-      className="w-full max-w-full overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900 space-y-3"
+      className="w-full max-w-full overflow-x-hidden ruled-index rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 text-[#2C2621] font-sans space-y-3"
     >
-      <div className="border-b border-slate-100 pb-2.5">
-        <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900">
+      <div className="border-b border-[#E5DFD2] pb-2.5">
+        <span className="inline-flex items-center rounded-sm paper-stamp status-violet px-2.5 py-0.5 text-[11px] font-semibold">
           {isEditing ? "Editar ficha de cliente" : "Alta de cliente"}
         </span>
-        <h3 className="mt-1 text-base font-bold text-slate-900">
+        <h3 className="mt-1.5 text-base font-bold text-[#2C2621]">
           {name.trim() || "Nuevo cliente"}
         </h3>
       </div>
 
       {payload.validation_hint && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs font-medium text-amber-950">
+        <div className="rounded-xl border border-[#D97706]/35 bg-[#FFF3A1] p-2.5 text-xs font-medium text-[#3E3300]">
           {payload.validation_hint}
         </div>
       )}
 
       <div className="space-y-2.5">
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-name">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-name">
             Nombre o razón social *
           </label>
           <input
@@ -180,13 +180,13 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ej: Laura Méndez Ruiz"
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-phone">
+            <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-phone">
               Teléfono
             </label>
             <input
@@ -197,11 +197,11 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+34 600 123 456"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-nif">
+            <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-nif">
               NIF / NIE / CIF (opcional)
             </label>
             <input
@@ -212,13 +212,13 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
               value={nif}
               onChange={(e) => setNif(e.target.value.toUpperCase())}
               placeholder="Ej: 12345678Z"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-address">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-address">
             Domicilio fiscal / obra
           </label>
           <ZoomableTextField
@@ -232,12 +232,12 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
             value={fiscalAddress}
             onValueChange={setFiscalAddress}
             placeholder="Calle, número, código postal y ciudad"
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-email">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-email">
             Correo electrónico
           </label>
           <input
@@ -248,12 +248,12 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="cliente@ejemplo.local"
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="cpw-notes">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="cpw-notes">
             Notas internas
           </label>
           <ZoomableTextField
@@ -268,7 +268,7 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
             value={notes}
             onValueChange={setNotes}
             placeholder="Horarios de acceso, preferencias de facturación..."
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
       </div>
@@ -276,7 +276,7 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-medium text-rose-800"
+          className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 text-xs font-medium text-[#5A121C]"
         >
           {errorMsg}
         </div>
@@ -288,7 +288,7 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
           data-testid="client-widget-cancel-btn"
           disabled={disabled}
           onClick={() => runtime.onDismissOverlay?.()}
-          className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+          className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
         >
           Cancelar
         </button>
@@ -297,7 +297,7 @@ export function ClientProfileWidget({ widget, runtime, isSubmitting }: WidgetCom
           data-testid="client-widget-save-btn"
           disabled={disabled}
           onClick={() => void handleSave()}
-          className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+          className="min-h-12 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
         >
           {busy ? "Guardando ficha..." : isEditing ? "Guardar cambios" : "Guardar cliente"}
         </button>

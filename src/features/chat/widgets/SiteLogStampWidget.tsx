@@ -256,14 +256,14 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
   return (
     <section
       data-testid="sitelog-stamp-widget"
-      className="mt-2 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm text-slate-900 space-y-3"
+      className="mt-2 paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-[#2C2621] font-sans space-y-3"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+      <div className="flex items-center justify-between gap-2 border-b border-[#E5DFD2] pb-2">
         <div>
-          <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-900">
+          <span className="inline-flex items-center rounded-sm paper-stamp status-cobalt px-2.5 py-0.5 text-[11px] font-semibold">
             Diario de Obra · Sello Local
           </span>
-          <h3 className="mt-1 text-sm font-bold text-slate-900">
+          <h3 className="mt-1.5 text-sm font-bold text-[#2C2621]">
             {createNewJob
               ? "Nueva obra rápida + entrada diario"
               : activeJobObj
@@ -275,7 +275,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
 
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700">Obra destino</span>
+          <span className="text-xs font-semibold text-[#2C2621]">Obra destino</span>
           <button
             type="button"
             disabled={busy}
@@ -286,7 +286,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
                 setCreateNewJob(true);
               }
             }}
-            className="text-xs font-semibold text-orange-700"
+            className="text-xs font-semibold text-[#D04B00]"
           >
             {createNewJob ? "Usar obra existente" : "+ Crear obra rápida"}
           </button>
@@ -299,7 +299,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             disabled={busy}
             value={selectedJobId}
             onChange={(e) => setSelectedJobId(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+            className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
           >
             <option value="">-- Seleccionar obra --</option>
             {jobs.map((j) => (
@@ -309,7 +309,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             ))}
           </select>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+          <div className="ruled-index rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 space-y-2">
             <input
               type="text"
               data-testid="sitelog-new-job-title"
@@ -317,7 +317,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
               placeholder="Título de nueva obra *"
               value={newJobTitle}
               onChange={(e) => setNewJobTitle(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+              className="w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
             <ZoomableTextField
               as="input"
@@ -329,7 +329,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
               placeholder="Dirección / Ubicación (opcional)"
               value={newJobAddress}
               onValueChange={setNewJobAddress}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+              className="w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
         )}
@@ -344,8 +344,8 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
               onClick={() => setCategory(cat)}
               className={`min-h-9 rounded-xl px-3 text-xs font-bold capitalize ${
                 category === cat
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-700"
+                  ? "bg-[#4B7094] text-[#FFFDF9]"
+                  : "bg-[#F5F1E6] border border-[#E5DFD2] text-[#2C2621]"
               }`}
             >
               {cat}
@@ -354,7 +354,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="sl-note">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="sl-note">
             Nota técnica de obra
           </label>
           <ZoomableTextField
@@ -369,14 +369,14 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             value={noteText}
             onValueChange={setNoteText}
             placeholder="Describe el avance, materiales o estado observado..."
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
 
         {previewUrl && (
-          <div className="relative overflow-hidden rounded-xl border border-slate-200">
+          <div className="relative overflow-hidden rounded-xl border border-[#E5DFD2] bg-[#FFFDF7]">
             <img src={previewUrl} alt="Foto de diario" className="max-h-40 w-full object-cover" />
-            <div className="bg-slate-900/85 px-2.5 py-1 text-[10px] font-semibold text-white">
+            <div className="border-t border-[#E5DFD2] bg-[#FFFDF7]/95 px-2.5 py-1 text-[10px] font-mono-nums font-semibold text-[#2C2621]">
               GESTOR AUTÓNOMO · {activeJobObj?.job_code ?? (newJobTitle || "NUEVA OBRA")} ·{" "}
               {sl.stamp_preview_meta.timestamp_iso}
             </div>
@@ -384,7 +384,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
         )}
 
         {errorMsg && (
-          <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
+          <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2 text-xs text-[#5A121C]">
             {errorMsg}
           </div>
         )}
@@ -392,7 +392,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
         {savedBanner && (
           <div
             data-testid="sitelog-saved-banner"
-            className="rounded-xl border border-emerald-300 bg-emerald-50 p-2 text-xs font-semibold text-emerald-900"
+            className="rounded-xl border border-[#059669]/30 bg-[#D4EDDA] p-2 text-xs font-semibold text-[#1B3A24]"
           >
             {savedBanner}
           </div>
@@ -404,7 +404,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             data-testid="sitelog-cancel-btn"
             disabled={busy}
             onClick={() => void handleDiscardWidget()}
-            className="min-h-12 rounded-xl border border-rose-300 bg-white px-3.5 text-xs font-bold text-rose-700"
+            className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-3.5 text-xs font-bold text-[#9A2D08]"
           >
             Descartar
           </button>
@@ -412,7 +412,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             type="button"
             disabled={busy}
             onClick={() => void handleCapturePhoto()}
-            className="min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800"
+            className="min-h-12 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-xs font-bold text-[#2C2621]"
           >
             {mediaUri ? "Cambiar foto" : "Adjuntar foto"}
           </button>
@@ -421,7 +421,7 @@ export function SiteLogStampWidget({ widget, runtime }: WidgetCommonProps) {
             data-testid="sitelog-save-btn"
             disabled={busy || Boolean(savedBanner)}
             onClick={() => void handleSave()}
-            className="min-h-12 flex-1 rounded-xl bg-sky-700 px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+            className="min-h-12 flex-1 rounded-xl bg-[#4B7094] px-4 text-sm font-bold text-[#FFFDF9] shadow-sm disabled:opacity-50"
           >
             {busy ? "Sellando y guardando..." : savedBanner ? "Guardado" : "Guardar en diario"}
           </button>

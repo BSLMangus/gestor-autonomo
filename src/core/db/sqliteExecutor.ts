@@ -302,6 +302,11 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
         `ALTER TABLE app_settings ADD COLUMN emitter_iban TEXT NOT NULL DEFAULT '';`
       );
     }
+    if (!cols.some((c) => c.name === "emitter_bank_name")) {
+      await executor.run(
+        `ALTER TABLE app_settings ADD COLUMN emitter_bank_name TEXT NOT NULL DEFAULT '';`
+      );
+    }
     if (!cols.some((c) => c.name === "emitter_logo_data_url")) {
       await executor.run(
         `ALTER TABLE app_settings ADD COLUMN emitter_logo_data_url TEXT;`
@@ -410,22 +415,64 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
     const clientCol = quoteCols.find((c) => c.name === "client_id");
     if (clientCol && Number(clientCol.notnull) === 1) {
       await rebuildLegacyQuotesTable(executor, quoteCols);
-    } else {
-      if (!quoteCols.some((c) => c.name === "validity_days")) {
-        await executor.run(
-          `ALTER TABLE quotes ADD COLUMN validity_days INTEGER CHECK (validity_days IS NULL OR (validity_days BETWEEN 1 AND 365));`
-        );
-      }
-      if (!quoteCols.some((c) => c.name === "payment_methods_json")) {
-        await executor.run(
-          `ALTER TABLE quotes ADD COLUMN payment_methods_json TEXT NOT NULL DEFAULT '[]';`
-        );
-      }
-      if (!quoteCols.some((c) => c.name === "payment_schedule_json")) {
-        await executor.run(
-          `ALTER TABLE quotes ADD COLUMN payment_schedule_json TEXT NOT NULL DEFAULT '[]';`
-        );
-      }
+    }
+    const currentQuoteCols = await executor.query<{ name: string }>(
+      `PRAGMA table_info(quotes)`
+    );
+    if (!currentQuoteCols.some((c) => c.name === "validity_days")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN validity_days INTEGER CHECK (validity_days IS NULL OR (validity_days BETWEEN 1 AND 365));`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "payment_methods_json")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN payment_methods_json TEXT NOT NULL DEFAULT '[]';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "payment_schedule_json")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN payment_schedule_json TEXT NOT NULL DEFAULT '[]';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "general_description")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN general_description TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "estimated_duration_value")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN estimated_duration_value REAL CHECK (estimated_duration_value IS NULL OR estimated_duration_value > 0);`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "estimated_duration_unit")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN estimated_duration_unit TEXT NOT NULL DEFAULT 'dias_laborables' CHECK (estimated_duration_unit IN ('dias_laborables', 'semanas'));`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "payment_terms_text")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN payment_terms_text TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "iban_override")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN iban_override TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "bank_name")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN bank_name TEXT NOT NULL DEFAULT '';`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "show_iban")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN show_iban INTEGER NOT NULL DEFAULT 1 CHECK (show_iban IN (0, 1));`
+      );
+    }
+    if (!currentQuoteCols.some((c) => c.name === "attachments_json")) {
+      await executor.run(
+        `ALTER TABLE quotes ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]';`
+      );
     }
   }
 }

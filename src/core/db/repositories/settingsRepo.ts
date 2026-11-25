@@ -38,6 +38,7 @@ interface RawAppSettingsRow extends Record<string, unknown> {
   emitter_fiscal_address: string;
   emitter_phone: string;
   emitter_iban?: string;
+  emitter_bank_name?: string;
   emitter_logo_data_url?: string | null;
   active_account_id?: string | null;
   last_active_thread_id: string | null;
@@ -112,6 +113,7 @@ function mapSettingsRow(row: RawAppSettingsRow): AppSettingsRecord {
     emitter_fiscal_address: row.emitter_fiscal_address,
     emitter_phone: row.emitter_phone,
     emitter_iban: row.emitter_iban ?? "",
+    emitter_bank_name: row.emitter_bank_name ?? "",
     emitter_logo_data_url: row.emitter_logo_data_url ?? null,
     active_account_id: row.active_account_id ?? null,
     last_active_thread_id: row.last_active_thread_id,
@@ -405,38 +407,38 @@ export class SettingsRepository {
     const parsed = EmitterProfileInputSchema.parse(input);
     const now = Date.now();
     await this.getAppSettings();
-    if (parsed.emitter_logo_data_url !== undefined) {
-      await this.executor.run(
-        `UPDATE app_settings
-         SET emitter_name = ?, emitter_nif = ?, emitter_fiscal_address = ?, emitter_phone = ?,
-             emitter_iban = ?, emitter_logo_data_url = ?, updated_at_ms = ?
-         WHERE id = 1`,
-        [
-          parsed.emitter_name,
-          parsed.emitter_nif,
-          parsed.emitter_fiscal_address,
-          parsed.emitter_phone,
-          parsed.emitter_iban,
-          parsed.emitter_logo_data_url,
-          now,
-        ]
-      );
-    } else {
-      await this.executor.run(
-        `UPDATE app_settings
-         SET emitter_name = ?, emitter_nif = ?, emitter_fiscal_address = ?, emitter_phone = ?,
-             emitter_iban = ?, updated_at_ms = ?
-         WHERE id = 1`,
-        [
-          parsed.emitter_name,
-          parsed.emitter_nif,
-          parsed.emitter_fiscal_address,
-          parsed.emitter_phone,
-          parsed.emitter_iban,
-          now,
-        ]
-      );
+    const setClauses: string[] = [
+      "emitter_name = ?",
+      "emitter_nif = ?",
+      "emitter_fiscal_address = ?",
+      "emitter_phone = ?",
+      "emitter_iban = ?",
+    ];
+    const params: unknown[] = [
+      parsed.emitter_name,
+      parsed.emitter_nif,
+      parsed.emitter_fiscal_address,
+      parsed.emitter_phone,
+      parsed.emitter_iban,
+    ];
+    if (parsed.emitter_bank_name !== undefined) {
+      setClauses.push("emitter_bank_name = ?");
+      params.push(parsed.emitter_bank_name);
     }
+    if (parsed.emitter_email !== undefined) {
+      setClauses.push("emitter_email = ?");
+      params.push(parsed.emitter_email);
+    }
+    if (parsed.emitter_logo_data_url !== undefined) {
+      setClauses.push("emitter_logo_data_url = ?");
+      params.push(parsed.emitter_logo_data_url);
+    }
+    setClauses.push("updated_at_ms = ?");
+    params.push(now);
+    await this.executor.run(
+      `UPDATE app_settings SET ${setClauses.join(", ")} WHERE id = 1`,
+      params
+    );
     return this.getAppSettings();
   }
 

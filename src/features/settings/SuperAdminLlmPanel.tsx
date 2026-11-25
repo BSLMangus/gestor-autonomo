@@ -220,14 +220,14 @@ export function SuperAdminLlmPanel({
   return (
     <section
       data-testid="superadmin-llm-panel"
-      className="rounded-2xl border-2 border-indigo-400 bg-slate-900 p-3.5 text-slate-100 space-y-3"
+      className="paper-sheet rounded-2xl border-2 border-[#8B5CF6]/40 bg-[#FFFDF7] p-3.5 text-[#2C2621] space-y-3 font-sans"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-slate-700 pb-2">
+      <div className="flex items-center justify-between gap-2 border-b border-[#E5DFD2] pb-2.5">
         <div>
-          <span className="inline-flex rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300">
+          <span className="paper-stamp status-violet inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold">
             SUPER ADMIN · IA Nativa
           </span>
-          <h3 className="mt-1 text-sm font-extrabold text-white">
+          <h3 className="mt-1.5 text-sm font-bold text-[#2C2621]">
             Consola de Modelos Locales
           </h3>
         </div>
@@ -235,59 +235,59 @@ export function SuperAdminLlmPanel({
           type="button"
           data-testid="superadmin-logout-btn"
           onClick={onLockAdminSession}
-          className="min-h-9 rounded-xl border border-slate-600 bg-slate-800 px-3 text-[11px] font-bold text-slate-200"
+          className="min-h-9 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-[11px] font-bold text-[#2C2621] cursor-pointer"
         >
           Cerrar sesión
         </button>
       </div>
 
       {adminMsg && (
-        <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-2 text-[11px] text-emerald-200">
+        <div className="rounded-xl status-emerald p-2.5 text-[11px] font-semibold">
           {adminMsg}
         </div>
       )}
       {adminErr && (
-        <div role="alert" className="rounded-xl border border-rose-500/50 bg-rose-950/70 p-2 text-[11px] text-rose-200">
+        <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 text-[11px] font-semibold text-[#5A121C]">
           {adminErr}
         </div>
       )}
 
       {/* Telemetría del dispositivo */}
-      <div className="rounded-xl bg-slate-800/80 p-2.5 text-[11px] space-y-1 font-mono">
-        <div>Plataforma: <span className="text-emerald-300">{nativeStatus.platform}</span></div>
+      <div className="ruled-index rounded-xl border border-[#E5DFD2] p-2.5 text-[11px] space-y-1 font-mono tabular-nums text-[#2C2621]">
+        <div>Plataforma: <span className="font-bold text-[#059669]">{nativeStatus.platform}</span></div>
         <div>
           RAM detectada:{" "}
-          <span className="text-emerald-300">
+          <span className="font-bold text-[#059669]">
             {nativeStatus.deviceRamGb !== undefined ? `${nativeStatus.deviceRamGb} GB` : "No reportada"}
           </span>{" "}
-          · Tier Auto Android: <span className="text-amber-300">{ANDROID_MODEL_FILENAMES[autoTier].label}</span>
+          · Tier Auto Android: <span className="font-bold text-[#D97706]">{ANDROID_MODEL_FILENAMES[autoTier].label}</span>
         </div>
         <div>
-          Estado: <span className="text-sky-300">{nativeStatus.readiness}</span> · Runner activo:{" "}
-          <span className="text-sky-300">{inferenceAdapter.hasLlmRunner() ? "Sí" : "No"}</span>
+          Estado: <span className="font-bold text-[#4B7094]">{nativeStatus.readiness}</span> · Runner activo:{" "}
+          <span className="font-bold text-[#4B7094]">{inferenceAdapter.hasLlmRunner() ? "Sí" : "No"}</span>
         </div>
-        <div className="truncate">Ruta activa: {nativeStatus.activeModelPath ?? "ninguna"}</div>
+        <div className="truncate text-[#6B6860]">Ruta activa: {nativeStatus.activeModelPath ?? "ninguna"}</div>
         {nativeStatus.readiness === "downloading" && nativeStatus.progress !== null && (
           <div className="pt-1">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE4]">
               <div
-                className="h-full bg-indigo-400 transition-all"
+                className="h-full bg-[#EA580C] transition-all"
                 style={{ width: `${nativeStatus.progress}%` }}
               />
             </div>
-            <div className="mt-0.5 text-[10px] text-indigo-300">Descargando: {nativeStatus.progress}%</div>
+            <div className="mt-0.5 text-[10px] font-semibold text-[#4C1D95]">Descargando: {nativeStatus.progress}%</div>
           </div>
         )}
       </div>
 
       <form onSubmit={(e) => void handleSaveOnly(e)} className="space-y-2">
         <label className="block space-y-1">
-          <span className="text-[11px] font-bold text-slate-300">Estrategia activa</span>
+          <span className="text-[11px] font-bold text-[#2C2621]">Estrategia activa</span>
           <select
             data-testid="superadmin-strategy-select"
             value={strategy}
             onChange={(e) => setStrategy(e.target.value as LlmStrategyOverride)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           >
             {STRATEGY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -298,7 +298,7 @@ export function SuperAdminLlmPanel({
         </label>
 
         <div className="space-y-1.5">
-          <span className="block text-[11px] font-bold text-slate-300">
+          <span className="block text-[11px] font-bold text-[#2C2621]">
             Android Tier &lt; 8 GB (Gemma 3 270M)
           </span>
           <input
@@ -306,19 +306,19 @@ export function SuperAdminLlmPanel({
             placeholder="URL .task (270M)"
             value={url270m}
             onChange={(e) => setUrl270m(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 font-mono text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <input
             type="url"
             placeholder="URL .litertlm opcional (270M)"
             value={comp270m}
             onChange={(e) => setComp270m(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 font-mono text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
         </div>
 
         <div className="space-y-1.5">
-          <span className="block text-[11px] font-bold text-slate-300">
+          <span className="block text-[11px] font-bold text-[#2C2621]">
             Android Tier &gt;= 8 GB (Gemma 3 1B)
           </span>
           <input
@@ -326,54 +326,54 @@ export function SuperAdminLlmPanel({
             placeholder="URL .task (1B)"
             value={url1b}
             onChange={(e) => setUrl1b(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 font-mono text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <input
             type="url"
             placeholder="URL .litertlm opcional (1B)"
             value={comp1b}
             onChange={(e) => setComp1b(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 font-mono text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
         </div>
 
         <label className="block space-y-1">
-          <span className="text-[11px] font-bold text-slate-300">URI WebGPU (solo modo Forzar WebGPU)</span>
+          <span className="text-[11px] font-bold text-[#2C2621]">URI WebGPU (solo modo Forzar WebGPU)</span>
           <input
             type="text"
             placeholder="assets/models/llm.task"
             value={customUri}
             onChange={(e) => setCustomUri(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 font-mono text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
         </label>
 
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1">
-            <span className="text-[10px] text-slate-400">maxTokens</span>
+            <span className="text-[10px] font-semibold text-[#6B6860]">maxTokens</span>
             <input
               type="number"
               value={maxTokens}
               onChange={(e) => setMaxTokens(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white"
+              className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1.5 font-mono-nums text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-[10px] text-slate-400">Temp.</span>
+            <span className="text-[10px] font-semibold text-[#6B6860]">Temp.</span>
             <input
               type="text"
               value={temperatureStr}
               onChange={(e) => setTemperatureStr(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white"
+              className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1.5 font-mono-nums text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-[10px] text-slate-400">topK</span>
+            <span className="text-[10px] font-semibold text-[#6B6860]">topK</span>
             <input
               type="number"
               value={topk}
               onChange={(e) => setTopk(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-white"
+              className="min-h-[38px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1.5 font-mono-nums text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </label>
         </div>
@@ -383,7 +383,7 @@ export function SuperAdminLlmPanel({
             type="submit"
             data-testid="superadmin-save-btn"
             disabled={busy}
-            className="min-h-10 rounded-xl bg-slate-700 font-bold text-white"
+            className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-bold text-[#2C2621] cursor-pointer"
           >
             Guardar config
           </button>
@@ -392,7 +392,7 @@ export function SuperAdminLlmPanel({
             data-testid="superadmin-apply-btn"
             disabled={busy}
             onClick={() => void handleApplyAndDownload()}
-            className="min-h-10 rounded-xl bg-indigo-600 font-bold text-white"
+            className="min-h-[42px] rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
           >
             Descargar / Aplicar
           </button>
@@ -404,28 +404,28 @@ export function SuperAdminLlmPanel({
         data-testid="superadmin-delete-btn"
         disabled={busy}
         onClick={() => void handleDeleteLocalModel()}
-        className="min-h-9 w-full rounded-xl border border-rose-500/50 bg-rose-950/50 font-bold text-rose-200"
+        className="min-h-10 w-full rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] font-bold text-[#5A121C] cursor-pointer"
       >
         Borrar modelo descargado del dispositivo
       </button>
 
       {/* Prueba rápida */}
-      <div className="space-y-1.5 border-t border-slate-700 pt-2">
-        <span className="block text-[11px] font-bold text-slate-300">Probar inferencia</span>
+      <div className="space-y-1.5 border-t border-[#E5DFD2] pt-2.5">
+        <span className="block text-[11px] font-bold text-[#2C2621]">Probar inferencia</span>
         <div className="flex gap-1.5">
           <input
             type="text"
             data-testid="superadmin-test-prompt-input"
             value={testPrompt}
             onChange={(e) => setTestPrompt(e.target.value)}
-            className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-white"
+            className="min-h-[40px] flex-1 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
           <button
             type="button"
             data-testid="superadmin-test-prompt-btn"
             disabled={busy}
             onClick={() => void handleQuickPromptTest()}
-            className="rounded-xl bg-emerald-600 px-3 py-1.5 font-bold text-white"
+            className="min-h-[40px] rounded-xl bg-[#059669] px-3 py-1.5 font-bold text-white cursor-pointer"
           >
             Probar
           </button>
@@ -433,7 +433,7 @@ export function SuperAdminLlmPanel({
         {testOutput && (
           <pre
             data-testid="superadmin-test-output"
-            className="max-h-40 overflow-auto rounded-xl bg-slate-950 p-2 text-[10px] text-emerald-300"
+            className="max-h-40 overflow-auto rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 font-mono text-[10px] text-[#1B3A24]"
           >
             {testOutput}
           </pre>

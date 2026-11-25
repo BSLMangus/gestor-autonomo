@@ -102,7 +102,7 @@ function SiteLogThumbnail({
     <img
       src={url}
       alt={alt}
-      className="mt-1.5 max-h-36 w-full rounded-lg object-cover border border-slate-200"
+      className="mt-1.5 max-h-36 w-full rounded-lg object-cover border border-[#E5DFD2]"
     />
   );
 }
@@ -254,18 +254,18 @@ export function JobDetailDrawer({
   return (
     <div
       data-testid="job-detail-drawer"
-      className="fixed inset-0 z-50 flex flex-col bg-secondary/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex flex-col bg-[#2C2621]/45 backdrop-blur-[1px] font-sans text-[#2C2621]"
       role="dialog"
       aria-modal="true"
       aria-label="Detalle de obra"
     >
-      <div className="mx-auto mt-8 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-outline-variant bg-surface-container-lowest shadow-2xl">
-        <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3.5">
+      <div className="clipboard-panel mx-auto mt-8 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-[#E5DFD2] bg-[#FFFDF7] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#E5DFD2] bg-[#F5F1E6] rounded-t-[24px] px-4 py-3.5">
           <div className="min-w-0">
-            <div className="font-mono text-[11px] font-semibold text-on-primary-container">
+            <div className="font-mono font-mono-nums text-[11px] font-semibold text-[#4A2500] tabular-nums">
               {job?.job_code ?? jobId}
             </div>
-            <h3 className="truncate text-[16px] font-semibold text-on-surface">
+            <h3 className="truncate text-[16px] font-semibold text-[#2C2621]">
               {job?.title ?? "Cargando obra..."}
             </h3>
           </div>
@@ -273,41 +273,51 @@ export function JobDetailDrawer({
             type="button"
             data-testid="close-job-detail-btn"
             onClick={onClose}
-            className="h-10 w-10 rounded-full text-sm font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer"
+            className="h-10 w-10 rounded-full text-sm font-bold text-[#6B6860] hover:bg-[#EFECE4] cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 text-xs">
+        <div className="cotton-paper flex-1 overflow-y-auto no-scrollbar bg-[#F9F7F2] p-4 space-y-4 text-xs">
           {errorMsg && (
-            <div role="alert" className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 text-on-error-container">
+            <div role="alert" className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-[#5A121C]">
               {errorMsg}
             </div>
           )}
           {scheduleSavedMsg && (
-            <div className="rounded-2xl border border-outline-variant bg-success-container p-3 font-semibold text-on-success-container">
+            <div className="rounded-2xl border border-[#059669]/30 bg-[#D4EDDA] p-3 font-semibold text-[#1B3A24]">
               {scheduleSavedMsg}
             </div>
           )}
 
           {job && (
             <>
-              <div className="rounded-[20px] border border-outline-variant bg-surface-warm-card p-4 space-y-2.5">
+              <div className="postit-note postit-blue p-4 space-y-2.5 text-[#143552]">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-on-surface-variant">Estado de obra:</span>
-                  <span className="rounded-full bg-secondary px-2.5 py-0.5 font-semibold text-on-secondary uppercase text-[10px]">
+                  <span className="font-semibold text-[#143552]">Estado de obra:</span>
+                  <span
+                    className={`paper-stamp rounded px-2.5 py-0.5 font-semibold uppercase text-[10px] ${
+                      job.status === "en_curso"
+                        ? "status-emerald"
+                        : job.status === "finalizado"
+                          ? "status-cobalt"
+                          : job.status === "cancelado"
+                            ? "status-tangerine"
+                            : "status-gold"
+                    }`}
+                  >
                     {job.status}
                   </span>
                 </div>
-                <div className="text-on-surface">
+                <div className="text-[#2C2621]">
                   Cliente:{" "}
                   {client && onOpenClient ? (
                     <button
                       type="button"
                       data-testid="job-detail-open-client-btn"
                       onClick={() => onOpenClient(client.id)}
-                      className="font-semibold text-on-primary-container underline underline-offset-2 cursor-pointer"
+                      className="font-semibold text-[#143552] underline underline-offset-2 cursor-pointer"
                     >
                       {client.name} →
                     </button>
@@ -315,7 +325,7 @@ export function JobDetailDrawer({
                     <strong>{client?.name ?? "Sin cliente asignado"}</strong>
                   )}
                 </div>
-                {job.address && <div className="text-on-surface-variant">{job.address}</div>}
+                {job.address && <div className="text-[#143552]/90">{job.address}</div>}
 
                 {(job.status !== "cancelado" || transitionOptions.length > 0) && (
                   <div className="flex flex-wrap gap-2 pt-2">
@@ -325,7 +335,7 @@ export function JobDetailDrawer({
                         data-testid="job-detail-start-quote-btn"
                         disabled={busy}
                         onClick={() => void onStartJobQuote(job.id)}
-                        className="min-h-[44px] rounded-xl bg-primary hover:bg-terracotta px-3.5 font-semibold text-white cursor-pointer"
+                        className="min-h-[44px] rounded-xl bg-[#D04B00] hover:bg-[#EA580C] px-3.5 font-semibold text-white cursor-pointer shadow-xs"
                       >
                         + Presupuesto en chat
                       </button>
@@ -341,7 +351,7 @@ export function JobDetailDrawer({
                             await new JobsRepository(executor).transitionStatus(job.id, st);
                           })
                         }
-                        className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-lowest px-3 font-semibold text-on-surface hover:border-terracotta cursor-pointer"
+                        className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
                       >
                         Pasar a {st}
                       </button>
@@ -351,13 +361,13 @@ export function JobDetailDrawer({
               </div>
 
               {/* Planificación en Agenda y Calendario */}
-              <div className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-2.5">
+              <div className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-[13px] font-semibold text-on-surface">
+                  <h4 className="text-[13px] font-semibold text-[#2C2621]">
                     Planificación y horas en calendario
                   </h4>
                   {scheduleSummary && scheduleSummary.planned_days > 0 && (
-                    <span className="font-mono text-[11px] font-semibold rounded-full bg-terracotta-soft px-2.5 py-0.5 text-on-primary-container tabular-nums">
+                    <span className="font-mono font-mono-nums text-[11px] font-semibold rounded-full status-tangerine px-2.5 py-0.5 tabular-nums">
                       {scheduleSummary.planned_days} días · {(scheduleSummary.planned_hours_thousandths / 1000).toFixed(1).replace(/\.0$/, "")} h
                     </span>
                   )}
@@ -418,7 +428,7 @@ export function JobDetailDrawer({
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-on-surface-variant">Inicio</span>
+                    <span className="text-[11px] font-semibold text-[#6B6860]">Inicio</span>
                     <input
                       type="date"
                       data-testid="job-detail-start-date"
@@ -430,23 +440,23 @@ export function JobDetailDrawer({
                           setEditEndDate(next);
                         }
                       }}
-                      className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
+                      className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[12px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-on-surface-variant">Fin</span>
+                    <span className="text-[11px] font-semibold text-[#6B6860]">Fin</span>
                     <input
                       type="date"
                       data-testid="job-detail-end-date"
                       value={editEndDate}
                       onChange={(e) => setEditEndDate(e.target.value)}
-                      className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
+                      className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[12px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                     />
                   </label>
                 </div>
 
                 {editStartDate && (!editEndDate || editStartDate === editEndDate) && (
-                  <div className="rounded-xl border border-outline-variant bg-surface-container-low/60 p-3">
+                  <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
                     <SubDayDurationPicker
                       startTime={planStartTime}
                       endTime={planEndTime}
@@ -462,14 +472,14 @@ export function JobDetailDrawer({
                 )}
 
                 {scheduleSummary && scheduleSummary.logged_days > 0 && (
-                  <div className="rounded-xl bg-surface-container-low px-3 py-2 flex items-center justify-between text-[11px]">
-                    <span className="text-on-surface-variant">
+                  <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 flex items-center justify-between text-[11px]">
+                    <span className="text-[#6B6860]">
                       Registrado ({scheduleSummary.logged_days} días):{" "}
-                      <strong className="font-mono text-on-surface">
+                      <strong className="font-mono tabular-nums text-[#2C2621]">
                         {(scheduleSummary.actual_hours_thousandths / 1000).toFixed(1).replace(/\.0$/, "")} h
                       </strong>
                     </span>
-                    <span className="font-mono font-semibold text-on-primary-container tabular-nums">
+                    <span className="font-mono font-mono-nums font-semibold text-[#4A2500] tabular-nums">
                       Desv. {scheduleSummary.deviation_hours_thousandths >= 0 ? "+" : ""}
                       {(scheduleSummary.deviation_hours_thousandths / 1000).toFixed(1).replace(/\.0$/, "")} h (
                       {scheduleSummary.economic_impact_cents >= 0 ? "+" : ""}
@@ -509,14 +519,14 @@ export function JobDetailDrawer({
                       );
                     })
                   }
-                  className="min-h-[42px] w-full rounded-xl bg-secondary font-semibold text-on-secondary disabled:opacity-45 cursor-pointer"
+                  className="min-h-[42px] w-full rounded-xl bg-[#4B7094] font-semibold text-[#FFFDF9] disabled:opacity-45 cursor-pointer shadow-xs"
                 >
                   Planificar en calendario
                 </button>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">Presupuestos ({quotes.length})</h4>
+                <h4 className="font-semibold text-[#2C2621] mb-1.5">Presupuestos ({quotes.length})</h4>
                 <div className="space-y-2">
                   {quotes.map((q) => (
                     <button
@@ -524,34 +534,34 @@ export function JobDetailDrawer({
                       type="button"
                       data-testid={`job-quote-card-${q.id}`}
                       onClick={() => onOpenQuote(q.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-terracotta transition-colors cursor-pointer"
+                      className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono font-bold text-slate-900">{q.quote_code}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">{q.quote_code}</div>
+                        <div className="text-[11px] text-[#6B6860]">
                           IVA {q.vat_rate} % · Estado: <strong>{q.status}</strong>
                           {q.sent_at_iso ? ` · Enviado ${q.sent_at_iso}` : ""}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="font-mono font-bold text-slate-900 tabular-nums">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">
                           {formatCentsEs(q.total_cents)}
                         </div>
-                        <div className="text-[10px] font-semibold text-on-primary-container">
+                        <div className="text-[10px] font-semibold text-[#D04B00]">
                           Abrir →
                         </div>
                       </div>
                     </button>
                   ))}
                   {quotes.length === 0 && (
-                    <div className="text-slate-500">Sin presupuestos emitidos aún.</div>
+                    <div className="text-[#6B6860]">Sin presupuestos emitidos aún.</div>
                   )}
                 </div>
               </div>
 
               <div>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <h4 className="font-bold text-slate-800">
+                  <h4 className="font-semibold text-[#2C2621]">
                     Actas de puesta en marcha ({actas.length})
                   </h4>
                   {onCreateJobActa && (
@@ -560,7 +570,7 @@ export function JobDetailDrawer({
                       data-testid="job-detail-create-acta-btn"
                       disabled={busy}
                       onClick={() => void onCreateJobActa(job.id, job.client_id)}
-                      className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-800 cursor-pointer"
+                      className="rounded-lg border border-[#EA580C]/40 bg-[#FFD6B0] px-2.5 py-1 text-[11px] font-bold text-[#4A2500] cursor-pointer"
                     >
                       + Crear Acta
                     </button>
@@ -573,27 +583,27 @@ export function JobDetailDrawer({
                       type="button"
                       data-testid={`job-acta-${a.id}`}
                       onClick={() => onOpenActa?.(a.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-terracotta transition-colors cursor-pointer"
+                      className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono font-bold text-slate-900">{a.codigo_acta}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">{a.codigo_acta}</div>
+                        <div className="text-[11px] text-[#6B6860]">
                           {a.especialidad} · {a.fecha_emision_iso} · <strong>{a.estado}</strong>
                         </div>
                       </div>
-                      <div className="shrink-0 text-[10px] font-semibold text-on-primary-container">
+                      <div className="shrink-0 text-[10px] font-semibold text-[#D04B00]">
                         Abrir →
                       </div>
                     </button>
                   ))}
                   {actas.length === 0 && (
-                    <div className="text-slate-500">Sin actas técnicas emitidas para esta obra.</div>
+                    <div className="text-[#6B6860]">Sin actas técnicas emitidas para esta obra.</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">Facturas ({invoices.length})</h4>
+                <h4 className="font-semibold text-[#2C2621] mb-1.5">Facturas ({invoices.length})</h4>
                 <div className="space-y-2">
                   {invoices.map((inv) => (
                     <button
@@ -601,74 +611,76 @@ export function JobDetailDrawer({
                       type="button"
                       data-testid={`job-invoice-${inv.id}`}
                       onClick={() => onOpenInvoice(inv.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-terracotta transition-colors cursor-pointer"
+                      className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono font-bold text-slate-900">{inv.invoice_number}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">{inv.invoice_number}</div>
+                        <div className="text-[11px] text-[#6B6860]">
                           {inv.quarter} · Estado: <strong>{inv.status.replace("_", " ")}</strong>
                           {inv.paid_at_iso ? ` (Cobrado ${inv.paid_at_iso})` : ""}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="font-mono font-bold text-slate-900 tabular-nums">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">
                           {formatCentsEs(inv.total_cents)}
                         </div>
-                        <div className="text-[10px] font-semibold text-on-primary-container">
+                        <div className="text-[10px] font-semibold text-[#D04B00]">
                           Abrir →
                         </div>
                       </div>
                     </button>
                   ))}
                   {invoices.length === 0 && (
-                    <div className="text-slate-500">Sin facturas emitidas todavía.</div>
+                    <div className="text-[#6B6860]">Sin facturas emitidas todavía.</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">Tickets de gasto ({tickets.length})</h4>
-                <div className="space-y-1.5">
+                <h4 className="font-semibold text-[#2C2621] mb-1.5">Tickets de gasto ({tickets.length})</h4>
+                <div className="space-y-2.5 pt-1">
                   {tickets.map((t) => (
                     <button
                       key={t.id}
                       type="button"
                       data-testid={`job-ticket-${t.id}`}
                       onClick={() => onOpenTicket(t.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:border-terracotta transition-colors cursor-pointer"
+                      className="receipt-slip flex w-full items-center justify-between gap-2 border-x border-[#E5DFD2] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold text-slate-900">{t.supplier_name}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="truncate font-semibold text-[#2C2621]">{t.supplier_name}</div>
+                        <div className="text-[11px] text-[#6B6860]">
                           {t.issue_date_iso} · {t.quarter} · {t.category}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="font-bold text-slate-900">{formatCentsEs(t.total_cents)}</div>
-                        <div className="text-[10px] font-semibold text-on-primary-container">
+                        <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">{formatCentsEs(t.total_cents)}</div>
+                        <div className="text-[10px] font-semibold text-[#D04B00]">
                           Abrir →
                         </div>
                       </div>
                     </button>
                   ))}
                   {tickets.length === 0 && (
-                    <div className="text-slate-500">Sin tickets imputados a esta obra.</div>
+                    <div className="text-[#6B6860]">Sin tickets imputados a esta obra.</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">Diario de obra ({siteLogs.length})</h4>
+                <h4 className="font-semibold text-[#2C2621] mb-1.5">Diario de obra ({siteLogs.length})</h4>
                 <div className="space-y-2">
                   {siteLogs.map((sl) => (
                     <div
                       key={sl.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 p-2.5"
+                      className="relative ruled-notebook rounded-xl border border-[#E5DFD2] p-3 pl-10"
                     >
-                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                      <span className="absolute left-2.5 top-3.5 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
+                      <span className="absolute left-2.5 bottom-3.5 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-[#6B6860]">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold uppercase text-sky-800">{sl.category}</span>
-                          <span>{sl.created_at_iso}</span>
+                          <span className="status-cobalt rounded-full px-2 py-0.5 text-[10px] font-bold uppercase">{sl.category}</span>
+                          <span className="font-mono tabular-nums">{sl.created_at_iso}</span>
                         </div>
                         <button
                           type="button"
@@ -679,12 +691,12 @@ export function JobDetailDrawer({
                             setDeleteError(null);
                             setDeleteSiteLogTarget(sl);
                           }}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-coral-alert/25 bg-white text-coral-alert hover:bg-error-container cursor-pointer disabled:opacity-50"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#DC2626]/25 bg-[#FFFDF7] text-[#DC2626] hover:bg-[#FAD2D8] cursor-pointer disabled:opacity-50"
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </div>
-                      <p className="mt-1 text-slate-800">{sl.note_text}</p>
+                      <p className="mt-1 text-[#2C2621]">{sl.note_text}</p>
                       <SiteLogThumbnail
                         fileBridge={fileBridge}
                         photoUri={sl.photo_uri}
@@ -693,7 +705,7 @@ export function JobDetailDrawer({
                     </div>
                   ))}
                   {siteLogs.length === 0 && (
-                    <div className="text-slate-500">Sin entradas en el diario de obra.</div>
+                    <div className="text-[#6B6860]">Sin entradas en el diario de obra.</div>
                   )}
                 </div>
               </div>

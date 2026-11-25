@@ -27,19 +27,19 @@ const QUOTE_STATUSES: Array<{ value: "" | QuoteStatus; label: string }> = [
 const STATUS_BADGES: Record<QuoteStatus, { label: string; cls: string }> = {
   borrador: {
     label: "Borrador",
-    cls: "bg-terracotta-soft text-on-primary-container border-outline-variant",
+    cls: "paper-stamp status-violet",
   },
   enviado: {
     label: "Enviado",
-    cls: "bg-info-container text-on-info-container border-info/20",
+    cls: "paper-stamp status-cobalt",
   },
   aceptado: {
     label: "Aceptado",
-    cls: "bg-success-container text-on-success-container border-emerald-free/20",
+    cls: "paper-stamp status-emerald",
   },
   rechazado: {
     label: "Rechazado",
-    cls: "bg-error-container text-on-error-container border-coral-alert/20",
+    cls: "paper-stamp status-tangerine",
   },
 };
 
@@ -102,7 +102,7 @@ export function QuotesView({
   return (
     <div
       data-testid="quotes-view"
-      className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-3.5 bg-surface"
+      className="cotton-paper flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar p-4 space-y-3.5 bg-[#F9F7F2] text-[#2C2621] font-sans"
     >
       <div className="flex w-full min-w-0 items-center gap-2">
         <input
@@ -111,13 +111,13 @@ export function QuotesView({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por PRE, cliente u obra..."
-          className="min-h-[48px] min-w-0 flex-1 rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 text-[14px] text-on-surface placeholder:text-outline focus:border-terracotta focus:outline-none"
+          className="min-h-[48px] min-w-0 flex-1 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 text-[14px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none shadow-xs"
         />
         <button
           type="button"
           data-testid="quotes-new-btn"
           onClick={() => void onStartEmptyQuote()}
-          className="min-h-[48px] shrink-0 whitespace-nowrap rounded-2xl bg-primary hover:bg-terracotta px-3.5 text-[13px] font-semibold text-white shadow-xs cursor-pointer"
+          className="min-h-[48px] shrink-0 whitespace-nowrap rounded-xl bg-[#D04B00] hover:bg-[#EA580C] px-3.5 text-[13px] font-semibold text-white shadow-xs cursor-pointer transition-colors"
         >
           + Nuevo
         </button>
@@ -131,8 +131,8 @@ export function QuotesView({
             onClick={() => setStatusFilter(st.value)}
             className={`min-h-[40px] shrink-0 rounded-full px-3.5 text-[12px] font-semibold cursor-pointer transition-colors ${
               statusFilter === st.value
-                ? "bg-secondary text-on-secondary"
-                : "bg-surface-container-lowest border border-outline-variant text-on-surface-variant"
+                ? "bg-[#4B7094] text-[#FFFDF9] shadow-xs"
+                : "bg-[#EAE5D9] border border-[#E5DFD2] text-[#3D352E]"
             }`}
           >
             {st.label}
@@ -140,7 +140,7 @@ export function QuotesView({
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-5 pt-2">
         {quotes.map((q) => {
           const badge = STATUS_BADGES[q.status];
           const validUntilIso = computeQuoteValidUntilIso(q.created_at_ms, q.validity_days);
@@ -150,7 +150,7 @@ export function QuotesView({
           return (
             <div
               key={q.id}
-              className="w-full max-w-full overflow-hidden rounded-[20px] border border-outline-variant bg-surface-warm-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:border-terracotta transition-colors text-xs"
+              className="receipt-slip w-full max-w-full border-x border-[#E5DFD2] hover:border-[#EA580C] transition-colors text-xs"
             >
               <button
                 type="button"
@@ -160,23 +160,23 @@ export function QuotesView({
               >
                 <div className="flex w-full min-w-0 items-start justify-between gap-2">
                   <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[12px] font-semibold text-on-primary-container tabular-nums">
+                    <span className="font-mono font-mono-nums text-[12px] font-semibold text-[#6B6860] tabular-nums">
                       {q.quote_code}
                     </span>
                     <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase ${badge.cls}`}
+                      className={`rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase ${badge.cls}`}
                     >
                       {badge.label}
                     </span>
                     {!q.client_id && (
-                      <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                      <span className="rounded-full border border-[#E5DFD2] bg-[#EAE5D9] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
                         Sin cliente
                       </span>
                     )}
                     {isExpired && (
                       <span
                         data-testid={`quote-expired-badge-${q.id}`}
-                        className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900"
+                        className="status-gold rounded-full px-2 py-0.5 text-[10px] font-semibold"
                       >
                         Caducado
                       </span>
@@ -184,28 +184,28 @@ export function QuotesView({
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <div className="font-mono text-[15px] font-bold text-on-surface tabular-nums">
+                    <div className="highlighter-yellow font-mono font-mono-nums text-[15px] font-bold text-[#2C2621] tabular-nums">
                       {formatCentsEs(q.total_cents)}
                     </div>
-                    <div className="text-[11px] text-on-surface-variant">IVA {q.vat_rate} %</div>
+                    <div className="text-[11px] text-[#6B6860]">IVA {q.vat_rate} %</div>
                   </div>
                 </div>
 
-                <div className="line-clamp-2 break-words [overflow-wrap:anywhere] text-[15px] font-semibold leading-snug text-on-surface">
+                <div className="line-clamp-2 break-words [overflow-wrap:anywhere] text-[15px] font-semibold leading-snug text-[#2C2621]">
                   {q.job_code} · {q.job_title}
                 </div>
               </button>
 
-              <div className="flex w-full min-w-0 items-center justify-between gap-2 px-4 py-2 border-t border-outline-variant/60">
+              <div className="flex w-full min-w-0 items-center justify-between gap-2 px-4 py-2 border-t border-dashed border-[#E5DFD2]">
                 <button
                   type="button"
                   onClick={() => onOpenQuoteDetail(q.id)}
                   className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1 text-left cursor-pointer"
                 >
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant">
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-[#6B6860]">
                     {q.client_name_snapshot || "Sin datos de cliente"}
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-outline" aria-hidden="true" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[#6B6860]" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -215,7 +215,7 @@ export function QuotesView({
                     setDeleteError(null);
                     setDeleteTarget(q);
                   }}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-coral-alert/25 bg-surface-container-lowest text-coral-alert hover:bg-error-container cursor-pointer"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DC2626]/25 bg-[#FFFDF7] text-[#DC2626] hover:bg-[#FAD2D8] cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -225,7 +225,7 @@ export function QuotesView({
         })}
 
         {quotes.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+          <div className="paper-sheet rounded-2xl border border-dashed border-[#E5DFD2] bg-[#FFFDF7] p-6 text-center text-xs text-[#6B6860]">
             No hay presupuestos ({totalCount}) que coincidan con el filtro.
           </div>
         )}

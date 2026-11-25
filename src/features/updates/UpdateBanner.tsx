@@ -55,23 +55,23 @@ export function UpdateBanner({
       data-testid="apk-update-banner"
       role="region"
       aria-label="Actualización disponible"
-      className={`w-full max-w-full overflow-x-hidden rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs text-slate-900 shadow-sm ${className}`.trim()}
+      className={`paper-sheet w-full max-w-full overflow-x-hidden rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-xs text-[#2C2621] ${className}`.trim()}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="status-mustard inline-flex rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold tabular-nums">
               Nueva versión v{update.remoteVersionName}
             </span>
-            <span className="text-[11px] font-medium text-amber-900">
+            <span className="font-mono text-[11px] font-medium text-[#6B6860] tabular-nums">
               Instalada: v{update.installedVersionName}
             </span>
           </div>
-          <p className="break-words [overflow-wrap:anywhere] font-semibold text-slate-900">
+          <p className="break-words [overflow-wrap:anywhere] font-semibold text-[#2C2621]">
             Hay una actualización lista para Gestor Autónomo.
           </p>
           {update.releaseNotes && (
-            <p className="break-words [overflow-wrap:anywhere] whitespace-pre-line text-[11px] text-slate-700">
+            <p className="break-words [overflow-wrap:anywhere] whitespace-pre-line text-[11px] text-[#6B6860]">
               {update.releaseNotes}
             </p>
           )}
@@ -80,13 +80,13 @@ export function UpdateBanner({
 
       {phase === "downloading" && (
         <div className="mt-2.5 space-y-1.5">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-amber-200">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE4]">
             <div
-              className="h-full rounded-full bg-amber-600 transition-all duration-150"
+              className="h-full rounded-full chart-gold transition-all duration-150"
               style={{ width: `${Math.max(4, Math.min(100, progress.percent))}%` }}
             />
           </div>
-          <div className="text-[11px] font-semibold text-amber-900 tabular-nums">
+          <div className="font-mono text-[11px] font-semibold text-[#78350F] tabular-nums">
             {progress.totalBytes > 0
               ? `Descargando actualización... ${progress.percent} % (${downloadedMb} MB)`
               : `Descargando actualización... ${downloadedMb} MB`}
@@ -95,8 +95,8 @@ export function UpdateBanner({
       )}
 
       {phase === "permission_required" && (
-        <div className="mt-2.5 space-y-2 rounded-xl border border-amber-300 bg-white p-2.5">
-          <p className="break-words [overflow-wrap:anywhere] text-[11px] text-slate-800">
+        <div className="mt-2.5 space-y-2 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+          <p className="break-words [overflow-wrap:anywhere] text-[11px] text-[#2C2621]">
             Activa <strong>«Permitir desde esta fuente»</strong> para Gestor Autónomo en el ajuste
             que se acaba de abrir y después pulsa <strong>«Instalar actualización»</strong>.
           </p>
@@ -105,7 +105,7 @@ export function UpdateBanner({
               type="button"
               data-testid="update-banner-retry-install-btn"
               onClick={() => void handleInstall()}
-              className="min-h-10 flex-1 rounded-xl bg-amber-600 px-3 font-bold text-white cursor-pointer"
+              className="min-h-10 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-3 font-bold text-[#FFFDF9] cursor-pointer transition-colors"
             >
               Instalar actualización
             </button>
@@ -114,7 +114,7 @@ export function UpdateBanner({
                 type="button"
                 data-testid="update-banner-dismiss-btn"
                 onClick={onDismiss}
-                className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-700 cursor-pointer"
+                className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#6B6860] cursor-pointer"
               >
                 Más tarde
               </button>
@@ -124,15 +124,15 @@ export function UpdateBanner({
       )}
 
       {phase === "error" && (
-        <div className="mt-2.5 space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5">
-          <p className="break-words [overflow-wrap:anywhere] text-[11px] text-rose-800">
+        <div className="mt-2.5 space-y-2 rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5">
+          <p className="break-words [overflow-wrap:anywhere] text-[11px] text-[#5A121C]">
             No se pudo completar la actualización: {errorMsg || "error de red"}.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void handleInstall()}
-              className="min-h-10 flex-1 rounded-xl bg-slate-900 px-3 font-bold text-white cursor-pointer"
+              className="min-h-10 flex-1 rounded-xl bg-[#4B7094] hover:bg-[#3F5F7E] px-3 font-bold text-[#FFFDF9] cursor-pointer transition-colors"
             >
               Reintentar
             </button>
@@ -141,7 +141,7 @@ export function UpdateBanner({
                 type="button"
                 data-testid="update-banner-dismiss-btn"
                 onClick={onDismiss}
-                className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-700 cursor-pointer"
+                className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#6B6860] cursor-pointer"
               >
                 Cerrar
               </button>
@@ -156,7 +156,7 @@ export function UpdateBanner({
             type="button"
             data-testid="update-banner-install-btn"
             onClick={() => void handleInstall()}
-            className="min-h-10 flex-1 rounded-xl bg-amber-600 px-3 font-bold text-white cursor-pointer"
+            className="min-h-10 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-3 font-bold text-[#FFFDF9] cursor-pointer transition-colors"
           >
             Actualizar ahora
           </button>
@@ -165,7 +165,7 @@ export function UpdateBanner({
               type="button"
               data-testid="update-banner-dismiss-btn"
               onClick={onDismiss}
-              className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-700 cursor-pointer"
+              className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#6B6860] cursor-pointer"
             >
               Más tarde
             </button>

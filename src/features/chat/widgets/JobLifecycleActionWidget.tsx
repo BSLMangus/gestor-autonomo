@@ -504,11 +504,15 @@ export function JobLifecycleActionWidget({
     <section
       data-testid="job-lifecycle-widget"
       data-mode={lp.mode}
-      className="mt-2 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm text-slate-900 space-y-3"
+      className="mt-2 paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-[#2C2621] font-sans space-y-3"
     >
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+      <div className="flex items-start justify-between gap-2 border-b border-[#E5DFD2] pb-2.5">
         <div>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-800">
+          <span
+            className={`inline-flex items-center rounded-sm paper-stamp px-2.5 py-0.5 text-[11px] font-semibold ${
+              canActGate3 || canActGate4 ? "status-tangerine" : "status-cobalt"
+            }`}
+          >
             {lp.mode === "preview_gate_3"
               ? canActGate3
                 ? "Revisión de factura"
@@ -521,20 +525,20 @@ export function JobLifecycleActionWidget({
                   ? "Listo para compartir"
                   : "Ciclo de Obra"}
           </span>
-          <h3 className="mt-1 text-sm font-bold text-slate-900">
+          <h3 className="mt-1.5 text-sm font-bold text-[#2C2621]">
             {job ? `${job.job_code} · ${job.title}` : `Obra ${lp.job_id}`}
           </h3>
           {quote && (
-            <div className="text-xs text-slate-600">
+            <div className="text-xs font-mono-nums text-[#6B6860]">
               {quote.quote_code} · {formatCentsEs(quote.total_cents)} · Estado:{" "}
-              <strong>{quote.status}</strong>
+              <strong className="text-[#2C2621]">{quote.status}</strong>
               {quote.sent_at_iso ? ` · Enviado ${quote.sent_at_iso}` : ""}
             </div>
           )}
           {invoice && (
-            <div className="text-xs text-slate-600">
+            <div className="text-xs font-mono-nums text-[#6B6860]">
               {invoice.invoice_number} · {formatCentsEs(invoice.total_cents)} · Estado:{" "}
-              <strong>{invoice.status}</strong>
+              <strong className="text-[#2C2621]">{invoice.status}</strong>
               {invoice.sent_at_iso ? ` · Enviado ${invoice.sent_at_iso}` : ""}
             </div>
           )}
@@ -543,7 +547,7 @@ export function JobLifecycleActionWidget({
         {isDocDeleted ? (
           <span
             data-testid="lifecycle-doc-deleted-badge"
-            className="inline-flex shrink-0 items-center rounded-full bg-error-container px-2.5 py-1 text-[11px] font-semibold text-on-error-container"
+            className="inline-flex shrink-0 items-center rounded-full border border-[#DC2626]/30 bg-[#FAD2D8] px-2.5 py-1 text-[11px] font-semibold text-[#5A121C]"
           >
             Documento eliminado
           </span>
@@ -559,7 +563,7 @@ export function JobLifecycleActionWidget({
                   lp.invoice_id ?? lp.quote_id ?? ""
                 )
               }
-              className="min-h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs font-bold text-slate-800"
+              className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-xs font-bold text-[#2C2621] hover:bg-[#EFECE4]"
             >
               Abrir PDF
             </button>
@@ -569,7 +573,7 @@ export function JobLifecycleActionWidget({
 
       {lp.mode === "preview_gate_3" && g3Draft && (
         <div className="space-y-2.5">
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-2 text-xs text-amber-950">
+          <div className="rounded-xl bg-[#FFF3A1] border border-[#D97706]/35 p-2 text-xs text-[#3E3300]">
             Bloqueo fiscal correlativo:{" "}
             <strong>
               {g3Draft.sub_intent === "advance_40"
@@ -581,7 +585,7 @@ export function JobLifecycleActionWidget({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-issued">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-issued">
                 Fecha emisión
               </label>
               <input
@@ -590,11 +594,11 @@ export function JobLifecycleActionWidget({
                 disabled={!canActGate3 || isSubmitting}
                 value={g3Draft.issued_at_iso}
                 onChange={(e) => setG3Draft((p) => (p ? { ...p, issued_at_iso: e.target.value } : p))}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-due">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-due">
                 Vencimiento
               </label>
               <input
@@ -603,14 +607,14 @@ export function JobLifecycleActionWidget({
                 disabled={!canActGate3 || isSubmitting}
                 value={g3Draft.due_at_iso}
                 onChange={(e) => setG3Draft((p) => (p ? { ...p, due_at_iso: e.target.value } : p))}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-em-name">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-em-name">
                 Nombre / Razón social emisor *
               </label>
               <input
@@ -619,11 +623,11 @@ export function JobLifecycleActionWidget({
                 disabled={!canActGate3 || isSubmitting}
                 value={g3Draft.emitter_name}
                 onChange={(e) => setG3Draft((p) => (p ? { ...p, emitter_name: e.target.value } : p))}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-em-nif">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-em-nif">
                 NIF/CIF emisor *
               </label>
               <input
@@ -634,13 +638,13 @@ export function JobLifecycleActionWidget({
                 onChange={(e) =>
                   setG3Draft((p) => (p ? { ...p, emitter_nif: e.target.value.toUpperCase() } : p))
                 }
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-em-addr">
+            <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-em-addr">
               Domicilio fiscal emisor *
             </label>
             <ZoomableTextField
@@ -654,13 +658,13 @@ export function JobLifecycleActionWidget({
               onValueChange={(next) =>
                 setG3Draft((p) => (p ? { ...p, emitter_fiscal_address: next } : p))
               }
-              className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+              className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-cl-nif">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-cl-nif">
                 NIF/DNI cliente *
               </label>
               <input
@@ -673,11 +677,11 @@ export function JobLifecycleActionWidget({
                   setG3Draft((p) => (p ? { ...p, client_nif: e.target.value.toUpperCase() } : p))
                 }
                 placeholder="Ej: 12345678Z"
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-cl-addr">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-cl-addr">
                 Domicilio fiscal cliente *
               </label>
               <ZoomableTextField
@@ -693,13 +697,13 @@ export function JobLifecycleActionWidget({
                   setG3Draft((p) => (p ? { ...p, client_fiscal_address: next } : p))
                 }
                 placeholder="Calle, CP, Ciudad"
-                className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g3-notes">
+            <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g3-notes">
               Notas de factura
             </label>
             <ZoomableTextField
@@ -712,12 +716,12 @@ export function JobLifecycleActionWidget({
               disabled={!canActGate3 || isSubmitting}
               value={g3Draft.notes}
               onValueChange={(next) => setG3Draft((p) => (p ? { ...p, notes: next } : p))}
-              className="mt-1 w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs"
+              className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
 
           {validationError && (
-            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
+            <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2 text-xs text-[#5A121C]">
               {validationError}
             </div>
           )}
@@ -729,7 +733,7 @@ export function JobLifecycleActionWidget({
                 data-testid="gate3-reject-btn"
                 disabled={isSubmitting}
                 onClick={() => void handleReject("gate_3_invoice")}
-                className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+                className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
               >
                 Cancelar
               </button>
@@ -738,7 +742,7 @@ export function JobLifecycleActionWidget({
                 data-testid="gate3-approve-btn"
                 disabled={isSubmitting}
                 onClick={() => void handleConfirmGate3()}
-                className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm"
+                className="min-h-12 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-sm font-bold text-white shadow-sm"
               >
                 {isSubmitting ? "Emitiendo factura..." : "Emitir factura correlativa"}
               </button>
@@ -758,8 +762,8 @@ export function JobLifecycleActionWidget({
                 onClick={() => setG4Draft((p) => (p ? { ...p, channel: ch } : p))}
                 className={`min-h-10 flex-1 rounded-xl px-3 text-xs font-bold ${
                   g4Draft.channel === ch
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "bg-[#F5F1E6] border border-[#E5DFD2] text-[#2C2621]"
                 }`}
               >
                 {ch === "whatsapp" ? "WhatsApp" : "Otras apps / Compartir"}
@@ -769,7 +773,7 @@ export function JobLifecycleActionWidget({
 
           {g4Draft.channel === "whatsapp" && (
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g4-phone">
+              <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g4-phone">
                 Teléfono del cliente
               </label>
               <input
@@ -782,13 +786,13 @@ export function JobLifecycleActionWidget({
                   setG4Draft((p) => (p ? { ...p, recipient_phone: e.target.value } : p))
                 }
                 placeholder="+34600112233"
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-700" htmlFor="g4-msg">
+            <label className="block text-[11px] font-semibold text-[#2C2621]" htmlFor="g4-msg">
               Mensaje para el cliente
             </label>
             <ZoomableTextField
@@ -803,12 +807,12 @@ export function JobLifecycleActionWidget({
               onValueChange={(next) =>
                 setG4Draft((p) => (p ? { ...p, message_text: next } : p))
               }
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+              className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
             />
           </div>
 
           {validationError && (
-            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
+            <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2 text-xs text-[#5A121C]">
               {validationError}
             </div>
           )}
@@ -820,7 +824,7 @@ export function JobLifecycleActionWidget({
                 data-testid="gate4-reject-btn"
                 disabled={isSubmitting}
                 onClick={() => void handleReject("gate_4_share")}
-                className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+                className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
               >
                 Cancelar
               </button>
@@ -829,7 +833,7 @@ export function JobLifecycleActionWidget({
                 data-testid="gate4-approve-btn"
                 disabled={isSubmitting}
                 onClick={() => void handleConfirmGate4()}
-                className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm"
+                className="min-h-12 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-sm font-bold text-white shadow-sm"
               >
                 {isSubmitting ? "Preparando..." : "Preparar y compartir documento"}
               </button>
@@ -841,7 +845,7 @@ export function JobLifecycleActionWidget({
       {(lp.mode === "overview" || lp.mode === "ready_to_share") && !isDocDeleted && (
         <div className="space-y-2">
           {shareFeedback && (
-            <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900">
+            <div className="rounded-xl border border-[#2563EB]/30 bg-[#CBE4F9] p-2 text-xs text-[#143552]">
               {shareFeedback}
             </div>
           )}
@@ -853,7 +857,7 @@ export function JobLifecycleActionWidget({
                 data-testid="lifecycle-accept-quote-btn"
                 disabled={manualBusy}
                 onClick={() => void handleAcceptQuote()}
-                className="min-h-10 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white"
+                className="min-h-10 rounded-xl bg-[#059669] px-3 text-xs font-bold text-white"
               >
                 Marcar presupuesto aceptado
               </button>
@@ -866,14 +870,14 @@ export function JobLifecycleActionWidget({
                   data-testid="lifecycle-mark-sent-btn"
                   disabled={manualBusy}
                   onClick={() => void handleMarkSentToday()}
-                  className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800"
+                  className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs font-bold text-[#2C2621]"
                 >
                   Confirmar envío manual
                 </button>
               )}
 
             {lp.quote_id && !hasFinal && quoteMissingClient && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+              <div className="rounded-xl border border-[#D97706]/35 bg-[#FFF3A1] px-3 py-2 text-[11px] font-semibold text-[#3E3300]">
                 Asigna un cliente al presupuesto (desde Presupuestos) antes de poder emitir facturas.
               </div>
             )}
@@ -893,7 +897,7 @@ export function JobLifecycleActionWidget({
                     },
                   })
                 }
-                className="min-h-10 rounded-xl bg-orange-600 px-3 text-xs font-bold text-white"
+                className="min-h-10 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-3 text-xs font-bold text-white"
               >
                 Facturar anticipo {advPctLabel}
               </button>
@@ -914,7 +918,7 @@ export function JobLifecycleActionWidget({
                     },
                   })
                 }
-                className="min-h-10 rounded-xl bg-slate-900 px-3 text-xs font-bold text-white"
+                className="min-h-10 rounded-xl bg-[#4B7094] px-3 text-xs font-bold text-[#FFFDF9]"
               >
                 {hasAdvance
                   ? "Factura final (resto)"
@@ -943,7 +947,7 @@ export function JobLifecycleActionWidget({
                     },
                   })
                 }
-                className="min-h-10 rounded-xl border border-orange-300 bg-orange-50 px-3 text-xs font-bold text-orange-900"
+                className="min-h-10 rounded-xl border border-[#EA580C]/40 bg-[#FFD6B0] px-3 text-xs font-bold text-[#4A2500]"
               >
                 Enviar por WhatsApp / Share
               </button>
@@ -958,7 +962,7 @@ export function JobLifecycleActionWidget({
                   setDeleteError(null);
                   setConfirmDeleteOpen(true);
                 }}
-                className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-coral-alert/30 bg-white px-3 text-xs font-bold text-coral-alert cursor-pointer disabled:opacity-50"
+                className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[#DC2626]/35 bg-[#FFFDF7] px-3 text-xs font-bold text-[#DC2626] cursor-pointer disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>Eliminar</span>

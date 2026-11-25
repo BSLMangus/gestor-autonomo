@@ -200,10 +200,13 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
         emitter_nif: string;
         emitter_fiscal_address: string;
         emitter_phone: string;
+        emitter_email?: string;
         emitter_iban?: string;
+        emitter_bank_name?: string;
         emitter_logo_data_url?: string | null;
       }>(
-        `SELECT emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone, emitter_iban, emitter_logo_data_url
+        `SELECT emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
+                emitter_email, emitter_iban, emitter_bank_name, emitter_logo_data_url
          FROM app_settings WHERE id = 1`
       );
       const emitter = settingsRows[0] ?? {
@@ -211,7 +214,9 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
         emitter_nif: "",
         emitter_fiscal_address: "",
         emitter_phone: "",
+        emitter_email: "",
         emitter_iban: "",
+        emitter_bank_name: "",
         emitter_logo_data_url: null,
       };
 
@@ -234,12 +239,14 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
             nif: existingClient.nif,
             fiscalAddress: existingClient.fiscal_address,
             phone: existingClient.phone,
+            email: existingClient.email,
           }
         : {
             name: committed.new_client?.name.trim() ?? "",
             nif: committed.new_client?.nif?.trim().toUpperCase() ?? "",
             fiscalAddress: committed.new_client?.fiscal_address?.trim() ?? "",
             phone: committed.new_client?.phone?.trim() ?? "",
+            email: committed.new_client?.email?.trim() ?? "",
           };
 
       const effectiveJobTitle =
@@ -247,10 +254,21 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
         truncateText(committed.lines[0]?.description.trim() || "Presupuesto sin título", 80);
       const issuedDateIso = existingQuote ? formatLocalDateIso(existingQuote.created_at_ms) : todayIso;
       const issuedMs = existingQuote ? existingQuote.created_at_ms : now;
-      const validityDays = committed.validity_days ?? null;
+      const validityDays = committed.validity_days === undefined ? 30 : committed.validity_days;
       const validUntilIso = computeQuoteValidUntilIso(issuedMs, validityDays);
       const paymentMethods = committed.payment_methods ?? [];
       const paymentSchedule = committed.payment_schedule ?? [];
+      const generalDescription = (committed.general_description ?? "").trim();
+      const estimatedDurationValue = committed.estimated_duration_value ?? null;
+      const estimatedDurationUnit = committed.estimated_duration_unit ?? "dias_laborables";
+      const paymentTermsText = (committed.payment_terms_text ?? "").trim();
+      const ibanOverride = (committed.iban_override ?? "").replace(/\s+/g, "").toUpperCase();
+      const bankName = (committed.bank_name ?? "").trim();
+      const effectiveIban = ibanOverride || (emitter.emitter_iban ?? "").trim();
+      const effectiveBankName = bankName || (emitter.emitter_bank_name ?? "").trim();
+      const showIban =
+        committed.show_iban !== undefined ? committed.show_iban : effectiveIban.length > 0;
+      const attachments = committed.attachments ?? [];
 
       // Pre-generación PDF en memoria + disco ANTES de abrir transacción SQLite (Sección 3.2)
       const pdfInput: PdfQuoteDocumentInput = {
@@ -264,18 +282,28 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
           nif: emitter.emitter_nif,
           fiscalAddress: emitter.emitter_fiscal_address,
           phone: emitter.emitter_phone,
-          iban: emitter.emitter_iban ?? "",
+          email: emitter.emitter_email ?? "",
+          iban: effectiveIban,
+          bankName: effectiveBankName,
           logoDataUrl: emitter.emitter_logo_data_url ?? null,
         },
         client: clientSnapshot,
         jobTitle: effectiveJobTitle,
+        generalDescription,
+        estimatedDurationValue,
+        estimatedDurationUnit,
         vatRate: committed.vat_rate,
         subtotalCents: totals.subtotalCents,
         vatCents: totals.vatCents,
         totalCents: totals.totalCents,
         paymentMethods,
         paymentSchedule,
+        paymentTermsText,
+        ibanOverride,
+        bankName: effectiveBankName,
+        showIban,
         notes: committed.notes,
+        attachments,
         lines: committed.lines.map((line, i) => ({
           description: line.description,
           unit: line.unit,
@@ -311,13 +339,14 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
             await tx.run(
               `INSERT INTO clients (
                 id, name, nif, fiscal_address, phone, email, notes, created_at_ms, updated_at_ms
-              ) VALUES (?, ?, ?, ?, ?, '', '', ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?)`,
               [
                 resolvedClientId,
                 clientSnapshot.name,
                 clientSnapshot.nif,
                 clientSnapshot.fiscalAddress,
                 clientSnapshot.phone,
+                clientSnapshot.email,
                 now,
                 now,
               ]
@@ -397,8 +426,10 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                SET client_id = ?, client_name_snapshot = ?, client_nif_snapshot = ?,
                    client_address_snapshot = ?, client_phone_snapshot = ?,
                    vat_rate = ?, subtotal_cents = ?, vat_cents = ?, total_cents = ?,
+                   general_description = ?, estimated_duration_value = ?, estimated_duration_unit = ?,
                    validity_days = ?, payment_methods_json = ?, payment_schedule_json = ?,
-                   notes = ?, pdf_uri = ?, updated_at_ms = ?
+                   payment_terms_text = ?, iban_override = ?, bank_name = ?, show_iban = ?,
+                   notes = ?, attachments_json = ?, pdf_uri = ?, updated_at_ms = ?
                WHERE id = ?`,
               [
                 resolvedClientId,
@@ -410,10 +441,18 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 totals.subtotalCents,
                 totals.vatCents,
                 totals.totalCents,
+                generalDescription,
+                estimatedDurationValue,
+                estimatedDurationUnit,
                 validityDays,
                 JSON.stringify(paymentMethods),
                 JSON.stringify(paymentSchedule),
+                paymentTermsText,
+                ibanOverride,
+                bankName,
+                showIban ? 1 : 0,
                 committed.notes,
+                JSON.stringify(attachments),
                 pdfUri,
                 now,
                 finalQuoteId,
@@ -430,10 +469,12 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
               `INSERT INTO quotes (
                 id, quote_code, job_id, client_id, client_name_snapshot, client_nif_snapshot,
                 client_address_snapshot, client_phone_snapshot, vat_rate, subtotal_cents,
-                vat_cents, total_cents, status, validity_days, payment_methods_json,
-                payment_schedule_json, notes, pdf_uri, sent_at_iso,
+                vat_cents, total_cents, status, general_description, estimated_duration_value,
+                estimated_duration_unit, validity_days, payment_methods_json,
+                payment_schedule_json, payment_terms_text, iban_override, bank_name,
+                show_iban, notes, attachments_json, pdf_uri, sent_at_iso,
                 created_at_ms, updated_at_ms
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, NULL, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
               [
                 finalQuoteId,
                 quoteCode,
@@ -447,10 +488,18 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 totals.subtotalCents,
                 totals.vatCents,
                 totals.totalCents,
+                generalDescription,
+                estimatedDurationValue,
+                estimatedDurationUnit,
                 validityDays,
                 JSON.stringify(paymentMethods),
                 JSON.stringify(paymentSchedule),
+                paymentTermsText,
+                ibanOverride,
+                bankName,
+                showIban ? 1 : 0,
                 committed.notes,
+                JSON.stringify(attachments),
                 pdfUri,
                 now,
                 now,
@@ -1207,6 +1256,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
       const clientRow = clientRows[0];
       const clientName = clientRow?.name || liveQuote.client_name_snapshot;
       const clientPhone = clientRow?.phone || liveQuote.client_phone_snapshot;
+      const clientEmail = clientRow?.email ?? "";
 
       const pdfInput: PdfInvoiceDocumentInput = {
         kind: "invoice",
@@ -1220,7 +1270,9 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
           nif: committed.emitter_nif,
           fiscalAddress: committed.emitter_fiscal_address,
           phone: settings.emitter_phone,
+          email: settings.emitter_email,
           iban: settings.emitter_iban,
+          bankName: settings.emitter_bank_name,
           logoDataUrl: settings.emitter_logo_data_url,
         },
         client: {
@@ -1228,6 +1280,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
           nif: committed.client_nif,
           fiscalAddress: committed.client_fiscal_address,
           phone: clientPhone,
+          email: clientEmail,
         },
         jobCode: liveJob.job_code,
         jobTitle: liveJob.title,
@@ -1239,6 +1292,7 @@ export function createLifecycleCommitNode(deps: GraphDependencies) {
         advanceDeductedBaseCents: deductedBase,
         advanceDeductedVatCents: deductedVat,
         notes: committed.notes,
+        paymentStatus: "Pendiente de cobro",
       };
 
       const releasePdf = await deps.memoryCoordinator.acquireHeavyTask("pdf");

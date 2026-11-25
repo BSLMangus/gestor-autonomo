@@ -31,12 +31,12 @@ export function BottomQuickBar({
   return (
     <div
       data-testid="bottom-quick-bar"
-      className="border-t border-outline-variant bg-surface-container-lowest px-3 py-2.5 space-y-2"
+      className="border-t border-[#E2DDD0] bg-[#F5F1E6] px-3 py-2.5 space-y-2"
     >
       {isInterrupted && (
         <div
           data-testid="composer-interrupted-lock-banner"
-          className="flex items-center justify-between gap-2 rounded-2xl border border-outline-variant bg-terracotta-soft px-3.5 py-2 text-[12px] font-semibold text-on-primary-container"
+          className="flex items-center justify-between gap-2 rounded-2xl border border-[#EA580C]/35 bg-[#FFD6B0] px-3.5 py-2 text-[12px] font-semibold text-[#4A2500]"
         >
           <span>Propuesta pendiente de revisión.</span>
           {onOpenActiveInterrupt && (
@@ -65,14 +65,14 @@ export function BottomQuickBar({
               ? "Confirma o descarta la tarjeta para continuar..."
               : "Escribe qué necesitas (presupuesto, agenda, ticket, cliente)..."
           }
-          className="min-h-[48px] flex-1 rounded-2xl border border-outline-variant bg-surface-container-low px-3.5 text-[14px] text-on-surface placeholder:text-outline focus:border-terracotta focus:outline-none disabled:bg-surface-container disabled:text-outline"
+          className="min-h-[48px] flex-1 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 text-[14px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-terracotta focus:outline-none disabled:bg-[#EFECE4] disabled:text-[#6B6860]"
         />
 
         <button
           type="submit"
           data-testid="chat-send-btn"
           disabled={locked || text.trim().length === 0}
-          className="inline-flex min-h-[48px] items-center gap-1.5 rounded-2xl bg-secondary px-4 text-[13px] font-semibold text-on-secondary transition-colors hover:bg-secondary/90 disabled:opacity-40 cursor-pointer"
+          className="inline-flex min-h-[48px] items-center gap-1.5 rounded-2xl bg-[#4B7094] px-4 text-[13px] font-semibold text-[#FFFDF9] transition-colors hover:bg-[#3F6080] disabled:opacity-40 cursor-pointer"
         >
           <Send className="h-4 w-4" />
           <span>Enviar</span>

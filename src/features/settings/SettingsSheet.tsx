@@ -84,7 +84,9 @@ export function SettingsSheet({
   const [emitterNif, setEmitterNif] = useState("");
   const [emitterAddr, setEmitterAddr] = useState("");
   const [emitterPhone, setEmitterPhone] = useState("");
+  const [emitterEmail, setEmitterEmail] = useState("");
   const [emitterIban, setEmitterIban] = useState("");
+  const [emitterBankName, setEmitterBankName] = useState("");
   const [emitterLogoDataUrl, setEmitterLogoDataUrl] = useState<string | null>(null);
   const [defaultVatRate, setDefaultVatRate] = useState("21");
   const [irpfReserveRate, setIrpfReserveRate] = useState("20");
@@ -166,7 +168,9 @@ export function SettingsSheet({
     setEmitterNif(settings.emitter_nif);
     setEmitterAddr(settings.emitter_fiscal_address);
     setEmitterPhone(settings.emitter_phone);
+    setEmitterEmail(settings.emitter_email);
     setEmitterIban(settings.emitter_iban);
+    setEmitterBankName(settings.emitter_bank_name);
     setEmitterLogoDataUrl(settings.emitter_logo_data_url);
     setDefaultVatRate(String(settings.default_vat_rate));
     setIrpfReserveRate(String(settings.irpf_reserve_rate));
@@ -205,7 +209,9 @@ export function SettingsSheet({
         emitter_nif: emitterNif,
         emitter_fiscal_address: emitterAddr,
         emitter_phone: emitterPhone,
+        emitter_email: emitterEmail,
         emitter_iban: emitterIban,
+        emitter_bank_name: emitterBankName,
         emitter_logo_data_url: emitterLogoDataUrl,
       });
       await onDataRebuilt({ resetRoute: false });
@@ -230,7 +236,9 @@ export function SettingsSheet({
         emitter_nif: emitterNif,
         emitter_fiscal_address: emitterAddr,
         emitter_phone: emitterPhone,
+        emitter_email: emitterEmail,
         emitter_iban: emitterIban,
+        emitter_bank_name: emitterBankName,
         emitter_logo_data_url: nextUrl,
       });
       setStatusMsg("Logotipo actualizado para tus PDFs.");
@@ -378,15 +386,15 @@ export function SettingsSheet({
   };
 
   return (
-    <div data-testid="settings-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-4 text-xs bg-surface">
+    <div data-testid="settings-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-4 text-xs font-sans cotton-paper bg-[#F9F7F2] text-[#2C2621]">
       {/* Selector superior: General | Personalización */}
-      <div className="grid grid-cols-2 gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest p-1">
+      <div className="grid grid-cols-2 gap-1.5 rounded-full border border-[#E5DFD2] bg-[#EFECE4] p-1">
         <button
           type="button"
           data-testid="settings-tab-general"
           onClick={() => onSelectSection("general")}
           className={`min-h-[40px] rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            activeSection === "general" ? "bg-secondary text-on-secondary" : "text-on-surface-variant"
+            activeSection === "general" ? "bg-[#4B7094] text-[#FFFDF9]" : "text-[#6B6860]"
           }`}
         >
           General y Fiscal
@@ -396,7 +404,7 @@ export function SettingsSheet({
           data-testid="settings-tab-personalizacion"
           onClick={() => onSelectSection("personalizacion")}
           className={`min-h-[40px] rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-            activeSection === "personalizacion" ? "bg-secondary text-on-secondary" : "text-on-surface-variant"
+            activeSection === "personalizacion" ? "bg-[#4B7094] text-[#FFFDF9]" : "text-[#6B6860]"
           }`}
         >
           Personalización y Tarifario
@@ -420,14 +428,14 @@ export function SettingsSheet({
       ) : (
         <>
           {errorMsg && (
-        <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-rose-800">
+        <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 font-semibold text-[#5A121C]">
           {errorMsg}
         </div>
       )}
       {statusMsg && (
         <div
           data-testid="settings-status-banner"
-          className="rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 font-semibold text-emerald-900"
+          className="rounded-xl status-emerald p-2.5 font-semibold"
         >
           {statusMsg}
         </div>
@@ -435,15 +443,15 @@ export function SettingsSheet({
 
       <form
         onSubmit={(e) => void handleSaveEmitter(e)}
-        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2"
+        className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5"
       >
-        <div className="text-sm font-extrabold text-slate-900">Mis datos de facturación</div>
+        <div className="text-sm font-bold text-[#2C2621]">Mis datos de facturación</div>
         <input
           type="text"
           placeholder="Nombre / Razón social"
           value={emitterName}
           onChange={(e) => setEmitterName(e.target.value)}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
         <div className="grid grid-cols-2 gap-2">
           <input
@@ -451,14 +459,14 @@ export function SettingsSheet({
             placeholder="NIF/CIF"
             value={emitterNif}
             onChange={(e) => setEmitterNif(e.target.value.toUpperCase())}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-xs"
+            className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <input
             type="tel"
             placeholder="Teléfono"
             value={emitterPhone}
             onChange={(e) => setEmitterPhone(e.target.value)}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-xs"
+            className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
         </div>
         <ZoomableTextField
@@ -469,19 +477,37 @@ export function SettingsSheet({
           placeholder="Domicilio fiscal completo"
           value={emitterAddr}
           onValueChange={setEmitterAddr}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
         <input
-          type="text"
-          data-testid="settings-emitter-iban-input"
-          placeholder="Cuenta bancaria IBAN (opcional)"
-          value={emitterIban}
-          onChange={(e) => setEmitterIban(e.target.value.toUpperCase())}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs"
+          type="email"
+          data-testid="settings-emitter-email-input"
+          placeholder="Email profesional (opcional)"
+          value={emitterEmail}
+          onChange={(e) => setEmitterEmail(e.target.value)}
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <input
+            type="text"
+            data-testid="settings-emitter-iban-input"
+            placeholder="Cuenta bancaria IBAN (opcional)"
+            value={emitterIban}
+            onChange={(e) => setEmitterIban(e.target.value.toUpperCase())}
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
+          />
+          <input
+            type="text"
+            data-testid="settings-emitter-bank-input"
+            placeholder="Entidad bancaria (ej. CaixaBank, BBVA)"
+            value={emitterBankName}
+            onChange={(e) => setEmitterBankName(e.target.value)}
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
+          />
+        </div>
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-slate-700">
+            <span className="text-[11px] font-semibold text-[#2C2621]">
               Logotipo para presupuestos y facturas PDF
             </span>
             {emitterLogoDataUrl && (
@@ -489,7 +515,7 @@ export function SettingsSheet({
                 type="button"
                 data-testid="settings-remove-logo-btn"
                 onClick={() => setEmitterLogoDataUrl(null)}
-                className="text-[11px] font-semibold text-rose-700 cursor-pointer"
+                className="text-[11px] font-semibold text-[#DC2626] cursor-pointer"
               >
                 Quitar logo
               </button>
@@ -499,10 +525,10 @@ export function SettingsSheet({
             <img
               src={emitterLogoDataUrl}
               alt="Logotipo del emisor"
-              className="max-h-12 max-w-[140px] rounded bg-white p-1 border border-slate-200 object-contain"
+              className="max-h-12 max-w-[140px] rounded bg-[#FFFDF7] p-1 border border-[#E5DFD2] object-contain"
             />
           ) : (
-            <label className="flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-3 text-[11px] font-semibold text-slate-700">
+            <label className="flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[11px] font-semibold text-[#2C2621]">
               Subir logotipo (PNG / JPG)
               <input
                 type="file"
@@ -522,7 +548,7 @@ export function SettingsSheet({
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 w-full rounded-xl bg-slate-900 font-bold text-white cursor-pointer"
+          className="min-h-[44px] w-full rounded-xl bg-[#EA580C] hover:bg-[#D04B00] font-bold text-white cursor-pointer transition-colors"
         >
           Guardar mis datos
         </button>
@@ -530,21 +556,21 @@ export function SettingsSheet({
 
       <form
         onSubmit={(e) => void handleSaveTaxSettings(e)}
-        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5"
+        className="ruled-notebook rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5"
       >
         <div>
-          <div className="text-sm font-extrabold text-slate-900">
+          <div className="text-sm font-bold text-[#2C2621]">
             Impuestos por defecto (IVA e IRPF)
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-[#6B6860]">
             IVA predeterminado para nuevos presupuestos y porcentaje de reserva de IRPF en la Hucha Fiscal.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-1">
             <label
               htmlFor="tax-default-vat"
-              className="block text-[11px] font-extrabold text-slate-900"
+              className="block text-[11px] font-bold text-[#2C2621]"
             >
               IVA por defecto (%)
             </label>
@@ -557,13 +583,13 @@ export function SettingsSheet({
               max="100"
               value={defaultVatRate}
               onChange={(e) => setDefaultVatRate(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+              className="min-h-[42px] w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-1">
             <label
               htmlFor="tax-irpf-rate"
-              className="block text-[11px] font-extrabold text-slate-900"
+              className="block text-[11px] font-bold text-[#2C2621]"
             >
               Reserva IRPF (%)
             </label>
@@ -576,7 +602,7 @@ export function SettingsSheet({
               max="100"
               value={irpfReserveRate}
               onChange={(e) => setIrpfReserveRate(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+              className="min-h-[42px] w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
         </div>
@@ -584,7 +610,7 @@ export function SettingsSheet({
           type="submit"
           data-testid="settings-save-tax-btn"
           disabled={busy}
-          className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900"
+          className="min-h-[44px] w-full rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
         >
           Guardar impuestos
         </button>
@@ -619,14 +645,14 @@ export function SettingsSheet({
         }}
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-extrabold text-slate-900">Comodidad de escritura</div>
-            <div className="mt-0.5 text-[11px] font-semibold text-slate-800">
+            <div className="text-sm font-bold text-[#2C2621]">Comodidad de escritura</div>
+            <div className="mt-0.5 text-[11px] font-semibold text-[#2C2621]">
               Ampliar campos largos al escribir
             </div>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B6860]">
               Al tocar descripciones de partidas, notas o direcciones, el campo se amplía en una
               tarjeta flotante para escribir más cómodo.
             </p>
@@ -656,11 +682,11 @@ export function SettingsSheet({
               }
             }}
             className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
-              expandLongTextInputs ? "bg-terracotta" : "bg-slate-300"
+              expandLongTextInputs ? "bg-[#EA580C]" : "bg-[#E5DFD2]"
             }`}
           >
             <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              className={`inline-block h-5 w-5 transform rounded-full bg-[#FFFDF7] shadow transition-transform ${
                 expandLongTextInputs ? "translate-x-6" : "translate-x-1"
               }`}
             />
@@ -670,13 +696,13 @@ export function SettingsSheet({
 
       <form
         onSubmit={(e) => void handleSaveSequences(e)}
-        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5"
+        className="ruled-notebook rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5"
       >
         <div>
-          <div className="text-sm font-extrabold text-slate-900">
-            Contadores correlativos ({fiscalYear})
+          <div className="text-sm font-bold text-[#2C2621]">
+            Contadores correlativos (<span className="font-mono-nums">{fiscalYear}</span>)
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-[#6B6860]">
             Último número usado este año en cada tipo de documento. El siguiente sumará 1 automáticamente.
           </p>
         </div>
@@ -720,22 +746,22 @@ export function SettingsSheet({
           ].map((s) => (
             <div
               key={s.code}
-              className="rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1"
+              className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-1"
             >
               <label
                 htmlFor={`seq-${s.code}`}
-                className="block text-[11px] font-extrabold text-slate-900"
+                className="block text-[11px] font-bold text-[#2C2621]"
               >
-                {s.code} · {s.name}
+                <span className="font-mono">{s.code}</span> · {s.name}
               </label>
-              <div className="text-[10px] text-slate-500">{s.desc}</div>
+              <div className="font-mono text-[10px] text-[#6B6860]">{s.desc}</div>
               <input
                 id={`seq-${s.code}`}
                 type="number"
                 min="0"
                 value={s.val}
                 onChange={(e) => s.set(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+                className="min-h-[40px] w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
           ))}
@@ -743,14 +769,14 @@ export function SettingsSheet({
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900"
+          className="min-h-[44px] w-full rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
         >
           Actualizar numeración
         </button>
       </form>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
-        <div className="text-sm font-extrabold text-slate-900">
+      <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
+        <div className="text-sm font-bold text-[#2C2621]">
           Copia de seguridad de tus datos
         </div>
         <input
@@ -759,7 +785,7 @@ export function SettingsSheet({
           placeholder="Contraseña opcional para proteger la copia"
           value={backupPassword}
           onChange={(e) => setBackupPassword(e.target.value)}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -767,11 +793,11 @@ export function SettingsSheet({
             data-testid="export-backup-btn"
             disabled={busy}
             onClick={() => void handleExportBackup()}
-            className="min-h-10 rounded-xl bg-slate-900 font-bold text-white"
+            className="min-h-[44px] rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
           >
             Exportar copia
           </button>
-          <label className="flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-800">
+          <label className="flex min-h-[44px] cursor-pointer items-center justify-center rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-bold text-[#2C2621]">
             Importar copia
             <input
               type="file"
@@ -787,11 +813,11 @@ export function SettingsSheet({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-extrabold text-slate-900">Actualizaciones de la app</div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-sm font-bold text-[#2C2621]">Actualizaciones de la app</div>
+            <div className="font-mono text-[11px] text-[#6B6860]">
               {installedVersion
                 ? `Versión instalada: v${installedVersion.versionName} (compilación ${installedVersion.versionCode})`
                 : "Versión instalada: v1.0.0"}
@@ -803,12 +829,12 @@ export function SettingsSheet({
           data-testid="settings-check-updates-btn"
           disabled={busy || checkingUpdates}
           onClick={() => void handleCheckUpdates()}
-          className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 cursor-pointer"
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-bold text-[#2C2621] cursor-pointer"
         >
           {checkingUpdates ? "Comprobando actualizaciones..." : "Buscar actualizaciones"}
         </button>
         {updateCheckInfo && (
-          <div className="rounded-xl bg-slate-50 p-2 text-[11px] text-slate-700">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 text-[11px] text-[#2C2621]">
             {updateCheckInfo}
           </div>
         )}
@@ -825,12 +851,12 @@ export function SettingsSheet({
         )}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="text-sm font-extrabold text-slate-900">Cuenta y sesión</div>
+            <div className="text-sm font-bold text-[#2C2621]">Cuenta y sesión</div>
             {activeAccount && (
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-[#6B6860]">
                 {activeAccount.display_name} · {activeAccount.email}
               </div>
             )}
@@ -841,7 +867,7 @@ export function SettingsSheet({
           data-testid="settings-reopen-onboarding-btn"
           disabled={busy}
           onClick={() => void onReopenOnboarding()}
-          className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 font-bold text-slate-900 cursor-pointer"
+          className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-bold text-[#2C2621] cursor-pointer"
         >
           Asistente de configuración inicial
         </button>
@@ -851,7 +877,7 @@ export function SettingsSheet({
             data-testid="settings-logout-btn"
             disabled={busy}
             onClick={() => void onLogout()}
-            className="min-h-10 rounded-xl bg-slate-900 font-bold text-white cursor-pointer"
+            className="min-h-[44px] rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
           >
             Cerrar sesión
           </button>
@@ -860,7 +886,7 @@ export function SettingsSheet({
             data-testid="start-clean-btn"
             disabled={busy}
             onClick={() => void handleStartClean()}
-            className="min-h-10 rounded-xl border border-rose-300 bg-rose-50 font-bold text-rose-800 cursor-pointer"
+            className="min-h-[44px] rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] font-bold text-[#5A121C] cursor-pointer"
           >
             Empezar en limpio
           </button>
@@ -881,19 +907,19 @@ export function SettingsSheet({
       {showAdminModal && (
         <div
           data-testid="superadmin-login-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#2C2621]/55 p-4"
         >
           <form
             onSubmit={(e) => void handleAdminUnlockSubmit(e)}
-            className="w-full max-w-xs rounded-2xl bg-white p-4 shadow-xl space-y-3"
+            className="clipboard-panel w-full max-w-xs rounded-2xl p-4 space-y-3"
           >
-            <div className="text-sm font-extrabold text-slate-900">Acceso Super Admin</div>
-            <p className="text-[11px] text-slate-500">
+            <div className="text-sm font-bold text-[#2C2621]">Acceso Super Admin</div>
+            <p className="text-[11px] text-[#6B6860]">
               Introduce el PIN de administrador para configurar modelos locales.
               {isUsingDevSuperAdminPin() ? " (PIN dev por defecto: 246800)" : ""}
             </p>
             {adminAuthError && (
-              <div role="alert" className="rounded-xl bg-rose-50 p-2 text-[11px] text-rose-800">
+              <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2 text-[11px] font-semibold text-[#5A121C]">
                 {adminAuthError}
               </div>
             )}
@@ -905,20 +931,20 @@ export function SettingsSheet({
               placeholder="PIN de administrador"
               value={adminPinInput}
               onChange={(e) => setAdminPinInput(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+              className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowAdminModal(false)}
-                className="min-h-10 flex-1 rounded-xl border border-slate-300 font-bold text-slate-700"
+                className="min-h-[44px] flex-1 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-bold text-[#2C2621] cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 data-testid="superadmin-pin-submit"
-                className="min-h-10 flex-1 rounded-xl bg-slate-900 font-bold text-white"
+                className="min-h-[44px] flex-1 rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
               >
                 Entrar
               </button>
@@ -932,7 +958,7 @@ export function SettingsSheet({
           type="button"
           data-testid="settings-version-trigger"
           onClick={handleVersionTap}
-          className="text-[10px] font-medium text-slate-400 select-none"
+          className="font-mono text-[10px] font-medium text-[#6B6860] select-none cursor-pointer"
         >
           Gestor Autónomo · v{installedVersion?.versionName ?? "1.0.0"}
         </button>

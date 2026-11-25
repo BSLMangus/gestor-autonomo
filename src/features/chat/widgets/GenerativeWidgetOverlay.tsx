@@ -64,14 +64,14 @@ export function GenerativeWidgetOverlay(props: {
         role="dialog"
         aria-modal="true"
         aria-label={overlay.title}
-        className="fixed inset-0 z-50 flex w-full max-w-full flex-col overflow-x-hidden bg-surface text-on-surface"
+        className="fixed inset-0 z-50 flex w-full max-w-full flex-col overflow-x-hidden bg-[#F9F7F2] cotton-paper text-[#2C2621] font-sans"
       >
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#E5DFD2] bg-[#FFFDF7] px-4 py-3 shadow-[0_2px_10px_rgba(44,38,33,0.04)]">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-on-primary-container">
+            <div className="inline-flex items-center rounded-full status-tangerine px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
               {overlay.badge}
             </div>
-            <h2 className="truncate text-[15px] font-semibold text-on-surface">{overlay.title}</h2>
+            <h2 className="mt-0.5 truncate text-[15px] font-semibold text-[#2C2621]">{overlay.title}</h2>
           </div>
           <button
             type="button"
@@ -79,7 +79,7 @@ export function GenerativeWidgetOverlay(props: {
             aria-label="Cerrar asistente interactivo"
             disabled={isSubmitting}
             onClick={onCloseOrReject}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621] hover:bg-[#EFECE4] disabled:opacity-50 cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -91,14 +91,14 @@ export function GenerativeWidgetOverlay(props: {
             data-testid="overlay-error-banner"
             className="mx-auto mt-3 w-full max-w-2xl px-4"
           >
-            <div className="rounded-2xl border border-coral-alert/30 bg-error-container px-3.5 py-2.5 text-xs font-semibold text-on-error-container">
+            <div className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3.5 py-2.5 text-xs font-semibold text-[#5A121C]">
               {overlayError}
             </div>
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-4 py-4 pb-8">
-          <div className="mx-auto w-full max-w-2xl">
+          <div className="mx-auto w-full max-w-2xl clipboard-panel rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 sm:p-3.5 text-[#2C2621]">
             {overlay.kind === "document_import" ? (
               <DocumentImportReviewWidget
                 initialDraft={overlay.draft}

@@ -202,7 +202,7 @@ export function JobsView({
   const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
 
   return (
-    <div data-testid="jobs-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-3.5 bg-surface">
+    <div data-testid="jobs-view" className="cotton-paper flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-3.5 bg-[#F9F7F2] text-[#2C2621] font-sans">
       <div className="flex items-center justify-between gap-2">
         <input
           type="search"
@@ -213,13 +213,13 @@ export function JobsView({
             setPageOffset(0);
           }}
           placeholder="Buscar por código, título o dirección..."
-          className="min-h-[48px] flex-1 rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 text-[14px] text-on-surface placeholder:text-outline focus:border-terracotta focus:outline-none"
+          className="min-h-[48px] flex-1 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 text-[14px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none shadow-xs"
         />
         <button
           type="button"
           data-testid="jobs-new-btn"
           onClick={() => setShowNewJobForm((v) => !v)}
-          className="min-h-[48px] shrink-0 rounded-2xl bg-primary hover:bg-terracotta px-4 text-[13px] font-semibold text-white shadow-xs cursor-pointer"
+          className="min-h-[48px] shrink-0 rounded-xl bg-[#D04B00] hover:bg-[#EA580C] px-4 text-[13px] font-semibold text-white shadow-xs cursor-pointer transition-colors"
         >
           + Nueva obra
         </button>
@@ -228,10 +228,10 @@ export function JobsView({
       {showNewJobForm && (
         <form
           onSubmit={(e) => void handleCreateJob(e)}
-          className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] space-y-3 text-xs"
+          className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3 text-xs"
         >
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[15px] font-semibold text-on-surface">
+            <div className="text-[15px] font-semibold text-[#2C2621]">
               Abrir nuevo expediente de obra
             </div>
           </div>
@@ -320,7 +320,7 @@ export function JobsView({
             placeholder="Título de la obra *"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <ZoomableTextField
             as="input"
@@ -330,12 +330,12 @@ export function JobsView({
             placeholder="Dirección / Ubicación (opcional)"
             value={newAddress}
             onValueChange={setNewAddress}
-            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <select
             value={newClientId}
             onChange={(e) => setNewClientId(e.target.value)}
-            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           >
             <option value="">Sin cliente vinculado todavía</option>
             {clients.map((c) => (
@@ -346,7 +346,7 @@ export function JobsView({
           </select>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-on-surface-variant">
+              <span className="text-[11px] font-semibold text-[#6B6860]">
                 Fecha inicio (opcional)
               </span>
               <input
@@ -360,11 +360,11 @@ export function JobsView({
                     setNewEndDate(next);
                   }
                 }}
-                className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
+                className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[12px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-on-surface-variant">
+              <span className="text-[11px] font-semibold text-[#6B6860]">
                 Fecha fin (opcional)
               </span>
               <input
@@ -372,12 +372,12 @@ export function JobsView({
                 data-testid="jobs-new-end-date"
                 value={newEndDate}
                 onChange={(e) => setNewEndDate(e.target.value)}
-                className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[12px]"
+                className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[12px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
           </div>
           {newStartDate && (!newEndDate || newStartDate === newEndDate) && (
-            <div className="rounded-xl border border-outline-variant bg-surface-container-low/60 p-3">
+            <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
               <SubDayDurationPicker
                 startTime={newPlanStartTime}
                 endTime={newPlanEndTime}
@@ -392,7 +392,7 @@ export function JobsView({
             </div>
           )}
           {newStartDate && (!newEndDate || newEndDate >= newStartDate) && (
-            <div className="rounded-xl border border-outline-variant bg-terracotta-soft px-3 py-2 text-[11px] font-medium text-on-primary-container">
+            <div className="rounded-xl border border-[#E5DFD2] bg-[#FFD6B0] px-3 py-2 text-[11px] font-medium text-[#4A2500]">
               {!newEndDate || newStartDate === newEndDate
                 ? "Trabajo de un solo día o por horas: se fijará directamente en el calendario."
                 : "Si tienes activado el horario habitual, se generarán automáticamente las jornadas en el calendario."}
@@ -402,14 +402,14 @@ export function JobsView({
             <button
               type="button"
               onClick={() => setShowNewJobForm(false)}
-              className="min-h-[44px] rounded-xl border border-outline-variant px-4 font-semibold text-on-surface-variant cursor-pointer"
+              className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-4 font-semibold text-[#6B6860] cursor-pointer hover:border-[#EA580C]"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="min-h-[44px] flex-1 rounded-xl bg-secondary font-semibold text-on-secondary cursor-pointer"
+              className="min-h-[44px] flex-1 rounded-xl bg-[#4B7094] font-semibold text-[#FFFDF9] cursor-pointer shadow-xs"
             >
               Crear obra
             </button>
@@ -428,8 +428,8 @@ export function JobsView({
             }}
             className={`min-h-[40px] shrink-0 rounded-full px-3.5 text-[12px] font-semibold cursor-pointer transition-colors ${
               statusFilter === st.value
-                ? "bg-secondary text-on-secondary"
-                : "bg-surface-container-lowest border border-outline-variant text-on-surface-variant"
+                ? "bg-[#4B7094] text-[#FFFDF9] shadow-xs"
+                : "bg-[#EAE5D9] border border-[#E5DFD2] text-[#3D352E]"
             }`}
           >
             {st.label}
@@ -438,7 +438,7 @@ export function JobsView({
       </div>
 
       {errorMsg && (
-        <div role="alert" className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 text-xs text-on-error-container">
+        <div role="alert" className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-xs text-[#5A121C]">
           {errorMsg}
         </div>
       )}
@@ -452,27 +452,31 @@ export function JobsView({
               type="button"
               data-testid={`directory-job-${job.id}`}
               onClick={() => setSelectedJobId(job.id)}
-              className="w-full rounded-[20px] border border-outline-variant bg-surface-warm-card p-4 text-left shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:border-terracotta transition-colors cursor-pointer"
+              className="relative w-full ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-10 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
+              <span className="absolute left-2.5 top-4 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
+              <span className="absolute left-2.5 bottom-4 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-[12px] font-semibold text-on-primary-container tabular-nums">
+                <span className="font-mono font-mono-nums text-[12px] font-semibold text-[#6B6860] tabular-nums">
                   {job.job_code}
                 </span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                     job.status === "en_curso"
-                      ? "bg-success-container text-on-success-container"
+                      ? "status-emerald"
                       : job.status === "finalizado"
-                        ? "bg-surface-container text-on-surface-variant"
-                        : "bg-warning-container text-on-warning-container"
+                        ? "status-cobalt"
+                        : job.status === "cancelado"
+                          ? "status-tangerine"
+                          : "status-gold"
                   }`}
                 >
                   {job.status}
                 </span>
               </div>
-              <div className="mt-1.5 text-[16px] font-semibold text-on-surface">{job.title}</div>
+              <div className="mt-1.5 text-[16px] font-semibold text-[#2C2621]">{job.title}</div>
               {(clName || job.address || job.start_date_iso) && (
-                <div className="mt-1 text-[13px] text-on-surface-variant">
+                <div className="mt-1 text-[13px] text-[#6B6860]">
                   {clName ? `${clName}${job.address ? ` · ${job.address}` : ""}` : job.address}
                   {job.start_date_iso
                     ? ` · ${job.start_date_iso}${job.end_date_iso ? ` → ${job.end_date_iso}` : ""}`
@@ -483,7 +487,7 @@ export function JobsView({
           );
         })}
         {jobs.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+          <div className="paper-sheet rounded-2xl border border-dashed border-[#E5DFD2] bg-[#FFFDF7] p-6 text-center text-xs text-[#6B6860]">
             No hay obras que coincidan con el filtro actual.
           </div>
         )}
@@ -495,18 +499,18 @@ export function JobsView({
             type="button"
             disabled={pageOffset === 0}
             onClick={() => setPageOffset((p) => Math.max(0, p - pageLimit))}
-            className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold disabled:opacity-40"
+            className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#2C2621] disabled:opacity-40"
           >
             Anterior
           </button>
-          <span className="text-slate-600">
+          <span className="font-mono tabular-nums text-[#6B6860]">
             {pageOffset + 1}–{Math.min(pageOffset + pageLimit, totalCount)} de {totalCount}
           </span>
           <button
             type="button"
             disabled={pageOffset + pageLimit >= totalCount}
             onClick={() => setPageOffset((p) => p + pageLimit)}
-            className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold disabled:opacity-40"
+            className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#2C2621] disabled:opacity-40"
           >
             Siguiente
           </button>

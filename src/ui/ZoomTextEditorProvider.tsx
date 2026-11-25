@@ -334,7 +334,7 @@ export function ZoomTextEditorProvider({
           }
         }}
         className={`fixed z-[80] flex items-start justify-center px-3 pt-3 pt-safe transition-opacity duration-200 ${
-          isEntering || isClosing ? "bg-secondary/0 opacity-0" : "bg-secondary/50 opacity-100"
+          isEntering || isClosing ? "bg-[#2C2621]/0 opacity-0" : "bg-[#2C2621]/45 opacity-100"
         } backdrop-blur-[2px]`}
       >
         <div
@@ -357,13 +357,13 @@ export function ZoomTextEditorProvider({
             }
           }}
           onClick={(e) => e.stopPropagation()}
-          className="relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-[22px] border-2 border-terracotta/45 bg-surface-container-lowest shadow-[0_24px_60px_rgba(15,23,42,0.3),0_10px_24px_rgba(15,23,42,0.16)]"
+          className="clipboard-panel relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-[22px] border-2 border-[#EA580C]/45 bg-[#FFFDF7]"
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-outline-variant bg-surface-warm-card px-4 py-2.5">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E5DFD2] bg-[#F5F1E6] px-4 py-2.5">
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-bold text-on-surface">{session.label}</div>
+              <div className="truncate text-[13px] font-bold text-[#2C2621]">{session.label}</div>
               {session.maxLength !== undefined && (
-                <div className="text-[11px] font-medium text-on-surface-variant">
+                <div className="text-[11px] font-medium text-[#6B6860]">
                   {draftValue.length} / {session.maxLength} caracteres
                 </div>
               )}
@@ -373,7 +373,7 @@ export function ZoomTextEditorProvider({
               data-testid="zoom-editor-header-cancel-btn"
               aria-label="Descartar cambios"
               onClick={closeWithAnimation}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface hover:border-coral-alert hover:text-coral-alert cursor-pointer"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] hover:border-[#DC2626] hover:text-[#DC2626] cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -399,16 +399,16 @@ export function ZoomTextEditorProvider({
                   commitAndClose();
                 }
               }}
-              className="w-full min-h-[120px] resize-none rounded-xl border border-outline-variant bg-surface-container-low px-3.5 py-3 text-[18px] leading-relaxed text-on-surface placeholder:text-outline focus:border-terracotta focus:outline-none"
+              className="w-full min-h-[120px] resize-none rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3.5 py-3 text-[18px] leading-relaxed text-[#2C2621] placeholder:text-[#6B6860] focus:border-terracotta focus:outline-none"
             />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5 border-t border-outline-variant bg-surface-container-lowest px-4 py-3">
+          <div className="flex shrink-0 items-center gap-2.5 border-t border-[#E5DFD2] bg-[#F5F1E6] px-4 py-3">
             <button
               type="button"
               data-testid="zoom-editor-cancel-btn"
               onClick={closeWithAnimation}
-              className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-low px-4 text-[14px] font-semibold text-on-surface hover:border-coral-alert hover:text-coral-alert cursor-pointer"
+              className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-[14px] font-semibold text-[#2C2621] hover:border-[#DC2626] hover:text-[#DC2626] cursor-pointer"
             >
               <X className="h-4 w-4 shrink-0" />
               <span>Cancelar</span>
@@ -430,13 +430,13 @@ export function ZoomTextEditorProvider({
               role="alertdialog"
               aria-modal="true"
               aria-label="¿Desea guardar los cambios realizados?"
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-surface-container-lowest/96 p-5 text-center space-y-4"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#FFFDF7]/96 p-5 text-center space-y-4"
             >
               <div className="space-y-1.5">
-                <h4 className="text-[16px] font-bold text-on-surface">
+                <h4 className="text-[16px] font-bold text-[#2C2621]">
                   ¿Desea guardar los cambios realizados?
                 </h4>
-                <p className="text-[12px] text-on-surface-variant">
+                <p className="text-[12px] text-[#6B6860]">
                   Has modificado el texto de «{session.label}».
                 </p>
               </div>
@@ -445,7 +445,7 @@ export function ZoomTextEditorProvider({
                   type="button"
                   data-testid="zoom-editor-discard-btn"
                   onClick={closeWithAnimation}
-                  className="min-h-[48px] flex-1 rounded-xl border border-coral-alert/40 bg-error-container px-4 text-[14px] font-bold text-on-error-container cursor-pointer"
+                  className="min-h-[48px] flex-1 rounded-xl border border-[#DC2626]/40 bg-[#FAD2D8] px-4 text-[14px] font-bold text-[#5A121C] cursor-pointer"
                 >
                   No
                 </button>

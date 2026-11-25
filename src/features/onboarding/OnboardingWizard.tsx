@@ -332,16 +332,16 @@ export function OnboardingWizard({
   return (
     <div
       data-testid="onboarding-wizard"
-      className="min-h-dvh w-full bg-surface flex flex-col overflow-x-hidden"
+      className="min-h-dvh w-full cotton-paper text-[#2C2621] flex flex-col overflow-x-hidden"
     >
       {/* Cabecera fija con progreso */}
-      <header className="sticky top-0 z-20 border-b border-outline-variant bg-surface-container-lowest px-4 py-3">
+      <header className="sticky top-0 z-20 border-b border-[#E5DFD2] bg-[#FFFDF7] px-4 py-3">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-2">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-on-primary-container">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-[#D04B00]">
               Configuración inicial · Paso {step} de 2
             </div>
-            <h1 className="text-[16px] font-bold text-on-surface">
+            <h1 className="font-sans text-[16px] font-bold text-[#2C2621]">
               {step === 1 ? "Tus datos y logotipo" : "Tarifa, horarios y tarifario"}
             </h1>
           </div>
@@ -350,7 +350,7 @@ export function OnboardingWizard({
             data-testid="onboarding-skip-btn"
             disabled={busy}
             onClick={() => void handleSkip()}
-            className="min-h-[38px] rounded-full border border-outline-variant px-3 text-[11px] font-semibold text-on-surface-variant hover:text-on-surface cursor-pointer"
+            className="min-h-[38px] rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[11px] font-semibold text-[#6B6860] hover:text-[#2C2621] cursor-pointer"
           >
             Más tarde
           </button>
@@ -358,8 +358,8 @@ export function OnboardingWizard({
 
         {/* Barra de progreso */}
         <div className="mx-auto mt-2.5 grid w-full max-w-md grid-cols-2 gap-1.5">
-          <div className="h-1.5 rounded-full bg-terracotta" />
-          <div className={`h-1.5 rounded-full ${step === 2 ? "bg-terracotta" : "bg-surface-container"}`} />
+          <div className="h-1.5 rounded-full bg-[#EA580C]" />
+          <div className={`h-1.5 rounded-full ${step === 2 ? "bg-[#EA580C]" : "bg-[#EFECE4]"}`} />
         </div>
       </header>
 
@@ -367,7 +367,7 @@ export function OnboardingWizard({
         {errorMsg && (
           <div
             role="alert"
-            className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 font-medium text-on-error-container break-words"
+            className="paper-sheet rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 font-medium text-[#5A121C] break-words"
           >
             {errorMsg}
           </div>
@@ -375,7 +375,7 @@ export function OnboardingWizard({
         {statusMsg && (
           <div
             role="status"
-            className="rounded-2xl border border-outline-variant bg-success-container p-3 font-semibold text-on-success-container break-words"
+            className="paper-sheet rounded-2xl border border-[#1E8E5A]/30 bg-[#D4EDDA] p-3 font-semibold text-[#1B3A24] break-words"
           >
             {statusMsg}
           </div>
@@ -387,23 +387,23 @@ export function OnboardingWizard({
             onSubmit={(e) => void handleSaveStep1AndNext(e)}
             className="space-y-4"
           >
-            <div className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
+            <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
               <div className="flex items-start gap-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta-soft text-on-primary-container">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFD6B0] text-[#4A2500]">
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-on-surface">
+                  <h2 className="text-[15px] font-bold text-[#2C2621]">
                     Datos fiscales de tu empresa o autónomo
                   </h2>
-                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                  <p className="mt-0.5 text-[11px] text-[#6B6860]">
                     Se usarán automáticamente en la cabecera de tus presupuestos y facturas PDF.
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-name">
+                <label className="block text-[11px] font-semibold text-[#6B6860] mb-1" htmlFor="onb-name">
                   Nombre completo o razón social
                 </label>
                 <input
@@ -417,13 +417,13 @@ export function OnboardingWizard({
                     setEmitterName(e.target.value);
                   }}
                   placeholder="Ej: Carlos Morales García"
-                  className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+                  className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-nif">
+                  <label className="block text-[11px] font-semibold text-[#6B6860] mb-1" htmlFor="onb-nif">
                     NIF / CIF
                   </label>
                   <input
@@ -437,11 +437,11 @@ export function OnboardingWizard({
                       setEmitterNif(e.target.value.toUpperCase());
                     }}
                     placeholder="12345678Z"
-                    className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+                    className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono text-[13px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-phone">
+                  <label className="block text-[11px] font-semibold text-[#6B6860] mb-1" htmlFor="onb-phone">
                     Teléfono
                   </label>
                   <input
@@ -455,13 +455,13 @@ export function OnboardingWizard({
                       setEmitterPhone(e.target.value);
                     }}
                     placeholder="+34 600 000 000"
-                    className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+                    className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono text-[13px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-address">
+                <label className="block text-[11px] font-semibold text-[#6B6860] mb-1" htmlFor="onb-address">
                   Domicilio fiscal
                 </label>
                 <ZoomableTextField
@@ -478,21 +478,21 @@ export function OnboardingWizard({
                     setEmitterAddress(next);
                   }}
                   placeholder="Calle, número, código postal y ciudad"
-                  className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px]"
+                  className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
+            <div className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <Landmark className="h-4 w-4 text-on-primary-container" />
-                <h2 className="text-[14px] font-semibold text-on-surface">
+                <Landmark className="h-4 w-4 text-[#D04B00]" />
+                <h2 className="text-[14px] font-bold text-[#2C2621]">
                   Cuenta bancaria y logotipo (opcional)
                 </h2>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-on-surface-variant mb-1" htmlFor="onb-iban">
+                <label className="block text-[11px] font-semibold text-[#6B6860] mb-1" htmlFor="onb-iban">
                   Cuenta bancaria (IBAN) para cobros
                 </label>
                 <input
@@ -506,16 +506,16 @@ export function OnboardingWizard({
                     setEmitterIban(e.target.value.toUpperCase());
                   }}
                   placeholder="ES00 0000 0000 0000 0000 0000"
-                  className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono text-[12px]"
+                  className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono text-[12px] text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
                 />
               </div>
 
               <div className="space-y-2">
-                <div className="text-[11px] font-semibold text-on-surface-variant">
+                <div className="text-[11px] font-semibold text-[#6B6860]">
                   Logotipo para tus PDFs
                 </div>
                 {logoDataUrl ? (
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-3">
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
                     <img
                       src={logoDataUrl}
                       alt="Logotipo seleccionado"
@@ -524,15 +524,15 @@ export function OnboardingWizard({
                     <button
                       type="button"
                       onClick={() => setLogoDataUrl(null)}
-                      className="inline-flex items-center gap-1 rounded-xl border border-coral-alert/30 bg-surface-container-lowest px-3 py-1.5 text-[11px] font-semibold text-coral-alert cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-xl border border-[#DC2626]/30 bg-[#FFFDF7] px-3 py-1.5 text-[11px] font-semibold text-[#DC2626] cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       <span>Quitar</span>
                     </button>
                   </div>
                 ) : (
-                  <label className="flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low px-3 py-2 font-semibold text-on-surface hover:border-terracotta">
-                    <ImagePlus className="h-4 w-4 text-on-primary-container" />
+                  <label className="flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 font-semibold text-[#2C2621] hover:border-[#EA580C]">
+                    <ImagePlus className="h-4 w-4 text-[#D04B00]" />
                     <span>Subir logotipo (PNG / JPG)</span>
                     <input
                       type="file"
@@ -555,7 +555,7 @@ export function OnboardingWizard({
               type="submit"
               data-testid="onboarding-next-btn"
               disabled={busy}
-              className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-primary hover:bg-terracotta px-4 text-[14px] font-semibold text-white shadow-sm cursor-pointer disabled:opacity-50"
+              className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[#D04B00] hover:bg-[#EA580C] px-4 text-[14px] font-semibold text-[#FFFDF9] shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
             >
               <span>Guardar y continuar</span>
               <ArrowRight className="h-4 w-4" />
@@ -564,17 +564,18 @@ export function OnboardingWizard({
         ) : (
           <div data-testid="onboarding-step-2" className="space-y-4">
             {/* Tarifa base e impuestos */}
-            <section className="rounded-[20px] border border-outline-variant bg-terracotta-soft p-4 space-y-3">
+            <section className="postit-note postit-peach p-4 pt-5 space-y-3">
+              <span className="washi-tape washi-peach" aria-hidden="true" />
               <div className="flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-on-primary-container" />
-                <h2 className="text-[15px] font-semibold text-on-surface">
+                <Calculator className="h-4 w-4 text-[#4A2500]" />
+                <h2 className="text-[15px] font-bold text-[#2C2621]">
                   Tarifa por hora e impuestos
                 </h2>
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-2.5">
-                  <label className="block text-[11px] font-semibold text-on-surface-variant" htmlFor="onb-rate">
+                <div className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5">
+                  <label className="block text-[11px] font-semibold text-[#6B6860]" htmlFor="onb-rate">
                     Tarifa base (€/h)
                   </label>
                   <input
@@ -589,11 +590,11 @@ export function OnboardingWizard({
                       editedFieldsRef.current.add("hourlyRate");
                       setHourlyRateInput(e.target.value);
                     }}
-                    className="mt-1 w-full rounded-lg border border-outline-variant px-2.5 py-1.5 font-mono text-[14px] font-bold"
+                    className="mt-1 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono text-[14px] font-bold text-[#2C2621] tabular-nums"
                   />
                 </div>
-                <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-2.5">
-                  <label className="block text-[11px] font-semibold text-on-surface-variant" htmlFor="onb-vat">
+                <div className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5">
+                  <label className="block text-[11px] font-semibold text-[#6B6860]" htmlFor="onb-vat">
                     IVA defecto (%)
                   </label>
                   <input
@@ -609,11 +610,11 @@ export function OnboardingWizard({
                       editedFieldsRef.current.add("defaultVat");
                       setDefaultVatInput(e.target.value);
                     }}
-                    className="mt-1 w-full rounded-lg border border-outline-variant px-2.5 py-1.5 font-mono text-[14px] font-bold"
+                    className="mt-1 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono text-[14px] font-bold text-[#2C2621] tabular-nums"
                   />
                 </div>
-                <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-2.5">
-                  <label className="block text-[11px] font-semibold text-on-surface-variant" htmlFor="onb-irpf">
+                <div className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5">
+                  <label className="block text-[11px] font-semibold text-[#6B6860]" htmlFor="onb-irpf">
                     Reserva IRPF (%)
                   </label>
                   <input
@@ -629,22 +630,22 @@ export function OnboardingWizard({
                       editedFieldsRef.current.add("irpfRate");
                       setIrpfRateInput(e.target.value);
                     }}
-                    className="mt-1 w-full rounded-lg border border-outline-variant px-2.5 py-1.5 font-mono text-[14px] font-bold"
+                    className="mt-1 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono text-[14px] font-bold text-[#2C2621] tabular-nums"
                   />
                 </div>
               </div>
             </section>
 
             {/* Horario habitual */}
-            <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
+            <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-on-primary-container" />
-                  <h2 className="text-[14px] font-semibold text-on-surface">
+                  <Clock className="h-4 w-4 text-[#D04B00]" />
+                  <h2 className="text-[14px] font-bold text-[#2C2621]">
                     Horario habitual de trabajo
                   </h2>
                 </div>
-                <span className="rounded-full bg-success-container px-2.5 py-0.5 font-mono text-[11px] font-semibold text-on-success-container">
+                <span className="status-emerald rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
                   {(dailyBreakdown.totalThousandths / 1000).toFixed(1).replace(/\.0$/, "")} h/día
                 </span>
               </div>
@@ -664,8 +665,8 @@ export function OnboardingWizard({
                       }}
                       className={`min-h-[40px] rounded-xl text-[12px] font-semibold cursor-pointer ${
                         active
-                          ? "bg-secondary text-on-secondary"
-                          : "border border-outline-variant bg-surface-container-low text-on-surface-variant"
+                          ? "bg-[#4B7094] text-[#FFFDF9]"
+                          : "border border-[#E5DFD2] bg-[#F5F1E6] text-[#6B6860]"
                       }`}
                     >
                       {day.label}
@@ -675,8 +676,8 @@ export function OnboardingWizard({
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2">
-                  <span className="font-semibold text-on-surface">Mañana</span>
+                <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2">
+                  <span className="font-semibold text-[#2C2621]">Mañana</span>
                   <div className="flex items-center gap-1">
                     <input
                       type="time"
@@ -685,7 +686,7 @@ export function OnboardingWizard({
                       onChange={(e) =>
                         setWorkSchedule((p) => ({ ...p, morning_start: e.target.value }))
                       }
-                      className="rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 font-mono text-[11px]"
+                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
                     />
                     <span>–</span>
                     <input
@@ -695,12 +696,12 @@ export function OnboardingWizard({
                       onChange={(e) =>
                         setWorkSchedule((p) => ({ ...p, morning_end: e.target.value }))
                       }
-                      className="rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 font-mono text-[11px]"
+                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
                     />
                   </div>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2">
-                  <span className="font-semibold text-on-surface">Tarde</span>
+                <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2">
+                  <span className="font-semibold text-[#2C2621]">Tarde</span>
                   <div className="flex items-center gap-1">
                     <input
                       type="time"
@@ -709,7 +710,7 @@ export function OnboardingWizard({
                       onChange={(e) =>
                         setWorkSchedule((p) => ({ ...p, afternoon_start: e.target.value }))
                       }
-                      className="rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 font-mono text-[11px]"
+                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
                     />
                     <span>–</span>
                     <input
@@ -719,7 +720,7 @@ export function OnboardingWizard({
                       onChange={(e) =>
                         setWorkSchedule((p) => ({ ...p, afternoon_end: e.target.value }))
                       }
-                      className="rounded-lg border border-outline-variant bg-surface-container-lowest px-1.5 py-1 font-mono text-[11px]"
+                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
                     />
                   </div>
                 </div>
@@ -727,22 +728,22 @@ export function OnboardingWizard({
             </section>
 
             {/* Importador IA y partidas predefinidas */}
-            <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
+            <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-on-primary-container" />
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#D04B00]" />
                   <div>
-                    <h2 className="text-[14px] font-semibold text-on-surface">
+                    <h2 className="text-[14px] font-bold text-[#2C2621]">
                       Tu tarifario ({activeCatalogCount} partidas activas)
                     </h2>
-                    <p className="text-[11px] text-on-surface-variant">
+                    <p className="text-[11px] text-[#6B6860]">
                       Sube presupuestos o tarifas anteriores, o activa partidas habituales.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <label className="flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/70 px-3 py-2 text-xs font-bold text-indigo-900">
+              <label className="status-cobalt flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-2 text-xs font-bold">
                 <FileUp className="h-4 w-4 shrink-0" />
                 <span>
                   {importingDocs
@@ -764,11 +765,11 @@ export function OnboardingWizard({
               </label>
 
               <div className="flex items-center justify-between pt-1">
-                <span className="font-semibold text-on-surface">Catálogo predefinido de oficios</span>
+                <span className="font-semibold text-[#2C2621]">Catálogo predefinido de oficios</span>
                 <button
                   type="button"
                   onClick={() => setShowTemplates((v) => !v)}
-                  className="rounded-lg border border-outline-variant px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant cursor-pointer"
+                  className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1 text-[11px] font-semibold text-[#6B6860] cursor-pointer"
                 >
                   {showTemplates ? "Ocultar" : "Mostrar"}
                 </button>
@@ -783,13 +784,13 @@ export function OnboardingWizard({
                     return (
                       <div
                         key={tpl.template_id}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 py-2"
+                        className="flex items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-2"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="break-words [overflow-wrap:anywhere] font-semibold text-on-surface">
+                          <div className="break-words [overflow-wrap:anywhere] font-semibold text-[#2C2621]">
                             {tpl.description}
                           </div>
-                          <div className="text-[10px] text-on-surface-variant">
+                          <div className="text-[10px] text-[#6B6860]">
                             {tpl.category} ·{" "}
                             {formatPricingBreakdown({
                               pricing_mode: tpl.pricing_mode,
@@ -801,7 +802,7 @@ export function OnboardingWizard({
                           </div>
                         </div>
                         {isActive ? (
-                          <span className="shrink-0 rounded-lg bg-success-container px-2.5 py-1 text-[11px] font-semibold text-on-success-container">
+                          <span className="status-emerald shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold">
                             Activa
                           </span>
                         ) : (
@@ -810,7 +811,7 @@ export function OnboardingWizard({
                             data-testid={`onboarding-activate-tpl-${tpl.template_id}`}
                             disabled={busy}
                             onClick={() => void handleActivateTemplate(tpl)}
-                            className="shrink-0 rounded-lg bg-secondary px-2.5 py-1.5 text-[11px] font-semibold text-on-secondary cursor-pointer"
+                            className="shrink-0 rounded-lg bg-[#4B7094] px-2.5 py-1.5 text-[11px] font-semibold text-[#FFFDF9] cursor-pointer"
                           >
                             Activar
                           </button>
@@ -823,10 +824,10 @@ export function OnboardingWizard({
             </section>
 
             {/* Restaurar copia de seguridad */}
-            <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 space-y-2.5">
+            <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5">
               <div className="flex items-center gap-2">
-                <Upload className="h-4 w-4 text-on-primary-container" />
-                <h2 className="text-[14px] font-semibold text-on-surface">
+                <Upload className="h-4 w-4 text-[#D04B00]" />
+                <h2 className="text-[14px] font-bold text-[#2C2621]">
                   ¿Quieres recuperar una copia anterior?
                 </h2>
               </div>
@@ -836,9 +837,9 @@ export function OnboardingWizard({
                 placeholder="Contraseña de la copia, si tiene"
                 value={backupPassword}
                 onChange={(e) => setBackupPassword(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-xs"
+                className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860]/70 focus:border-[#EA580C] focus:outline-none"
               />
-              <label className="flex min-h-[44px] cursor-pointer items-center justify-center rounded-xl border border-outline-variant bg-surface-container-low font-semibold text-on-surface hover:border-terracotta">
+              <label className="flex min-h-[44px] cursor-pointer items-center justify-center rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-semibold text-[#2C2621] hover:border-[#EA580C]">
                 Restaurar copia de seguridad
                 <input
                   type="file"
@@ -865,7 +866,7 @@ export function OnboardingWizard({
                   setStatusMsg(null);
                   setStep(1);
                 }}
-                className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 text-[13px] font-semibold text-on-surface cursor-pointer"
+                className="inline-flex min-h-[50px] items-center justify-center gap-1.5 rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-[13px] font-semibold text-[#2C2621] cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Volver</span>
@@ -875,7 +876,7 @@ export function OnboardingWizard({
                 data-testid="onboarding-finish-btn"
                 disabled={busy}
                 onClick={() => void handleFinish()}
-                className="inline-flex min-h-[50px] flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary hover:bg-terracotta px-4 text-[14px] font-semibold text-white shadow-sm cursor-pointer disabled:opacity-50"
+                className="inline-flex min-h-[50px] flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#D04B00] hover:bg-[#EA580C] px-4 text-[14px] font-semibold text-[#FFFDF9] shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
               >
                 <Check className="h-4 w-4" />
                 <span>{busy ? "Guardando..." : "Finalizar y empezar"}</span>
@@ -890,7 +891,7 @@ export function OnboardingWizard({
           role="dialog"
           aria-modal="true"
           aria-label="Revisar importación de tarifario"
-          className="fixed inset-0 z-50 flex flex-col bg-surface overflow-y-auto p-4"
+          className="fixed inset-0 z-50 flex flex-col cotton-paper overflow-y-auto p-4"
         >
           <div className="mx-auto w-full max-w-2xl">
             <DocumentImportReviewWidget

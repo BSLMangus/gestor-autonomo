@@ -44,12 +44,12 @@ function VoiceFeedbackStrip({
       className="w-full max-w-full overflow-hidden space-y-1.5 text-[11px]"
     >
       {(hasChanges || hasWarnings) && (
-        <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-xl border border-outline-variant bg-surface-warm-card px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 shadow-xs">
           <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1">
             {lastChanges?.map((ch, idx) => (
               <span
                 key={`${ch}-${idx}`}
-                className="inline-flex max-w-full items-center gap-1 rounded-full bg-success-container px-2 py-0.5 font-semibold text-on-success-container break-words"
+                className="inline-flex max-w-full items-center gap-1 rounded-full status-emerald px-2 py-0.5 font-semibold break-words"
               >
                 <Check className="h-3 w-3 shrink-0" />
                 <span className="truncate">{ch}</span>
@@ -58,7 +58,7 @@ function VoiceFeedbackStrip({
             {lastWarnings?.map((w, idx) => (
               <span
                 key={`${w}-${idx}`}
-                className="inline-flex max-w-full items-center rounded-full bg-warning-container px-2 py-0.5 font-semibold text-on-warning-container break-words"
+                className="inline-flex max-w-full items-center rounded-full status-mustard px-2 py-0.5 font-semibold break-words"
               >
                 {w}
               </span>
@@ -69,7 +69,7 @@ function VoiceFeedbackStrip({
               type="button"
               data-testid={`${testIdPrefix}-undo-btn`}
               onClick={onUndo}
-              className="inline-flex min-h-[30px] shrink-0 items-center gap-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 text-[11px] font-bold text-on-surface hover:border-terracotta cursor-pointer"
+              className="inline-flex min-h-[30px] shrink-0 items-center gap-1 rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 text-[11px] font-bold text-[#2C2621] hover:border-terracotta cursor-pointer"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
               <span>Deshacer</span>
@@ -81,10 +81,10 @@ function VoiceFeedbackStrip({
       {hasDisambig && disambiguation && (
         <div
           data-testid={`${testIdPrefix}-disambiguation`}
-          className="rounded-xl border border-terracotta/40 bg-terracotta-soft p-2 space-y-1.5"
+          className="rounded-xl border border-[#EA580C]/35 bg-[#FFD6B0]/70 p-2 space-y-1.5"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 font-semibold text-on-primary-container">
+            <span className="min-w-0 flex-1 font-semibold text-[#4A2500]">
               {disambiguation.prompt}
             </span>
             {disambiguation.onDismiss && (
@@ -92,7 +92,7 @@ function VoiceFeedbackStrip({
                 type="button"
                 aria-label="Descartar sugerencias"
                 onClick={disambiguation.onDismiss}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-on-primary-container hover:bg-white/60 cursor-pointer"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#4A2500] hover:bg-[#FFFDF7]/70 cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -105,11 +105,11 @@ function VoiceFeedbackStrip({
                 type="button"
                 data-testid={`${testIdPrefix}-disambig-${opt.id}`}
                 onClick={() => disambiguation.onSelect(opt.id)}
-                className="min-h-[34px] max-w-full rounded-xl border border-terracotta/30 bg-white px-2.5 py-1 text-left text-[11px] font-semibold text-on-surface hover:border-terracotta cursor-pointer"
+                className="min-h-[34px] max-w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1 text-left text-[11px] font-semibold text-[#2C2621] hover:border-terracotta cursor-pointer"
               >
                 <span className="block truncate">{opt.label}</span>
                 {opt.subtitle && (
-                  <span className="block truncate text-[10px] font-normal text-on-surface-variant">
+                  <span className="block truncate text-[10px] font-normal text-[#6B6860]">
                     {opt.subtitle}
                   </span>
                 )}
@@ -172,7 +172,7 @@ export function ContextualVoiceDock({
     <>
       <div
         data-testid="contextual-voice-dock"
-        className="shrink-0 w-full max-w-full overflow-x-hidden border-t border-outline-variant bg-surface-container-lowest px-4 py-2.5 pb-safe shadow-[0_-4px_16px_rgba(15,23,42,0.06)]"
+        className="shrink-0 w-full max-w-full overflow-x-hidden border-t border-[#E2DDD0] bg-[#F5F1E6] px-4 py-2.5 pb-safe shadow-[0_-4px_16px_rgba(44,38,33,0.06)]"
       >
         <div className="mx-auto w-full max-w-2xl space-y-2">
           <VoiceFeedbackStrip
@@ -185,7 +185,7 @@ export function ContextualVoiceDock({
           />
 
           <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-on-surface-variant">
+            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#6B6860]">
               Puedes seguir rellenando o corrigiendo campos por audio
             </span>
             <button
@@ -288,7 +288,7 @@ export function InlineVoiceFormTrigger({
             data-testid={testId}
             disabled={disabled || busy}
             onClick={() => setOpen(true)}
-            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-terracotta/40 bg-terracotta-soft px-3.5 text-[12px] font-semibold text-on-primary-container hover:border-terracotta disabled:opacity-45 cursor-pointer"
+            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-[#EA580C]/40 bg-[#FFD6B0] px-3.5 text-[12px] font-semibold text-[#4A2500] hover:border-terracotta disabled:opacity-45 cursor-pointer"
           >
             <Mic className="h-3.5 w-3.5 shrink-0" />
             <span>{buttonLabel}</span>

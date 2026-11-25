@@ -71,28 +71,28 @@ export function ConfirmDeleteDialog({
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descId}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-secondary/50 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[#2C2621]/45 p-4 backdrop-blur-[1px]"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) {
           onCancel();
         }
       }}
     >
-      <div className="w-full max-w-sm rounded-[24px] border border-outline-variant bg-surface-container-lowest p-5 shadow-2xl space-y-3.5 text-xs">
+      <div className="clipboard-panel w-full max-w-sm rounded-[24px] border border-[#DFD9CA] bg-[#FFFDF7] p-5 space-y-3.5 text-xs">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-error-container text-coral-alert">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FAD2D8] text-[#DC2626]">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <h3
               id={titleId}
-              className="text-[15px] font-bold leading-snug text-on-surface break-words"
+              className="text-[15px] font-bold leading-snug text-[#2C2621] break-words"
             >
               {title}
             </h3>
             <p
               id={descId}
-              className="text-xs leading-relaxed text-on-surface-variant break-words"
+              className="text-xs leading-relaxed text-[#6B6860] break-words"
             >
               {description}
             </p>
@@ -100,7 +100,7 @@ export function ConfirmDeleteDialog({
         </div>
 
         {warningNote && (
-          <div className="rounded-xl border border-amber-300/60 bg-warning-container p-2.5 text-[11px] font-medium leading-relaxed text-on-warning-container break-words">
+          <div className="rounded-xl border border-[#E6B84C]/55 bg-[#FFF3A1] p-2.5 text-[11px] font-medium leading-relaxed text-[#3E3300] break-words">
             {warningNote}
           </div>
         )}
@@ -108,7 +108,7 @@ export function ConfirmDeleteDialog({
         {errorMsg && (
           <div
             role="alert"
-            className="rounded-xl border border-coral-alert/30 bg-error-container p-2.5 text-[11px] leading-relaxed text-on-error-container break-words"
+            className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 text-[11px] leading-relaxed text-[#5A121C] break-words"
           >
             {errorMsg}
           </div>
@@ -120,7 +120,7 @@ export function ConfirmDeleteDialog({
             data-testid={cancelTestId}
             disabled={busy}
             onClick={onCancel}
-            className="min-h-[44px] flex-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-xs font-semibold text-on-surface cursor-pointer disabled:opacity-50"
+            className="min-h-[44px] flex-1 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-xs font-semibold text-[#2C2621] hover:bg-[#EFECE4] cursor-pointer disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -129,7 +129,7 @@ export function ConfirmDeleteDialog({
             data-testid={confirmTestId}
             disabled={busy}
             onClick={() => void onConfirm()}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-coral-alert px-3 text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#DC2626] px-3 text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{busy ? "Eliminando..." : confirmLabel}</span>

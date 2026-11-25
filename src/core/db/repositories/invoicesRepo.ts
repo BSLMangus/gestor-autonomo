@@ -135,12 +135,32 @@ export class InvoicesRepository {
     const quote = quoteRows[0];
     const settingsRows = await this.executor.query<{
       emitter_phone: string;
+      emitter_email?: string;
       emitter_iban?: string;
+      emitter_bank_name?: string;
       emitter_logo_data_url?: string | null;
-    }>(`SELECT emitter_phone, emitter_iban, emitter_logo_data_url FROM app_settings WHERE id = 1`);
+    }>(
+      `SELECT emitter_phone, emitter_email, emitter_iban, emitter_bank_name, emitter_logo_data_url
+       FROM app_settings WHERE id = 1`
+    );
     const emitterPhone = settingsRows[0]?.emitter_phone ?? "";
+    const emitterEmail = settingsRows[0]?.emitter_email ?? "";
     const emitterIban = settingsRows[0]?.emitter_iban ?? "";
+    const emitterBankName = settingsRows[0]?.emitter_bank_name ?? "";
     const emitterLogoDataUrl = settingsRows[0]?.emitter_logo_data_url ?? null;
+
+    const clientRows = await this.executor.query<{ email?: string }>(
+      `SELECT email FROM clients WHERE id = ? LIMIT 1`,
+      [invoice.client_id]
+    );
+    const clientEmail = clientRows[0]?.email ?? "";
+
+    const paymentStatus =
+      invoice.status === "pagado"
+        ? "Pagada"
+        : invoice.status === "vencido"
+          ? "Vencida"
+          : "Pendiente de cobro";
 
     const pdfInput: PdfInvoiceDocumentInput = {
       kind: "invoice",
@@ -154,7 +174,9 @@ export class InvoicesRepository {
         nif: invoice.emitter_nif_snapshot,
         fiscalAddress: invoice.emitter_address_snapshot,
         phone: emitterPhone,
+        email: emitterEmail,
         iban: emitterIban,
+        bankName: emitterBankName,
         logoDataUrl: emitterLogoDataUrl,
       },
       client: {
@@ -162,6 +184,7 @@ export class InvoicesRepository {
         nif: invoice.client_nif_snapshot,
         fiscalAddress: invoice.client_address_snapshot,
         phone: invoice.client_phone_snapshot,
+        email: clientEmail,
       },
       jobCode: job?.job_code ?? "",
       jobTitle: job?.title ?? "",
@@ -173,6 +196,7 @@ export class InvoicesRepository {
       advanceDeductedBaseCents: invoice.advance_deducted_base_cents,
       advanceDeductedVatCents: invoice.advance_deducted_vat_cents,
       notes: invoice.notes,
+      paymentStatus,
     };
 
     const release = this.memoryCoordinator

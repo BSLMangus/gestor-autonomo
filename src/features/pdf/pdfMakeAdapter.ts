@@ -13,7 +13,29 @@ import type {
   PdfInvoiceDocumentInput,
   PdfPort,
   PdfQuoteDocumentInput,
+  PdfWorkOrderDocumentInput,
 } from "../../core/ports/mediaPorts";
+import {
+  PDF_COLORS,
+  PDF_PAGE_MARGINS,
+  PDF_PAGE_SIZE,
+  buildContextBanner,
+  buildCreamNoticeBox,
+  buildDualSignatureBlock,
+  buildIbanStrip,
+  buildPastelDataCell,
+  buildPastelHeaderCell,
+  buildPastelSubtotalCell,
+  buildPastelTable,
+  buildSectionBanner,
+  buildSlateInfoStrip,
+  buildStatusBadgeCell,
+  buildTotalsBanner,
+  buildUnifiedFooter,
+  buildUnifiedHeader,
+  buildUnifiedPartiesBlock,
+  type TotalsBannerItem,
+} from "./pdfSharedStyles";
 
 interface PdfMakeRuntime {
   vfs?: Record<string, string>;
@@ -42,240 +64,241 @@ const PAYMENT_METHOD_LABELS: Record<QuotePaymentMethod, string> = {
   tarjeta: "Tarjeta",
 };
 
-function buildPartyBlock(
-  label: string,
-  party: { name: string; nif: string; fiscalAddress: string; phone: string; iban?: string },
-  options?: { allowEmpty?: boolean }
-): Record<string, unknown> {
-  const hasName = party.name.trim().length > 0;
-  if (options?.allowEmpty && !hasName) {
-    return {
-      stack: [
-        { text: label, fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
-        {
-          text: "Presupuesto simplificado sin datos de cliente asignados",
-          italics: true,
-          fontSize: 9,
-          color: "#64748b",
-        },
-      ],
-    };
+function formatEstimatedDuration(
+  value: number | null | undefined,
+  unit: PdfQuoteDocumentInput["estimatedDurationUnit"]
+): string | null {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null;
   }
-  return {
-    stack: [
-      { text: label, fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
-      { text: party.name || "-", bold: true, fontSize: 10 },
-      { text: `NIF/CIF: ${party.nif || "-"}`, fontSize: 9, color: "#334155" },
-      { text: party.fiscalAddress || "-", fontSize: 9, color: "#334155" },
-      ...(party.phone ? [{ text: `Tel: ${party.phone}`, fontSize: 9, color: "#334155" }] : []),
-      ...(party.iban ? [{ text: `IBAN: ${party.iban}`, fontSize: 9, bold: true, color: "#334155" }] : []),
-    ],
-  };
+  const formattedVal = Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
+  if (unit === "semanas") {
+    return `${formattedVal} ${value === 1 ? "Semana" : "Semanas"}`;
+  }
+  return `${formattedVal} ${value === 1 ? "Día laborable" : "Días laborables"}`;
 }
 
-function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, unknown> {
-  const cleanRows: Array<Array<Record<string, unknown>>> = [
+export function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<string, unknown> {
+  const generalDescription = input.generalDescription?.trim() || input.jobTitle?.trim() || "";
+  const estimatedDurationText = formatEstimatedDuration(
+    input.estimatedDurationValue,
+    input.estimatedDurationUnit
+  );
+
+  const lineRows: Array<Array<Record<string, unknown>>> = [
     [
-      { text: "Concepto", style: "th" },
-      { text: "Ud", style: "th", alignment: "center" },
-      { text: "Cant.", style: "th", alignment: "right" },
-      { text: "P. Unit.", style: "th", alignment: "right" },
-      { text: "Importe", style: "th", alignment: "right" },
+      buildPastelHeaderCell("Descripción de las tareas"),
+      buildPastelHeaderCell("Costes", "right"),
     ],
     ...input.lines.map((line) => [
-      { text: line.description, fontSize: 9 },
-      { text: line.unit, fontSize: 9, alignment: "center" },
-      { text: formatThousandthsEs(line.quantityThousandths), fontSize: 9, alignment: "right" },
-      { text: formatCentsEs(line.unitPriceCents), fontSize: 9, alignment: "right" },
-      { text: formatCentsEs(line.lineSubtotalCents), fontSize: 9, alignment: "right", bold: true },
+      buildPastelDataCell([
+        { text: line.description, fontSize: 9.5, color: PDF_COLORS.ink },
+        {
+          text: `${formatThousandthsEs(line.quantityThousandths)} ${line.unit} × ${formatCentsEs(line.unitPriceCents)}`,
+          fontSize: 8,
+          color: PDF_COLORS.ink,
+          margin: [0, 2, 0, 0],
+        },
+      ]),
+      buildPastelDataCell(formatCentsEs(line.lineSubtotalCents), {
+        bold: true,
+        alignment: "right",
+      }),
     ]),
+    [
+      buildPastelSubtotalCell("Sub-Total"),
+      buildPastelSubtotalCell(formatCentsEs(input.subtotalCents), "right"),
+    ],
   ];
 
-  const paymentMethods = input.paymentMethods ?? [];
-  const paymentSchedule = input.paymentSchedule ?? [];
-  const scheduleAmounts = computePaymentScheduleAmounts(input.totalCents, paymentSchedule);
-  const paymentBlocks: Array<Record<string, unknown>> = [];
+  const content: Array<Record<string, unknown>> = [
+    buildUnifiedHeader({
+      logoDataUrl: input.emitter.logoDataUrl,
+      title: "PRESUPUESTO",
+      documentNumber: input.quoteCode,
+      metaLines: [`Fecha de emisión: ${input.issuedDateIso}`],
+    }),
+    buildUnifiedPartiesBlock({
+      emitter: {
+        name: input.emitter.name,
+        nif: input.emitter.nif,
+        fiscalAddress: input.emitter.fiscalAddress,
+        phone: input.emitter.phone,
+        email: input.emitter.email,
+      },
+      client: {
+        name: input.client.name,
+        nif: input.client.nif,
+        fiscalAddress: input.client.fiscalAddress,
+        phone: input.client.phone,
+        email: input.client.email,
+        emptyFallbackText: "Presupuesto simplificado sin datos de cliente asignados",
+      },
+    }),
+  ];
 
-  if (paymentMethods.length > 0 || scheduleAmounts.length > 0) {
-    const methodLabels = paymentMethods.map((m) => PAYMENT_METHOD_LABELS[m] ?? m);
-    paymentBlocks.push({
-      stack: [
-        {
-          text: "CONDICIONES Y FORMA DE PAGO",
-          fontSize: 8.5,
-          bold: true,
-          color: "#0f172a",
-          margin: [0, 12, 0, 4],
-        },
-        ...(methodLabels.length > 0
-          ? [
-              {
-                text: `Métodos aceptados: ${methodLabels.join(" · ")}`,
-                fontSize: 9,
-                color: "#334155",
-                margin: [0, 0, 0, 3],
-              },
-            ]
-          : []),
-        ...(paymentMethods.includes("transferencia") && input.emitter.iban
-          ? [
-              {
-                text: `Cuenta bancaria (IBAN): ${input.emitter.iban}`,
-                fontSize: 8.5,
-                bold: true,
-                color: "#334155",
-                margin: [0, 0, 0, 4],
-              },
-            ]
-          : []),
-        ...(scheduleAmounts.length > 0
-          ? [
-              {
-                table: {
-                  headerRows: 1,
-                  widths: ["*", 64, 84],
-                  body: [
-                    [
-                      { text: "Hito de pago", style: "th" },
-                      { text: "Porcentaje", style: "th", alignment: "right" },
-                      { text: "Importe", style: "th", alignment: "right" },
-                    ],
-                    ...scheduleAmounts.map((step) => [
-                      { text: step.label, fontSize: 9, color: "#0f172a" },
-                      {
-                        text: formatPercentEs(step.percentage),
-                        fontSize: 9,
-                        alignment: "right",
-                        color: "#334155",
-                      },
-                      {
-                        text: formatCentsEs(step.amount_cents),
-                        fontSize: 9,
-                        bold: true,
-                        alignment: "right",
-                        color: "#0f172a",
-                      },
-                    ]),
-                  ],
-                },
-                layout: "lightHorizontalLines",
-                margin: [0, 2, 0, 4],
-              },
-            ]
-          : []),
-      ],
+  if (generalDescription.length > 0) {
+    content.push(
+      buildContextBanner({
+        label: "Descripción general",
+        value: generalDescription,
+        variant: "cyan",
+        marginBottom: estimatedDurationText ? 6 : 12,
+      })
+    );
+  }
+
+  if (estimatedDurationText) {
+    content.push(
+      buildContextBanner({
+        label: "Tiempo estimado",
+        value: estimatedDurationText,
+        variant: "sky",
+        marginBottom: 12,
+      })
+    );
+  }
+
+  content.push(
+    buildPastelTable({
+      widths: ["*", 96],
+      body: lineRows,
+      marginBottom: 12,
+    })
+  );
+
+  const closingStack: Array<Record<string, unknown>> = [];
+
+  const trimmedNotes = input.notes?.trim() ?? "";
+  const attachments = input.attachments ?? [];
+  if (trimmedNotes.length > 0 || attachments.length > 0) {
+    const notesStack: Array<Record<string, unknown>> = [
+      {
+        text: "Notas técnicas y certificaciones:",
+        fontSize: 9,
+        bold: true,
+        color: PDF_COLORS.mutedText,
+        margin: [0, 0, 0, 3],
+      },
+    ];
+    if (trimmedNotes.length > 0) {
+      notesStack.push({
+        text: trimmedNotes,
+        fontSize: 9,
+        color: PDF_COLORS.mutedText,
+        margin: [0, 0, 0, attachments.length > 0 ? 4 : 0],
+      });
+    }
+    for (const att of attachments) {
+      const excerpt = att.extractedText?.trim();
+      notesStack.push({
+        text: excerpt ? `• ${att.name}: ${excerpt}` : `• Documento adjunto: ${att.name}`,
+        fontSize: 9,
+        color: PDF_COLORS.mutedText,
+        margin: [0, 1, 0, 1],
+      });
+    }
+    closingStack.push({
+      stack: notesStack,
+      margin: [0, 0, 0, 12],
     });
   }
 
-  return {
-    pageSize: "A4",
-    pageMargins: [36, 40, 36, 48],
-    content: [
-      {
-        columns: [
-          {
-            stack: [
-              ...(input.emitter.logoDataUrl
-                ? [{ image: input.emitter.logoDataUrl, fit: [110, 44], margin: [0, 0, 0, 6] }]
-                : []),
-              { text: "PRESUPUESTO DE OBRA", fontSize: 16, bold: true, color: "#0f172a" },
-              { text: `Código: ${input.quoteCode}`, fontSize: 11, bold: true, color: "#ea580c", margin: [0, 3, 0, 0] },
-              { text: `Obra: ${input.jobTitle}`, fontSize: 9.5, color: "#334155", margin: [0, 2, 0, 0] },
-            ],
-          },
-          {
-            stack: [
-              { text: `Fecha emisión: ${input.issuedDateIso}`, fontSize: 9.5, alignment: "right" },
-              ...(input.validityDays
-                ? [
-                    {
-                      text: input.validUntilIso
-                        ? `Validez: ${input.validityDays} días (hasta ${input.validUntilIso})`
-                        : `Validez: ${input.validityDays} días`,
-                      fontSize: 9,
-                      bold: true,
-                      color: "#334155",
-                      alignment: "right",
-                      margin: [0, 2, 0, 0],
-                    },
-                  ]
-                : []),
-              { text: "Documento generado 100 % offline", fontSize: 8, color: "#64748b", alignment: "right", margin: [0, 2, 0, 0] },
-            ],
-          },
-        ],
-        margin: [0, 0, 0, 14],
-      },
-      {
-        columns: [
-          buildPartyBlock("EMISOR / PROFESIONAL", input.emitter),
-          buildPartyBlock("CLIENTE", input.client, { allowEmpty: true }),
-        ],
-        columnGap: 20,
-        margin: [0, 0, 0, 16],
-      },
-      {
-        table: {
-          headerRows: 1,
-          widths: ["*", 32, 42, 62, 68],
-          body: cleanRows,
-        },
-        layout: "lightHorizontalLines",
-        margin: [0, 0, 0, 14],
-      },
-      {
-        columns: [
-          { width: "*", text: "" },
-          {
-            width: 210,
-            table: {
-              widths: ["*", 84],
-              body: [
-                [
-                  { text: "Base imponible:", fontSize: 9.5 },
-                  { text: formatCentsEs(input.subtotalCents), fontSize: 9.5, alignment: "right" },
-                ],
-                [
-                  { text: `IVA (${input.vatRate} %):`, fontSize: 9.5 },
-                  { text: formatCentsEs(input.vatCents), fontSize: 9.5, alignment: "right" },
-                ],
-                [
-                  { text: "TOTAL PRESUPUESTO:", fontSize: 11, bold: true, fillColor: "#f8fafc" },
-                  {
-                    text: formatCentsEs(input.totalCents),
-                    fontSize: 11,
-                    bold: true,
-                    alignment: "right",
-                    fillColor: "#f8fafc",
-                  },
-                ],
-              ],
-            },
-            layout: "noBorders",
-          },
-        ],
-      },
-      ...paymentBlocks,
-      ...(input.notes
-        ? [
-            {
-              stack: [
-                {
-                  text: "OBSERVACIONES Y CONDICIONES ADICIONALES",
-                  fontSize: 8.5,
-                  bold: true,
-                  color: "#0f172a",
-                  margin: [0, 12, 0, 3],
-                },
-                { text: input.notes, fontSize: 8.5, color: "#475569" },
-              ],
-            },
-          ]
-        : []),
-    ],
-    styles: {
-      th: { fontSize: 9, bold: true, color: "#0f172a", fillColor: "#f1f5f9", margin: [0, 3, 0, 3] },
+  closingStack.push(
+    buildTotalsBanner([
+      { label: "Base imponible", value: formatCentsEs(input.subtotalCents), alignment: "left" },
+      { label: `IVA (${input.vatRate} %)`, value: formatCentsEs(input.vatCents), alignment: "center" },
+      { label: "Total", value: formatCentsEs(input.totalCents), alignment: "right", emphasize: true },
+    ])
+  );
+
+  const effectiveValidityDays =
+    input.validityDays !== null &&
+    input.validityDays !== undefined &&
+    Number.isFinite(input.validityDays) &&
+    input.validityDays > 0
+      ? Math.round(input.validityDays)
+      : 30;
+
+  const trimmedPaymentTerms = input.paymentTermsText?.trim() ?? "";
+  const paymentMethods = input.paymentMethods ?? [];
+  const paymentSchedule = input.paymentSchedule ?? [];
+  const scheduleAmounts = computePaymentScheduleAmounts(input.totalCents, paymentSchedule);
+  const paymentConditionParts: string[] = [];
+
+  if (trimmedPaymentTerms.length > 0) {
+    paymentConditionParts.push(trimmedPaymentTerms);
+  }
+  if (scheduleAmounts.length > 0) {
+    paymentConditionParts.push(
+      scheduleAmounts
+        .map((s) => `${s.label}: ${formatPercentEs(s.percentage)} (${formatCentsEs(s.amount_cents)})`)
+        .join(" · ")
+    );
+  }
+  if (paymentMethods.length > 0) {
+    const methodLabels = paymentMethods.map((m) => PAYMENT_METHOD_LABELS[m] ?? m);
+    paymentConditionParts.push(`Métodos aceptados: ${methodLabels.join(" · ")}`);
+  }
+
+  const validityBoxStack: Array<Record<string, unknown>> = [
+    {
+      text: "Presupuesto orientativo. Sujeto a diseño, medición y negociación.",
+      fontSize: 8.5,
+      bold: true,
+      color: PDF_COLORS.creamText,
+      alignment: "center",
+      margin: [0, 0, 0, 3],
     },
+    {
+      text: `Presupuesto válido durante ${effectiveValidityDays} días.`,
+      fontSize: 8.5,
+      bold: true,
+      color: PDF_COLORS.creamText,
+      alignment: "center",
+      margin: [0, 0, 0, 4],
+    },
+    {
+      text: "El presupuesto no cubre imprevistos generados por problemas surgidos una vez empiecen las obras debido a vicios ocultos del inmueble. Importe estimado con materiales de calidades medias; puede variar según necesidades del cliente.",
+      fontSize: 8,
+      color: PDF_COLORS.creamText,
+      alignment: "center",
+    },
+  ];
+
+  if (paymentConditionParts.length > 0) {
+    validityBoxStack.push({
+      text: [
+        { text: "Condiciones de pago: ", bold: true, color: PDF_COLORS.creamText },
+        { text: paymentConditionParts.join(" | "), color: PDF_COLORS.creamText },
+      ],
+      fontSize: 8.5,
+      alignment: "center",
+      margin: [0, 5, 0, 0],
+    });
+  }
+
+  closingStack.push(buildCreamNoticeBox(validityBoxStack, 10));
+
+  const resolvedIban = input.ibanOverride?.trim() || input.emitter.iban?.trim() || "";
+  const resolvedBankName = input.bankName?.trim() || input.emitter.bankName?.trim() || "";
+  const shouldShowIban = (input.showIban ?? true) && resolvedIban.length > 0;
+
+  if (shouldShowIban) {
+    closingStack.push(buildIbanStrip(resolvedIban, resolvedBankName, 10));
+  }
+
+  closingStack.push(buildUnifiedFooter());
+
+  content.push({
+    stack: closingStack,
+    unbreakable: true,
+  });
+
+  return {
+    pageSize: PDF_PAGE_SIZE,
+    pageMargins: PDF_PAGE_MARGINS,
+    content,
   };
 }
 
@@ -285,132 +308,444 @@ function invoiceKindLabel(
 ): string {
   switch (kind) {
     case "advance_40":
-      return `FACTURA DE ANTICIPO (${formatPercentEs(advancePercent ?? 40)})`;
+      return `Factura de anticipo (${formatPercentEs(advancePercent ?? 40)})`;
     case "final":
-      return "FACTURA FINAL / LIQUIDACIÓN";
+      return "Factura final / liquidación";
     case "full":
-      return "FACTURA COMPLETA";
+      return "Factura completa";
   }
 }
 
-function buildInvoiceDocDefinition(input: PdfInvoiceDocumentInput): Record<string, unknown> {
+export function buildInvoiceDocDefinition(input: PdfInvoiceDocumentInput): Record<string, unknown> {
   const kindText = invoiceKindLabel(input.invoiceKind, input.advancePercent);
+  const irpfCents =
+    input.irpfCents !== undefined && Number.isFinite(input.irpfCents) && input.irpfCents > 0
+      ? input.irpfCents
+      : 0;
+  const lineGrossTotalCents = input.baseCents + input.vatCents;
+
+  const headerMetaLines: Array<string | { text: string; bold?: boolean }> = [
+    `Fecha de emisión: ${input.issuedAtIso}`,
+    `Fecha de vencimiento: ${input.dueAtIso}`,
+  ];
+
+  if (input.isRectificative) {
+    if (input.rectifiedInvoiceNumber?.trim()) {
+      headerMetaLines.push({
+        text: `Rectifica a: Nº ${input.rectifiedInvoiceNumber.trim()}`,
+        bold: true,
+      });
+    }
+    if (input.rectificationReason?.trim()) {
+      headerMetaLines.push(`Motivo: ${input.rectificationReason.trim()}`);
+    }
+  }
+
   const rows: Array<Array<Record<string, unknown>>> = [
     [
-      { text: "Concepto", style: "th" },
-      { text: "Base", style: "th", alignment: "right" },
-      { text: `IVA (${input.vatRate} %)`, style: "th", alignment: "right" },
-      { text: "Total", style: "th", alignment: "right" },
+      buildPastelHeaderCell("Concepto"),
+      buildPastelHeaderCell("Base", "right"),
+      buildPastelHeaderCell(`IVA (${input.vatRate} %)`, "right"),
+      buildPastelHeaderCell("Total", "right"),
     ],
     [
-      {
-        text: `${kindText} · Obra ${input.jobCode} (${input.jobTitle}) · Ref. ${input.quoteCode}`,
+      buildPastelDataCell(
+        `${kindText} · Obra ${input.jobCode} (${input.jobTitle}) · Ref. ${input.quoteCode}`,
+        { fontSize: 9 }
+      ),
+      buildPastelDataCell(formatCentsEs(input.baseCents), { fontSize: 9, alignment: "right" }),
+      buildPastelDataCell(formatCentsEs(input.vatCents), { fontSize: 9, alignment: "right" }),
+      buildPastelDataCell(formatCentsEs(lineGrossTotalCents), {
         fontSize: 9,
-      },
-      { text: formatCentsEs(input.baseCents), fontSize: 9, alignment: "right" },
-      { text: formatCentsEs(input.vatCents), fontSize: 9, alignment: "right" },
-      { text: formatCentsEs(input.totalCents), fontSize: 9, alignment: "right", bold: true },
+        bold: true,
+        alignment: "right",
+      }),
     ],
   ];
 
   if (input.advanceDeductedBaseCents > 0) {
     const deductedTotal = input.advanceDeductedBaseCents + input.advanceDeductedVatCents;
     rows.push([
-      {
-        text: "Anticipo previo deducido (ya facturado y devengado en factura ANT)",
+      buildPastelDataCell(
+        "Anticipo previo deducido (ya facturado y devengado en factura ANT)",
+        { fontSize: 8.5, color: PDF_COLORS.slateSubtle }
+      ),
+      buildPastelDataCell(`-${formatCentsEs(input.advanceDeductedBaseCents)}`, {
         fontSize: 8.5,
-        color: "#475569",
-      },
-      { text: `-${formatCentsEs(input.advanceDeductedBaseCents)}`, fontSize: 8.5, alignment: "right", color: "#475569" },
-      { text: `-${formatCentsEs(input.advanceDeductedVatCents)}`, fontSize: 8.5, alignment: "right", color: "#475569" },
-      { text: `-${formatCentsEs(deductedTotal)}`, fontSize: 8.5, alignment: "right", color: "#475569" },
+        color: PDF_COLORS.slateSubtle,
+        alignment: "right",
+      }),
+      buildPastelDataCell(`-${formatCentsEs(input.advanceDeductedVatCents)}`, {
+        fontSize: 8.5,
+        color: PDF_COLORS.slateSubtle,
+        alignment: "right",
+      }),
+      buildPastelDataCell(`-${formatCentsEs(deductedTotal)}`, {
+        fontSize: 8.5,
+        color: PDF_COLORS.slateSubtle,
+        alignment: "right",
+      }),
+    ]);
+    rows.push([
+      buildPastelSubtotalCell("Sub-Total", "left", 9),
+      buildPastelSubtotalCell(formatCentsEs(input.baseCents), "right", 9),
+      buildPastelSubtotalCell(formatCentsEs(input.vatCents), "right", 9),
+      buildPastelSubtotalCell(formatCentsEs(lineGrossTotalCents), "right", 9),
     ]);
   }
 
-  return {
-    pageSize: "A4",
-    pageMargins: [36, 40, 36, 48],
-    content: [
-      {
-        columns: [
-          {
-            stack: [
-              ...(input.emitter.logoDataUrl
-                ? [{ image: input.emitter.logoDataUrl, fit: [110, 44], margin: [0, 0, 0, 6] }]
-                : []),
-              { text: kindText, fontSize: 15, bold: true, color: "#0f172a" },
-              { text: `Número de factura: ${input.invoiceNumber}`, fontSize: 11, bold: true, color: "#ea580c", margin: [0, 3, 0, 0] },
-              { text: `Obra ${input.jobCode}: ${input.jobTitle}`, fontSize: 9.5, color: "#334155", margin: [0, 2, 0, 0] },
-            ],
-          },
-          {
-            stack: [
-              { text: `Fecha emisión: ${input.issuedAtIso}`, fontSize: 9.5, alignment: "right" },
-              { text: `Vencimiento: ${input.dueAtIso}`, fontSize: 9.5, alignment: "right" },
-              { text: "Factura conforme RD 1619/2012", fontSize: 8, color: "#64748b", alignment: "right", margin: [0, 2, 0, 0] },
-            ],
-          },
-        ],
-        margin: [0, 0, 0, 14],
+  const secondarySegments: Array<{ label?: string; text: string }> = [];
+  if (input.quoteCode?.trim()) {
+    secondarySegments.push({ label: "Ref. presupuesto", text: input.quoteCode.trim() });
+  }
+  secondarySegments.push({ label: "Tipo", text: kindText });
+
+  const content: Array<Record<string, unknown>> = [
+    buildUnifiedHeader({
+      logoDataUrl: input.emitter.logoDataUrl,
+      title: input.isRectificative ? "FACTURA RECTIFICATIVA" : "FACTURA",
+      titleFontSize: input.isRectificative ? 16 : 18,
+      documentNumber: input.invoiceNumber,
+      metaLines: headerMetaLines,
+    }),
+    buildUnifiedPartiesBlock({
+      emitter: {
+        name: input.emitter.name,
+        nif: input.emitter.nif,
+        fiscalAddress: input.emitter.fiscalAddress,
+        phone: input.emitter.phone,
+        email: input.emitter.email,
       },
-      {
-        columns: [
-          buildPartyBlock("EMISOR OBLIGADO TRIBUTARIO", input.emitter),
-          buildPartyBlock("DESTINATARIO / CLIENTE", input.client),
-        ],
-        columnGap: 20,
-        margin: [0, 0, 0, 16],
+      client: {
+        name: input.client.name,
+        nif: input.client.nif,
+        fiscalAddress: input.client.fiscalAddress,
+        phone: input.client.phone,
+        email: input.client.email,
       },
-      {
-        table: {
-          headerRows: 1,
-          widths: ["*", 68, 68, 72],
-          body: rows,
-        },
-        layout: "lightHorizontalLines",
-        margin: [0, 0, 0, 16],
-      },
-      {
-        columns: [
-          {
-            width: "*",
-            text: input.notes ? `Notas legales / Forma de pago:\n${input.notes}` : "",
-            fontSize: 8.5,
-            color: "#475569",
-          },
-          {
-            width: 210,
-            table: {
-              widths: ["*", 84],
-              body: [
-                [
-                  { text: "Base imponible factura:", fontSize: 9.5 },
-                  { text: formatCentsEs(input.baseCents), fontSize: 9.5, alignment: "right" },
-                ],
-                [
-                  { text: `Cuota IVA (${input.vatRate} %):`, fontSize: 9.5 },
-                  { text: formatCentsEs(input.vatCents), fontSize: 9.5, alignment: "right" },
-                ],
-                [
-                  { text: "TOTAL A PAGAR:", fontSize: 11, bold: true, fillColor: "#f8fafc" },
-                  {
-                    text: formatCentsEs(input.totalCents),
-                    fontSize: 11,
-                    bold: true,
-                    alignment: "right",
-                    fillColor: "#f8fafc",
-                  },
-                ],
-              ],
+    }),
+    buildContextBanner({
+      label: "Obra",
+      value: `${input.jobCode} · ${input.jobTitle}`,
+      secondarySegments,
+      variant: "cyan",
+      marginBottom: 12,
+    }),
+    buildPastelTable({
+      widths: ["*", 72, 72, 76],
+      body: rows,
+      marginBottom: 12,
+    }),
+  ];
+
+  const closingStack: Array<Record<string, unknown>> = [];
+
+  const totalsItems: TotalsBannerItem[] = [
+    { label: "Base imponible", value: formatCentsEs(input.baseCents), alignment: "left" },
+    { label: `IVA (${input.vatRate} %)`, value: formatCentsEs(input.vatCents), alignment: "center" },
+  ];
+
+  if (irpfCents > 0) {
+    const irpfRateLabel =
+      input.irpfRate !== undefined && Number.isFinite(input.irpfRate) ? input.irpfRate : 0;
+    totalsItems.push({
+      label: `Retención IRPF (-${irpfRateLabel} %)`,
+      value: `-${formatCentsEs(irpfCents)}`,
+      alignment: "center",
+    });
+  }
+
+  totalsItems.push({
+    label: "TOTAL FACTURA",
+    value: formatCentsEs(input.totalCents),
+    alignment: "right",
+    emphasize: true,
+  });
+
+  closingStack.push(buildTotalsBanner(totalsItems, 10));
+
+  const paymentMethod = input.paymentMethod?.trim() ?? "";
+  const paymentStatus = input.paymentStatus?.trim() ?? "";
+  if (paymentMethod || paymentStatus) {
+    const paymentRuns: Array<Record<string, unknown>> = [];
+    if (paymentMethod) {
+      paymentRuns.push(
+        { text: "Forma de pago: ", bold: true, color: PDF_COLORS.ink },
+        { text: paymentMethod, color: PDF_COLORS.ink }
+      );
+    }
+    if (paymentStatus) {
+      if (paymentRuns.length > 0) {
+        paymentRuns.push({ text: "   ·   ", color: PDF_COLORS.ink });
+      }
+      paymentRuns.push(
+        { text: "Estado: ", bold: true, color: PDF_COLORS.ink },
+        { text: paymentStatus, bold: true, color: PDF_COLORS.ink }
+      );
+    }
+    closingStack.push({
+      table: {
+        dontBreakRows: true,
+        widths: ["*"],
+        body: [
+          [
+            {
+              text: paymentRuns,
+              fontSize: 9,
+              fillColor: PDF_COLORS.contextSkyBg,
+              margin: [8, 5, 8, 5],
             },
-            layout: "noBorders",
-          },
+          ],
         ],
       },
-    ],
-    styles: {
-      th: { fontSize: 9, bold: true, color: "#0f172a", fillColor: "#f1f5f9", margin: [0, 3, 0, 3] },
-    },
+      layout: "noBorders",
+      margin: [0, 0, 0, 8],
+    });
+  }
+
+  const trimmedNotes = input.notes?.trim() ?? "";
+  if (trimmedNotes.length > 0) {
+    closingStack.push({
+      stack: [
+        {
+          text: "Observaciones:",
+          fontSize: 9,
+          bold: true,
+          color: PDF_COLORS.mutedText,
+          margin: [0, 0, 0, 2],
+        },
+        {
+          text: trimmedNotes,
+          fontSize: 9,
+          color: PDF_COLORS.mutedText,
+        },
+      ],
+      margin: [0, 0, 0, 8],
+    });
+  }
+
+  const resolvedIban = input.emitter.iban?.trim() ?? "";
+  const resolvedBankName = input.emitter.bankName?.trim() ?? "";
+  const legalNotice = input.legalNotice?.trim() ?? "";
+
+  if (resolvedIban.length > 0) {
+    closingStack.push(buildIbanStrip(resolvedIban, resolvedBankName, legalNotice ? 6 : 10));
+    if (legalNotice) {
+      closingStack.push({
+        text: legalNotice,
+        fontSize: 8,
+        color: PDF_COLORS.slateSubtle,
+        alignment: "center",
+        margin: [0, 0, 0, 8],
+      });
+    }
+  } else {
+    closingStack.push(
+      buildSlateInfoStrip(
+        legalNotice || "Factura emitida conforme al Reglamento de Facturación (RD 1619/2012).",
+        { alignment: "center", fontSize: 8.5, marginBottom: 10 }
+      )
+    );
+  }
+
+  closingStack.push(buildUnifiedFooter());
+
+  content.push({
+    stack: closingStack,
+    unbreakable: true,
+  });
+
+  return {
+    pageSize: PDF_PAGE_SIZE,
+    pageMargins: PDF_PAGE_MARGINS,
+    content,
+  };
+}
+
+export function buildWorkOrderDocDefinition(
+  input: PdfWorkOrderDocumentInput
+): Record<string, unknown> {
+  const isAlbaran = input.documentType === "albaran";
+  const showPrices = input.showPrices === true;
+
+  const headerMetaLines: string[] = [`Fecha: ${input.issuedDateIso}`];
+  if (input.hoursWorkedLabel?.trim()) {
+    headerMetaLines.push(`Jornada / Horas: ${input.hoursWorkedLabel.trim()}`);
+  }
+
+  const contextValue = input.jobCode?.trim()
+    ? `${input.jobCode.trim()} · ${input.jobTitle}`
+    : input.jobTitle;
+
+  const secondarySegments: Array<{ label?: string; text: string }> = [];
+  if (input.quoteCode?.trim()) {
+    secondarySegments.push({ label: "Ref. presupuesto", text: input.quoteCode.trim() });
+  }
+
+  const formatItemDescription = (item: PdfWorkOrderDocumentInput["items"][number]): string => {
+    if (item.kind === "material") return `[Material] ${item.description}`;
+    if (item.kind === "tarea") return `[Tarea] ${item.description}`;
+    return item.description;
+  };
+
+  let tableNode: Record<string, unknown>;
+  if (showPrices) {
+    const computedSubtotal =
+      input.subtotalCents !== undefined && Number.isFinite(input.subtotalCents)
+        ? input.subtotalCents
+        : input.items.reduce((acc, item) => acc + (item.lineSubtotalCents ?? 0), 0);
+
+    const rows: Array<Array<Record<string, unknown>>> = [
+      [
+        buildPastelHeaderCell("Conceptos realizados / Materiales suministrados"),
+        buildPastelHeaderCell("Cantidad / Horas", "right"),
+        buildPastelHeaderCell("Precio unit.", "right"),
+        buildPastelHeaderCell("Importe", "right"),
+      ],
+      ...input.items.map((item) => [
+        buildPastelDataCell(formatItemDescription(item), { fontSize: 9 }),
+        buildPastelDataCell(item.quantityLabel, { fontSize: 9, alignment: "right" }),
+        buildPastelDataCell(formatCentsEs(item.unitPriceCents ?? 0), {
+          fontSize: 9,
+          alignment: "right",
+        }),
+        buildPastelDataCell(formatCentsEs(item.lineSubtotalCents ?? 0), {
+          fontSize: 9,
+          bold: true,
+          alignment: "right",
+        }),
+      ]),
+      [
+        buildPastelSubtotalCell("Sub-Total", "left", 9),
+        buildPastelSubtotalCell("", "right", 9),
+        buildPastelSubtotalCell("", "right", 9),
+        buildPastelSubtotalCell(formatCentsEs(computedSubtotal), "right", 9),
+      ],
+    ];
+
+    tableNode = buildPastelTable({
+      widths: ["*", 78, 72, 78],
+      body: rows,
+      marginBottom: 12,
+    });
+  } else {
+    const rows: Array<Array<Record<string, unknown>>> = [
+      [
+        buildPastelHeaderCell("Conceptos realizados / Materiales suministrados"),
+        buildPastelHeaderCell("Cantidad / Horas", "right"),
+      ],
+      ...input.items.map((item) => [
+        buildPastelDataCell(formatItemDescription(item), { fontSize: 9.5 }),
+        buildPastelDataCell(item.quantityLabel, {
+          fontSize: 9.5,
+          bold: true,
+          alignment: "right",
+        }),
+      ]),
+    ];
+
+    tableNode = buildPastelTable({
+      widths: ["*", 110],
+      body: rows,
+      marginBottom: 12,
+    });
+  }
+
+  const content: Array<Record<string, unknown>> = [
+    buildUnifiedHeader({
+      logoDataUrl: input.emitter.logoDataUrl,
+      title: isAlbaran ? "ALBARÁN DE ENTREGA" : "PARTE DE TRABAJO",
+      titleFontSize: 17,
+      documentNumber: input.documentCode,
+      metaLines: headerMetaLines,
+    }),
+    buildUnifiedPartiesBlock({
+      emitter: {
+        name: input.emitter.name,
+        nif: input.emitter.nif,
+        fiscalAddress: input.emitter.fiscalAddress,
+        phone: input.emitter.phone,
+        email: input.emitter.email,
+      },
+      client: {
+        name: input.client.name,
+        nif: input.client.nif,
+        fiscalAddress: input.client.fiscalAddress,
+        phone: input.client.phone,
+        email: input.client.email,
+      },
+    }),
+    buildContextBanner({
+      label: "Obra / Servicio",
+      value: contextValue,
+      secondarySegments,
+      variant: "cyan",
+      marginBottom: 12,
+    }),
+    tableNode,
+  ];
+
+  const closingStack: Array<Record<string, unknown>> = [];
+
+  const trimmedNotes = input.notes?.trim() ?? "";
+  if (trimmedNotes.length > 0) {
+    closingStack.push({
+      stack: [
+        {
+          text: "Observaciones del trabajo:",
+          fontSize: 9,
+          bold: true,
+          color: PDF_COLORS.mutedText,
+          margin: [0, 0, 0, 2],
+        },
+        {
+          text: trimmedNotes,
+          fontSize: 9,
+          color: PDF_COLORS.mutedText,
+        },
+      ],
+      margin: [0, 0, 0, 10],
+    });
+  }
+
+  closingStack.push(
+    buildDualSignatureBlock({
+      left: {
+        title: "Firma del Profesional",
+        signatureDataUrl: input.firmaProfesionalDataUrl,
+        name: input.emitter.name,
+        nif: input.emitter.nif,
+      },
+      right: {
+        title: "Firma / Conformidad del Cliente",
+        signatureDataUrl: input.firmaClienteDataUrl,
+        name: input.receiverName?.trim() || input.client.name,
+        nif: input.receiverNif?.trim() || input.client.nif,
+      },
+      marginBottom: 10,
+    })
+  );
+
+  closingStack.push(
+    buildSlateInfoStrip(
+      isAlbaran
+        ? "Albarán de entrega de materiales y trabajos realizados · Documento sin validez fiscal como factura"
+        : "Parte de trabajo y conformidad del servicio realizado · Documento de control y trazabilidad en obra",
+      { alignment: "center", fontSize: 8.5, marginBottom: 10 }
+    )
+  );
+
+  closingStack.push(buildUnifiedFooter());
+
+  content.push({
+    stack: closingStack,
+    unbreakable: true,
+  });
+
+  return {
+    pageSize: PDF_PAGE_SIZE,
+    pageMargins: PDF_PAGE_MARGINS,
+    content,
   };
 }
 
@@ -432,372 +767,398 @@ function formatMeasure(val: number | null | undefined, unit: string): string {
   return `${String(val).replace(".", ",")} ${unit}`;
 }
 
-function buildActaDocDefinition(input: PdfActaDocumentInput): Record<string, unknown> {
+export function buildActaDocDefinition(input: PdfActaDocumentInput): Record<string, unknown> {
   const { data } = input;
   const needsElec = data.especialidad === "electricidad" || data.especialidad === "mixta";
   const needsFont = data.especialidad === "fontaneria" || data.especialidad === "mixta";
 
+  const emitterExtraLines: Array<{ text: string; bold?: boolean }> = [];
+  if (data.instalador.num_registro_empresa?.trim()) {
+    emitterExtraLines.push({
+      text: `Reg. Empresa (REIE/RII): ${data.instalador.num_registro_empresa.trim()}`,
+    });
+  }
+  emitterExtraLines.push({
+    text: `Técnico: ${data.instalador.tecnico_nombre || "-"} (${data.instalador.tecnico_dni || "-"})`,
+    bold: true,
+  });
+  if (data.instalador.num_carne_instalador?.trim()) {
+    emitterExtraLines.push({
+      text: `Carné instalador: ${data.instalador.num_carne_instalador.trim()}`,
+    });
+  }
+
   const content: Array<Record<string, unknown>> = [
-    {
-      columns: [
-        {
-          stack: [
-            ...(input.emitterLogoDataUrl
-              ? [{ image: input.emitterLogoDataUrl, fit: [100, 40], margin: [0, 0, 0, 6] }]
-              : []),
-            {
-              text: "ACTA DE PUESTA EN MARCHA Y CERTIFICACIÓN INTERNA",
-              fontSize: 13.5,
-              bold: true,
-              color: "#0f172a",
-            },
-            {
-              text: `Código: ${input.codigoActa}`,
-              fontSize: 11,
-              bold: true,
-              color: "#ea580c",
-              margin: [0, 3, 0, 0],
-            },
-            {
-              text: `${ESPECIALIDAD_PDF_LABELS[data.especialidad]} · ${TIPO_ACTUACION_PDF_LABELS[data.tipo_actuacion]}`,
-              fontSize: 9,
-              color: "#334155",
-              margin: [0, 2, 0, 0],
-            },
-          ],
-        },
-        {
-          width: 175,
-          stack: [
-            { text: `Fecha emisión: ${data.fecha_emision}`, fontSize: 9, alignment: "right" },
-            {
-              text: `Estado: ${input.estado.toUpperCase()}`,
-              fontSize: 9,
-              bold: true,
-              color: input.estado === "firmada" ? "#15803d" : "#334155",
-              alignment: "right",
-              margin: [0, 2, 0, 0],
-            },
-            {
-              text: "Acta técnica de entrega y garantía · No sustituye al CIE ante Industria",
-              fontSize: 7.5,
-              color: "#64748b",
-              alignment: "right",
-              margin: [0, 3, 0, 0],
-            },
-          ],
-        },
+    buildUnifiedHeader({
+      logoDataUrl: input.emitterLogoDataUrl,
+      title: "ACTA DE PUESTA EN MARCHA",
+      titleFontSize: 16,
+      documentNumber: input.codigoActa,
+      metaLines: [`Fecha de intervención: ${data.fecha_emision}`],
+      marginBottom: 14,
+    }),
+    buildUnifiedPartiesBlock({
+      emitterTitle: "EMISOR",
+      clientTitle: "CLIENTE",
+      emitter: {
+        name: data.instalador.nombre_razon_social,
+        nif: data.instalador.nif_cif,
+        fiscalAddress: data.instalador.domicilio_fiscal,
+        phone: data.instalador.telefono,
+        email: data.instalador.email,
+        extraLines: emitterExtraLines,
+      },
+      client: {
+        name: data.cliente.nombre_razon_social,
+        nif: data.cliente.nif_cif,
+        fiscalAddress: data.cliente.direccion_emplazamiento,
+        addressPrefix: "Emplazamiento: ",
+        phone: data.cliente.telefono,
+        email: data.cliente.email,
+      },
+      marginBottom: 12,
+    }),
+    buildContextBanner({
+      label: "Alcance y ubicación en obra",
+      value: data.alcance_ubicacion.trim() || data.cliente.direccion_emplazamiento || "-",
+      secondarySegments: [
+        { label: "Especialidad", text: ESPECIALIDAD_PDF_LABELS[data.especialidad] },
+        { label: "Actuación", text: TIPO_ACTUACION_PDF_LABELS[data.tipo_actuacion] },
       ],
-      margin: [0, 0, 0, 10],
-    },
-    ...(data.alcance_ubicacion.trim()
-      ? [
-          {
-            table: {
-              widths: ["*"],
-              body: [
-                [
-                  {
-                    stack: [
-                      {
-                        text: "ALCANCE Y UBICACIÓN EN OBRA",
-                        fontSize: 7.5,
-                        bold: true,
-                        color: "#64748b",
-                        margin: [0, 0, 0, 2],
-                      },
-                      { text: data.alcance_ubicacion, fontSize: 9, color: "#0f172a" },
-                    ],
-                    fillColor: "#f8fafc",
-                    margin: [8, 6, 8, 6],
-                  },
-                ],
-              ],
-            },
-            layout: "noBorders",
-            margin: [0, 0, 0, 10],
-          },
-        ]
-      : []),
-    {
-      columns: [
-        {
-          stack: [
-            { text: "INSTALADOR AUTORIZADO", fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
-            { text: data.instalador.nombre_razon_social || "-", bold: true, fontSize: 9.5 },
-            { text: `NIF/CIF: ${data.instalador.nif_cif || "-"}`, fontSize: 8.5, color: "#334155" },
-            { text: data.instalador.domicilio_fiscal || "-", fontSize: 8.5, color: "#334155" },
-            ...(data.instalador.telefono
-              ? [{ text: `Tel: ${data.instalador.telefono}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-            ...(data.instalador.email
-              ? [{ text: `Email: ${data.instalador.email}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-            ...(data.instalador.num_registro_empresa
-              ? [{ text: `Reg. Empresa (REIE/RII): ${data.instalador.num_registro_empresa}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-            {
-              text: `Técnico: ${data.instalador.tecnico_nombre || "-"} (${data.instalador.tecnico_dni || "-"})`,
-              fontSize: 8.5,
-              bold: true,
-              color: "#0f172a",
-              margin: [0, 2, 0, 0],
-            },
-            ...(data.instalador.num_carne_instalador
-              ? [{ text: `Carné instalador: ${data.instalador.num_carne_instalador}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-          ],
-        },
-        {
-          stack: [
-            { text: "TITULAR / CLIENTE", fontSize: 8, bold: true, color: "#64748b", margin: [0, 0, 0, 2] },
-            { text: data.cliente.nombre_razon_social || "-", bold: true, fontSize: 9.5 },
-            { text: `NIF/CIF: ${data.cliente.nif_cif || "-"}`, fontSize: 8.5, color: "#334155" },
-            { text: `Emplazamiento: ${data.cliente.direccion_emplazamiento || "-"}`, fontSize: 8.5, color: "#334155" },
-            ...(data.cliente.telefono
-              ? [{ text: `Tel: ${data.cliente.telefono}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-            ...(data.cliente.email
-              ? [{ text: `Email: ${data.cliente.email}`, fontSize: 8.5, color: "#334155" }]
-              : []),
-          ],
-        },
-      ],
-      columnGap: 18,
-      margin: [0, 0, 0, 12],
-    },
+      variant: "cyan",
+      marginBottom: 10,
+    }),
   ];
 
   if (needsElec && data.memoria_electricidad) {
     const me = data.memoria_electricidad;
-    content.push({
-      text: "MEMORIA DESCRIPTIVA · ELECTRICIDAD",
-      fontSize: 9,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 4],
-    });
-    content.push({
-      table: {
-        widths: [145, "*"],
+    content.push(buildSectionBanner("MEMORIA DESCRIPTIVA · ELECTRICIDAD (REBT)"));
+    content.push(
+      buildPastelTable({
+        widths: [165, "*"],
         body: [
-          [{ text: "Tensión nominal", style: "th" }, { text: me.tension_nominal, fontSize: 8.5 }],
-          [{ text: "Interruptor General (IGA)", style: "th" }, { text: `${me.iga_amperios} A`, fontSize: 8.5 }],
-          [{ text: "Protector sobretensiones", style: "th" }, { text: me.protector_sobretensiones ? "Sí instalado" : "No", fontSize: 8.5 }],
-          [{ text: "Diferencial", style: "th" }, { text: me.diferencial_calibre || "-", fontSize: 8.5 }],
-          [{ text: "Receptores conectados", style: "th" }, { text: me.receptores_conectados || "-", fontSize: 8.5 }],
+          [
+            buildPastelHeaderCell("Parámetro técnico", "left", 8.5),
+            buildPastelHeaderCell("Especificación", "left", 8.5),
+          ],
+          [
+            buildPastelDataCell("Tensión nominal", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(me.tension_nominal, { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Interruptor General (IGA)", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(`${me.iga_amperios} A`, { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Protector sobretensiones", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(me.protector_sobretensiones ? "Sí instalado" : "No", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Diferencial", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(me.diferencial_calibre || "-", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Receptores conectados", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(me.receptores_conectados || "-", { fontSize: 8.5 }),
+          ],
         ],
-      },
-      layout: "lightHorizontalLines",
-      margin: [0, 0, 0, me.circuitos.length > 0 ? 6 : 10],
-    });
+        marginBottom: me.circuitos.length > 0 ? 6 : 10,
+      })
+    );
 
     if (me.circuitos.length > 0) {
-      content.push({
-        table: {
-          headerRows: 1,
-          widths: ["*", 70, 80],
+      content.push(
+        buildPastelTable({
+          widths: ["*", 75, 85],
           body: [
             [
-              { text: "Circuito", style: "th" },
-              { text: "Calibre", style: "th", alignment: "right" },
-              { text: "Sección", style: "th", alignment: "right" },
+              buildPastelHeaderCell("Circuito", "left", 8.5),
+              buildPastelHeaderCell("Calibre", "right", 8.5),
+              buildPastelHeaderCell("Sección", "right", 8.5),
             ],
             ...me.circuitos.map((c) => [
-              { text: c.nombre, fontSize: 8.5 },
-              { text: `${c.calibre_a} A`, fontSize: 8.5, alignment: "right" },
-              { text: `${String(c.seccion_mm2).replace(".", ",")} mm²`, fontSize: 8.5, alignment: "right" },
+              buildPastelDataCell(c.nombre, { fontSize: 8.5 }),
+              buildPastelDataCell(`${c.calibre_a} A`, { fontSize: 8.5, alignment: "right" }),
+              buildPastelDataCell(`${String(c.seccion_mm2).replace(".", ",")} mm²`, {
+                fontSize: 8.5,
+                alignment: "right",
+              }),
             ]),
           ],
-        },
-        layout: "lightHorizontalLines",
-        margin: [0, 0, 0, 10],
-      });
+          marginBottom: 10,
+        })
+      );
     }
   }
 
   if (needsFont && data.memoria_fontaneria) {
     const mf = data.memoria_fontaneria;
-    content.push({
-      text: "MEMORIA DESCRIPTIVA · FONTANERÍA Y ACS",
-      fontSize: 9,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 4],
-    });
-    content.push({
-      table: {
-        widths: [145, "*"],
+    content.push(buildSectionBanner("MEMORIA DESCRIPTIVA · FONTANERÍA Y ACS (CTE HS-4)"));
+    content.push(
+      buildPastelTable({
+        widths: [165, "*"],
         body: [
-          [{ text: "Redes intervenidas", style: "th" }, { text: mf.redes_intervenidas.join(", ") || "-", fontSize: 8.5 }],
-          [{ text: "Material de tuberías", style: "th" }, { text: mf.material_tuberias || "-", fontSize: 8.5 }],
-          [{ text: "Diámetros instalados", style: "th" }, { text: mf.diametros_mm || "-", fontSize: 8.5 }],
-          [{ text: "Llaves de corte", style: "th" }, { text: mf.ubicacion_llaves_corte || "-", fontSize: 8.5 }],
-          [{ text: "Equipos sanitarios", style: "th" }, { text: mf.equipos_sanitarios || "-", fontSize: 8.5 }],
+          [
+            buildPastelHeaderCell("Parámetro técnico", "left", 8.5),
+            buildPastelHeaderCell("Especificación", "left", 8.5),
+          ],
+          [
+            buildPastelDataCell("Redes intervenidas", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(mf.redes_intervenidas.join(", ") || "-", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Material de tuberías", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(mf.material_tuberias || "-", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Diámetros instalados", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(mf.diametros_mm || "-", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Llaves de corte", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(mf.ubicacion_llaves_corte || "-", { fontSize: 8.5 }),
+          ],
+          [
+            buildPastelDataCell("Equipos sanitarios", { fontSize: 8.5, bold: true }),
+            buildPastelDataCell(mf.equipos_sanitarios || "-", { fontSize: 8.5 }),
+          ],
         ],
-      },
-      layout: "lightHorizontalLines",
-      margin: [0, 0, 0, 10],
-    });
+        marginBottom: 10,
+      })
+    );
   }
 
   if (needsElec && data.pruebas_electricidad) {
     const pe = data.pruebas_electricidad;
-    content.push({
-      text: "PROTOCOLO DE VERIFICACIÓN Y PRUEBAS · ELECTRICIDAD",
-      fontSize: 9,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 4],
-    });
-    content.push({
-      table: {
-        headerRows: 1,
-        widths: ["*", 120],
+    content.push(buildSectionBanner("PROTOCOLO DE VERIFICACIÓN Y PRUEBAS · ELECTRICIDAD"));
+    content.push(
+      buildPastelTable({
+        widths: ["*", 130],
         body: [
-          [{ text: "Verificación / Medición", style: "th" }, { text: "Resultado", style: "th", alignment: "right" }],
-          [{ text: "Inspección visual de bornes y etiquetado", fontSize: 8.5 }, { text: pe.inspeccion_visual_bornes_etiquetado ? "Correcto" : "Pendiente", fontSize: 8.5, alignment: "right" }],
-          [{ text: "Continuidad de protección y equipotencial", fontSize: 8.5 }, { text: pe.continuidad_proteccion_equipotencial ? "Correcto" : "Pendiente", fontSize: 8.5, alignment: "right" }],
-          [{ text: "Resistencia de aislamiento", fontSize: 8.5 }, { text: formatMeasure(pe.resistencia_aislamiento_mohm, "MΩ"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Resistencia de puesta a tierra", fontSize: 8.5 }, { text: formatMeasure(pe.resistencia_tierra_ohm, "Ω"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Tiempo de disparo diferencial", fontSize: 8.5 }, { text: formatMeasure(pe.disparo_diferencial_ms, "ms"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Tensión comprobada en servicio", fontSize: 8.5 }, { text: formatMeasure(pe.tension_comprobada_v, "V"), fontSize: 8.5, alignment: "right" }],
           [
-            { text: "Dictamen verificación eléctrica", fontSize: 8.5, bold: true },
-            { text: pe.resultado_apto ? "APTO" : "NO APTO", fontSize: 8.5, bold: true, color: pe.resultado_apto ? "#15803d" : "#b91c1c", alignment: "right" },
+            buildPastelHeaderCell("Verificación / Medición", "left", 8.5),
+            buildPastelHeaderCell("Resultado", "right", 8.5),
+          ],
+          [
+            buildPastelDataCell("Inspección visual de bornes y etiquetado", { fontSize: 8.5 }),
+            buildStatusBadgeCell(
+              pe.inspeccion_visual_bornes_etiquetado ? "OK / Conforme" : "Incidencia / No Apto",
+              pe.inspeccion_visual_bornes_etiquetado
+            ),
+          ],
+          [
+            buildPastelDataCell("Continuidad de protección y equipotencial", { fontSize: 8.5 }),
+            buildStatusBadgeCell(
+              pe.continuidad_proteccion_equipotencial ? "OK / Conforme" : "Incidencia / No Apto",
+              pe.continuidad_proteccion_equipotencial
+            ),
+          ],
+          [
+            buildPastelDataCell("Resistencia de aislamiento", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pe.resistencia_aislamiento_mohm, "MΩ"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Resistencia de puesta a tierra", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pe.resistencia_tierra_ohm, "Ω"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Tiempo de disparo diferencial", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pe.disparo_diferencial_ms, "ms"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Tensión comprobada en servicio", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pe.tension_comprobada_v, "V"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Dictamen verificación eléctrica", { fontSize: 8.5, bold: true }),
+            buildStatusBadgeCell(
+              pe.resultado_apto ? "OK / Conforme (APTO)" : "Incidencia / No Apto",
+              pe.resultado_apto
+            ),
           ],
         ],
-      },
-      layout: "lightHorizontalLines",
-      margin: [0, 0, 0, 10],
-    });
+        marginBottom: 10,
+      })
+    );
   }
 
   if (needsFont && data.pruebas_fontaneria) {
     const pf = data.pruebas_fontaneria;
-    content.push({
-      text: "PROTOCOLO DE VERIFICACIÓN Y PRUEBAS · FONTANERÍA",
-      fontSize: 9,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 4],
-    });
-    content.push({
-      table: {
-        headerRows: 1,
-        widths: ["*", 120],
+    content.push(buildSectionBanner("PROTOCOLO DE VERIFICACIÓN Y PRUEBAS · FONTANERÍA"));
+    content.push(
+      buildPastelTable({
+        widths: ["*", 130],
         body: [
-          [{ text: "Verificación / Medición", style: "th" }, { text: "Resultado", style: "th", alignment: "right" }],
-          [{ text: "Presión de prueba hidráulica", fontSize: 8.5 }, { text: formatMeasure(pf.presion_prueba_bar, "bar"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Duración de prueba", fontSize: 8.5 }, { text: formatMeasure(pf.duracion_prueba_min, "min"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Estanqueidad comprobada sin fugas", fontSize: 8.5 }, { text: pf.estanqueidad_sin_fugas ? "Sin fugas" : "Con incidencia", fontSize: 8.5, alignment: "right" }],
-          [{ text: "Presión de servicio en grifería", fontSize: 8.5 }, { text: formatMeasure(pf.presion_servicio_bar, "bar"), fontSize: 8.5, alignment: "right" }],
-          [{ text: "Comprobación de desagües y válvulas", fontSize: 8.5 }, { text: pf.comprobacion_desagues_valvulas ? "Correcto" : "Pendiente", fontSize: 8.5, alignment: "right" }],
+          [
+            buildPastelHeaderCell("Verificación / Medición", "left", 8.5),
+            buildPastelHeaderCell("Resultado", "right", 8.5),
+          ],
+          [
+            buildPastelDataCell("Presión de prueba hidráulica", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pf.presion_prueba_bar, "bar"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Duración de prueba", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pf.duracion_prueba_min, "min"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Estanqueidad comprobada sin fugas", { fontSize: 8.5 }),
+            buildStatusBadgeCell(
+              pf.estanqueidad_sin_fugas ? "OK / Conforme" : "Incidencia / No Apto",
+              pf.estanqueidad_sin_fugas
+            ),
+          ],
+          [
+            buildPastelDataCell("Presión de servicio en grifería", { fontSize: 8.5 }),
+            buildPastelDataCell(formatMeasure(pf.presion_servicio_bar, "bar"), {
+              fontSize: 8.5,
+              alignment: "right",
+            }),
+          ],
+          [
+            buildPastelDataCell("Comprobación de desagües y válvulas", { fontSize: 8.5 }),
+            buildStatusBadgeCell(
+              pf.comprobacion_desagues_valvulas ? "OK / Conforme" : "Incidencia / No Apto",
+              pf.comprobacion_desagues_valvulas
+            ),
+          ],
           ...(pf.temperatura_consigna_acs_c !== null && pf.temperatura_consigna_acs_c !== undefined
-            ? [[{ text: "Temperatura consigna ACS", fontSize: 8.5 }, { text: formatMeasure(pf.temperatura_consigna_acs_c, "°C"), fontSize: 8.5, alignment: "right" }]]
+            ? [
+                [
+                  buildPastelDataCell("Temperatura consigna ACS", { fontSize: 8.5 }),
+                  buildPastelDataCell(formatMeasure(pf.temperatura_consigna_acs_c, "°C"), {
+                    fontSize: 8.5,
+                    alignment: "right",
+                  }),
+                ],
+              ]
             : []),
           [
-            { text: "Dictamen verificación fontanería", fontSize: 8.5, bold: true },
-            { text: pf.resultado_apto ? "APTO" : "NO APTO", fontSize: 8.5, bold: true, color: pf.resultado_apto ? "#15803d" : "#b91c1c", alignment: "right" },
+            buildPastelDataCell("Dictamen verificación fontanería", { fontSize: 8.5, bold: true }),
+            buildStatusBadgeCell(
+              pf.resultado_apto ? "OK / Conforme (APTO)" : "Incidencia / No Apto",
+              pf.resultado_apto
+            ),
           ],
         ],
-      },
-      layout: "lightHorizontalLines",
-      margin: [0, 0, 0, 10],
-    });
+        marginBottom: 10,
+      })
+    );
   }
 
-  if (input.resolvedFotos.length > 0) {
-    content.push({
-      text: "ANEXO FOTOGRÁFICO DE OBRA",
-      fontSize: 9,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 4],
+  const boundedPhotos = input.resolvedFotos.slice(0, 2);
+  if (boundedPhotos.length > 0) {
+    content.push(buildSectionBanner("ANEXO FOTOGRÁFICO DE OBRA"));
+    const buildPhotoCell = (item: { dataUrl: string; pieFoto: string }) => ({
+      stack: [
+        { image: item.dataUrl, fit: [235, 145], alignment: "center", margin: [0, 0, 0, 4] },
+        {
+          text: item.pieFoto || "Fotografía de instalación",
+          fontSize: 8,
+          color: PDF_COLORS.slateSubtle,
+          alignment: "center",
+        },
+      ],
+      margin: [0, 4, 0, 6],
     });
-    const photoRows: Array<Array<Record<string, unknown>>> = [];
-    for (let i = 0; i < input.resolvedFotos.length; i += 2) {
-      const left = input.resolvedFotos[i]!;
-      const right = input.resolvedFotos[i + 1];
-      const buildPhotoCell = (item: { dataUrl: string; pieFoto: string }) => ({
-        stack: [
-          { image: item.dataUrl, fit: [235, 145], alignment: "center", margin: [0, 0, 0, 4] },
-          { text: item.pieFoto || "Fotografía de instalación", fontSize: 8, color: "#475569", alignment: "center" },
-        ],
-        margin: [0, 4, 0, 6],
-      });
-      photoRows.push([
-        buildPhotoCell(left),
-        right ? buildPhotoCell(right) : { text: "" },
-      ]);
-    }
+
+    const leftPhoto = boundedPhotos[0]!;
+    const rightPhoto = boundedPhotos[1];
     content.push({
-      table: { widths: ["*", "*"], body: photoRows },
+      table: {
+        dontBreakRows: true,
+        widths: ["*", "*"],
+        body: [[buildPhotoCell(leftPhoto), rightPhoto ? buildPhotoCell(rightPhoto) : { text: "" }]],
+      },
       layout: "noBorders",
       margin: [0, 0, 0, 10],
     });
   }
 
-  content.push(
+  const warrantyStack: Array<Record<string, unknown>> = [
     {
-      text: "INSTRUCCIONES DE USO Y MANTENIMIENTO",
+      text: "Garantía de instalación y recomendaciones de mantenimiento",
       fontSize: 8.5,
       bold: true,
-      color: "#0f172a",
-      margin: [0, 4, 0, 2],
+      color: PDF_COLORS.creamText,
+      margin: [0, 0, 0, 4],
     },
-    { text: data.instrucciones_mantenimiento, fontSize: 8, color: "#334155", margin: [0, 0, 0, 6] },
-    {
-      text: "DECLARACIÓN DE CONFORMIDAD Y GARANTÍA",
-      fontSize: 8.5,
-      bold: true,
-      color: "#0f172a",
-      margin: [0, 2, 0, 2],
-    },
-    { text: data.clausula_conformidad, fontSize: 8, color: "#334155", margin: [0, 0, 0, 4] },
-    { text: data.clausula_recepcion_cliente, fontSize: 8, color: "#334155", margin: [0, 0, 0, 14] },
-    {
-      columns: [
-        {
-          stack: [
-            { text: "Por la empresa instaladora", fontSize: 8.5, bold: true, color: "#0f172a", alignment: "center" },
-            ...(input.firmaInstaladorDataUrl
-              ? [{ image: input.firmaInstaladorDataUrl, fit: [175, 65], alignment: "center", margin: [0, 6, 0, 4] }]
-              : [{ text: "\n\n\n____________________________", alignment: "center", color: "#94a3b8", fontSize: 9 }]),
-            {
-              text: `${data.instalador.tecnico_nombre || data.instalador.nombre_razon_social || "-"}`,
-              fontSize: 8,
-              color: "#475569",
-              alignment: "center",
-            },
-          ],
-        },
-        {
-          stack: [
-            { text: "Conforme el titular / cliente", fontSize: 8.5, bold: true, color: "#0f172a", alignment: "center" },
-            ...(input.firmaClienteDataUrl
-              ? [{ image: input.firmaClienteDataUrl, fit: [175, 65], alignment: "center", margin: [0, 6, 0, 4] }]
-              : [{ text: "\n\n\n____________________________", alignment: "center", color: "#94a3b8", fontSize: 9 }]),
-            {
-              text: `${data.cliente.nombre_razon_social || "-"}`,
-              fontSize: 8,
-              color: "#475569",
-              alignment: "center",
-            },
-          ],
-        },
-      ],
-      columnGap: 24,
-    }
-  );
+  ];
+  if (data.instrucciones_mantenimiento?.trim()) {
+    warrantyStack.push({
+      text: data.instrucciones_mantenimiento.trim(),
+      fontSize: 8,
+      color: PDF_COLORS.creamText,
+      margin: [0, 0, 0, 3],
+    });
+  }
+  if (data.clausula_conformidad?.trim()) {
+    warrantyStack.push({
+      text: data.clausula_conformidad.trim(),
+      fontSize: 8,
+      color: PDF_COLORS.creamText,
+      margin: [0, 0, 0, 3],
+    });
+  }
+  if (data.clausula_recepcion_cliente?.trim()) {
+    warrantyStack.push({
+      text: data.clausula_recepcion_cliente.trim(),
+      fontSize: 8,
+      color: PDF_COLORS.creamText,
+    });
+  }
+
+  const closingStack: Array<Record<string, unknown>> = [
+    buildCreamNoticeBox(warrantyStack, 10),
+    buildDualSignatureBlock({
+      left: {
+        title: "Firma del Instalador",
+        signatureDataUrl: input.firmaInstaladorDataUrl,
+        name: data.instalador.tecnico_nombre || data.instalador.nombre_razon_social,
+        nif: data.instalador.tecnico_dni || data.instalador.nif_cif,
+      },
+      right: {
+        title: "Firma del Cliente",
+        signatureDataUrl: input.firmaClienteDataUrl,
+        name: data.cliente.nombre_razon_social,
+        nif: data.cliente.nif_cif,
+      },
+      marginBottom: 10,
+    }),
+    buildSlateInfoStrip(
+      "Acta técnica de entrega y garantía · No sustituye al CIE ante Industria",
+      { alignment: "center", fontSize: 8.5, marginBottom: 10 }
+    ),
+    buildUnifiedFooter(),
+  ];
+
+  content.push({
+    stack: closingStack,
+    unbreakable: true,
+  });
 
   return {
-    pageSize: "A4",
-    pageMargins: [36, 36, 36, 44],
+    pageSize: PDF_PAGE_SIZE,
+    pageMargins: PDF_PAGE_MARGINS,
     content,
-    styles: {
-      th: { fontSize: 8.5, bold: true, color: "#0f172a", fillColor: "#f1f5f9", margin: [0, 3, 0, 3] },
-    },
   };
 }
 
@@ -846,19 +1207,26 @@ export class PdfMakeAdapter implements PdfPort {
 
     pdfMake.vfs = resolvedVfs;
 
-    const docDef =
-      input.kind === "quote"
-        ? buildQuoteDocDefinition(input)
-        : input.kind === "invoice"
-          ? buildInvoiceDocDefinition(input)
-          : buildActaDocDefinition(input);
-
-    const fileName =
-      input.kind === "quote"
-        ? `${input.quoteCode}.pdf`
-        : input.kind === "invoice"
-          ? `${input.invoiceNumber}.pdf`
-          : `${input.codigoActa}.pdf`;
+    let docDef: Record<string, unknown>;
+    let fileName: string;
+    switch (input.kind) {
+      case "quote":
+        docDef = buildQuoteDocDefinition(input);
+        fileName = `${input.quoteCode}.pdf`;
+        break;
+      case "invoice":
+        docDef = buildInvoiceDocDefinition(input);
+        fileName = `${input.invoiceNumber}.pdf`;
+        break;
+      case "work_order":
+        docDef = buildWorkOrderDocDefinition(input);
+        fileName = `${input.documentCode}.pdf`;
+        break;
+      case "acta":
+        docDef = buildActaDocDefinition(input);
+        fileName = `${input.codigoActa}.pdf`;
+        break;
+    }
 
     return new Promise<Uint8Array>((resolve, reject) => {
       try {

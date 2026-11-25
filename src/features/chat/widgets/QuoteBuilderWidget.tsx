@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp, Paperclip, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   patchQuoteDraftByVoice,
@@ -17,6 +18,8 @@ import type {
   CatalogItemRow,
   ClientRow,
   Gate1QuoteDraftPayload,
+  QuoteAttachment,
+  QuoteDurationUnit,
   QuoteVatRate,
 } from "../../../core/contracts/types";
 import { CatalogRepository } from "../../../core/db/repositories/catalogRepo";
@@ -32,6 +35,10 @@ import {
   sanitizeDecimalPriceInput,
   shouldClearPriceOnFocus,
 } from "./priceInputUtils";
+import {
+  extractQuoteAttachment,
+  formatAttachmentSummaryForNotes,
+} from "../../quotes/quoteAttachmentExtractor";
 import {
   isScheduleSumValid,
   QuotePaymentValidityEditor,
@@ -120,7 +127,7 @@ function PriceInput({
         setText(display);
         onChangeCents(cents);
       }}
-      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+      className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
     />
   );
 }
@@ -146,7 +153,11 @@ export function QuoteBuilderWidget({
   const [hourlyRateCents, setHourlyRateCents] = useState(3800);
   const [defaultSettings, setDefaultSettings] = useState<AppSettingsRecord | null>(null);
   const [showCatalogPicker, setShowCatalogPicker] = useState(false);
+  const [showDocumentConditions, setShowDocumentConditions] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [extractingAttachment, setExtractingAttachment] = useState(false);
+  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [catalogFilter, setCatalogFilter] = useState("");
   const [useNewClient, setUseNewClient] = useState<boolean>(
     Boolean(initialDraft.new_client && !initialDraft.client_id)
@@ -171,6 +182,7 @@ export function QuoteBuilderWidget({
     setClientSelectorMode(nextNew ? "new" : initialDraft.client_id ? "existing" : "none");
     setValidationError(null);
     setShowCatalogPicker(false);
+    setAttachmentNotice(null);
     setCatalogFilter("");
     setVoiceUndoStack([]);
     setVoiceChanges([]);
@@ -354,12 +366,79 @@ export function QuoteBuilderWidget({
     );
   }, [catalogItems, catalogFilter]);
 
+  const effectiveGeneralDescription = draft.general_description ?? "";
+  const effectiveDurationValue = draft.estimated_duration_value ?? null;
+  const effectiveDurationUnit: QuoteDurationUnit =
+    draft.estimated_duration_unit ?? "dias_laborables";
   const effectiveValidityDays =
     draft.validity_days ?? defaultSettings?.default_quote_validity_days ?? 30;
   const effectivePaymentMethods =
     draft.payment_methods ?? defaultSettings?.default_payment_methods ?? ["transferencia"];
   const effectivePaymentSchedule =
     draft.payment_schedule ?? defaultSettings?.default_payment_schedule ?? [];
+  const effectivePaymentTermsText = draft.payment_terms_text ?? "";
+  const effectiveIban =
+    draft.iban_override !== undefined
+      ? draft.iban_override
+      : (defaultSettings?.emitter_iban ?? "");
+  const effectiveBankName =
+    draft.bank_name !== undefined
+      ? draft.bank_name
+      : (defaultSettings?.emitter_bank_name ?? "");
+  const effectiveShowIban =
+    draft.show_iban !== undefined ? draft.show_iban : Boolean(effectiveIban.trim());
+  const effectiveAttachments: QuoteAttachment[] = draft.attachments ?? [];
+
+  const handleAttachDocument = async (file: File | undefined) => {
+    if (!file) return;
+    setAttachmentNotice(null);
+    setExtractingAttachment(true);
+    try {
+      const extracted = await extractQuoteAttachment(file);
+      const nextAttachment: QuoteAttachment = {
+        name: extracted.name,
+        mimeType: extracted.mimeType,
+        ...(extracted.extractedText ? { extractedText: extracted.extractedText } : {}),
+      };
+      setDraft((prev) => {
+        const currentAttachments = prev.attachments ?? [];
+        const updatedAttachments = [...currentAttachments, nextAttachment].slice(0, 10);
+        let nextNotes = prev.notes;
+        if (extracted.extractedText) {
+          const formatted = formatAttachmentSummaryForNotes(nextAttachment);
+          const joined = prev.notes.trim() ? `${prev.notes.trimEnd()}\n\n${formatted}` : formatted;
+          nextNotes = joined.slice(0, TEXT_LIMITS.NOTES);
+        }
+        return {
+          ...prev,
+          attachments: updatedAttachments,
+          notes: nextNotes,
+        };
+      });
+      if (extracted.warning) {
+        setAttachmentNotice(extracted.warning);
+      } else if (extracted.extractedText) {
+        setAttachmentNotice(
+          `Texto extraído de «${extracted.name}» incorporado a las notas técnicas.`
+        );
+      } else {
+        setAttachmentNotice(`Documento «${extracted.name}» adjuntado como referencia.`);
+      }
+    } catch (err) {
+      setAttachmentNotice(
+        `Error al leer el documento: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setExtractingAttachment(false);
+    }
+  };
+
+  const handleRemoveAttachment = (idx: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      attachments: (prev.attachments ?? []).filter((_, i) => i !== idx),
+    }));
+  };
 
   const handleConfirm = async () => {
     setValidationError(null);
@@ -369,9 +448,17 @@ export function QuoteBuilderWidget({
     }
     const candidatePayload = {
       ...draft,
+      general_description: effectiveGeneralDescription,
+      estimated_duration_value: effectiveDurationValue,
+      estimated_duration_unit: effectiveDurationUnit,
       validity_days: effectiveValidityDays,
       payment_methods: effectivePaymentMethods,
       payment_schedule: effectivePaymentSchedule,
+      payment_terms_text: effectivePaymentTermsText,
+      iban_override: effectiveIban,
+      bank_name: effectiveBankName,
+      show_iban: effectiveShowIban,
+      attachments: effectiveAttachments,
     };
     const parsed = Gate1QuoteCommitPayloadSchema.safeParse(candidatePayload);
     if (!parsed.success) {
@@ -410,20 +497,23 @@ export function QuoteBuilderWidget({
   return (
     <section
       data-testid="quote-builder-widget"
-      className="mt-2 w-full max-w-full overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm text-slate-900"
+      className="mt-1 w-full max-w-full overflow-x-hidden paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-[#2C2621] font-sans"
     >
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+      <div className="flex items-start justify-between gap-2 border-b border-[#E5DFD2] pb-2.5">
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-semibold text-orange-800">
+          <span className="inline-flex items-center rounded-sm paper-stamp status-tangerine px-2.5 py-0.5 text-[11px] font-semibold">
             {canAct ? "Revisión de presupuesto" : "Presupuesto"}
           </span>
-          <h3 className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-bold text-slate-900">
+          <h3 className="mt-1.5 break-words [overflow-wrap:anywhere] text-sm font-bold text-[#2C2621]">
             {draft.job_title || "Nuevo presupuesto"}
           </h3>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[11px] text-slate-500">Total c/IVA ({draft.vat_rate} %)</div>
-          <div data-testid="quote-total-display" className="text-base font-extrabold text-slate-900 tabular-nums">
+          <div className="text-[11px] text-[#6B6860]">Total c/IVA ({draft.vat_rate} %)</div>
+          <div
+            data-testid="quote-total-display"
+            className="text-base font-extrabold font-mono-nums tabular-nums text-[#2C2621] highlighter-yellow"
+          >
             {formatCentsEs(totals.totalCents)}
           </div>
         </div>
@@ -431,7 +521,7 @@ export function QuoteBuilderWidget({
 
       <div className="mt-3 space-y-3">
         <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="qb-job-title">
+          <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="qb-job-title">
             Título de la obra (opcional)
           </label>
           <input
@@ -442,13 +532,13 @@ export function QuoteBuilderWidget({
             value={draft.job_title}
             onChange={(e) => setDraft((p) => ({ ...p, job_title: e.target.value }))}
             placeholder="Opcional — se usará la primera partida"
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
           />
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-2.5">
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-700">Cliente (opcional)</span>
+            <span className="text-xs font-semibold text-[#2C2621]">Cliente (opcional)</span>
             {canAct && (
               <div className="flex gap-1 text-[11px]">
                 <button
@@ -461,8 +551,8 @@ export function QuoteBuilderWidget({
                   }}
                   className={`rounded-lg px-2 py-1 font-medium ${
                     clientSelectorMode === "none"
-                      ? "bg-slate-900 text-white"
-                      : "bg-white text-slate-700 border border-slate-200"
+                      ? "bg-[#4B7094] text-[#FFFDF9]"
+                      : "bg-[#FFFDF7] text-[#2C2621] border border-[#E5DFD2]"
                   }`}
                 >
                   Sin cliente
@@ -477,8 +567,8 @@ export function QuoteBuilderWidget({
                   }}
                   className={`rounded-lg px-2 py-1 font-medium ${
                     clientSelectorMode === "existing"
-                      ? "bg-slate-900 text-white"
-                      : "bg-white text-slate-700 border border-slate-200"
+                      ? "bg-[#4B7094] text-[#FFFDF9]"
+                      : "bg-[#FFFDF7] text-[#2C2621] border border-[#E5DFD2]"
                   }`}
                 >
                   Existente
@@ -497,8 +587,8 @@ export function QuoteBuilderWidget({
                   }}
                   className={`rounded-lg px-2 py-1 font-medium ${
                     clientSelectorMode === "new"
-                      ? "bg-slate-900 text-white"
-                      : "bg-white text-slate-700 border border-slate-200"
+                      ? "bg-[#4B7094] text-[#FFFDF9]"
+                      : "bg-[#FFFDF7] text-[#2C2621] border border-[#E5DFD2]"
                   }`}
                 >
                   Nuevo cliente
@@ -508,7 +598,7 @@ export function QuoteBuilderWidget({
           </div>
 
           {clientSelectorMode === "none" ? (
-            <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white/80 px-2.5 py-2 text-[11px] text-slate-600">
+            <div className="mt-2 rounded-lg border border-dashed border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 text-[11px] text-[#6B6860]">
               Presupuesto simplificado sin datos de cliente (podrás asignar uno más tarde para facturar).
             </div>
           ) : clientSelectorMode === "existing" ? (
@@ -525,7 +615,7 @@ export function QuoteBuilderWidget({
                   new_client: undefined,
                 }));
               }}
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+              className="mt-2 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
             >
               <option value="">-- Seleccionar cliente --</option>
               {clients.map((c) => (
@@ -548,7 +638,7 @@ export function QuoteBuilderWidget({
                     new_client: { ...(p.new_client ?? { name: "" }), name: e.target.value },
                   }))
                 }
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
               <input
                 type="tel"
@@ -562,7 +652,7 @@ export function QuoteBuilderWidget({
                     new_client: { ...(p.new_client ?? { name: "" }), phone: e.target.value },
                   }))
                 }
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
               <input
                 type="text"
@@ -576,7 +666,7 @@ export function QuoteBuilderWidget({
                     new_client: { ...(p.new_client ?? { name: "" }), nif: e.target.value },
                   }))
                 }
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm font-mono-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
               <ZoomableTextField
                 as="input"
@@ -596,14 +686,28 @@ export function QuoteBuilderWidget({
                     },
                   }))
                 }
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
+              />
+              <input
+                type="email"
+                disabled={!canAct || isSubmitting}
+                placeholder="Email del cliente (opcional)"
+                value={draft.new_client?.email ?? ""}
+                onChange={(e) =>
+                  setDraft((p) => ({
+                    ...p,
+                    client_id: null,
+                    new_client: { ...(p.new_client ?? { name: "" }), email: e.target.value },
+                  }))
+                }
+                className="sm:col-span-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-sm text-[#2C2621] disabled:bg-[#F5F1E6]"
               />
             </div>
           )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-slate-700">Tipo de IVA aplicable</span>
+          <span className="text-xs font-semibold text-[#2C2621]">Tipo de IVA aplicable</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {([10, 21] as QuoteVatRate[]).map((rate) => (
               <button
@@ -612,16 +716,16 @@ export function QuoteBuilderWidget({
                 data-testid={`quote-vat-${rate}`}
                 disabled={!canAct || isSubmitting}
                 onClick={() => setDraft((p) => ({ ...p, vat_rate: rate }))}
-                className={`min-h-9 rounded-xl px-3 text-xs font-bold ${
+                className={`min-h-9 rounded-xl px-3 text-xs font-bold font-mono-nums ${
                   draft.vat_rate === rate
-                    ? "bg-orange-600 text-white"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-[#EA580C] text-white"
+                    : "bg-[#F5F1E6] border border-[#E5DFD2] text-[#2C2621]"
                 }`}
               >
                 {rate} %
               </button>
             ))}
-            <div className="flex items-center rounded-xl border border-slate-300 bg-white px-2">
+            <div className="flex items-center rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2">
               <input
                 type="number"
                 step="0.5"
@@ -640,16 +744,16 @@ export function QuoteBuilderWidget({
                     }));
                   }
                 }}
-                className="w-12 py-1.5 text-right text-xs font-bold text-slate-900 focus:outline-none disabled:bg-transparent"
+                className="w-12 py-1.5 text-right text-xs font-bold font-mono-nums text-[#2C2621] focus:outline-none disabled:bg-transparent"
               />
-              <span className="text-xs font-bold text-slate-500">%</span>
+              <span className="text-xs font-bold text-[#6B6860]">%</span>
             </div>
           </div>
         </div>
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-700">
+            <span className="text-xs font-semibold text-[#2C2621]">
               Partidas ({draft.lines.length})
             </span>
             {canAct && (
@@ -660,7 +764,7 @@ export function QuoteBuilderWidget({
                     data-testid="quote-catalog-picker-btn"
                     disabled={isSubmitting}
                     onClick={() => setShowCatalogPicker((v) => !v)}
-                    className="rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-800"
+                    className="rounded-lg border border-[#EA580C]/40 bg-[#FFD6B0] px-2.5 py-1 text-xs font-semibold text-[#4A2500]"
                   >
                     + Desde tarifario
                   </button>
@@ -670,7 +774,7 @@ export function QuoteBuilderWidget({
                   data-testid="quote-add-line"
                   disabled={isSubmitting}
                   onClick={addEmptyLine}
-                  className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white"
+                  className="rounded-lg bg-[#4B7094] px-2.5 py-1 text-xs font-semibold text-[#FFFDF9]"
                 >
                   + Añadir partida
                 </button>
@@ -679,17 +783,17 @@ export function QuoteBuilderWidget({
           </div>
 
           {canAct && showCatalogPicker && (
-            <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-2.5 space-y-2">
+            <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
               <input
                 type="search"
                 value={catalogFilter}
                 onChange={(e) => setCatalogFilter(e.target.value)}
                 placeholder="Buscar en tarifario local..."
-                className="w-full rounded-lg border border-orange-200 bg-white px-2.5 py-1.5 text-xs"
+                className="w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621]"
               />
               <div className="max-h-44 overflow-y-auto space-y-1">
                 {filteredCatalog.length === 0 ? (
-                  <div className="text-center text-[11px] text-slate-500 py-2">
+                  <div className="text-center text-[11px] text-[#6B6860] py-2">
                     Sin partidas coincidentes
                   </div>
                 ) : (
@@ -698,13 +802,13 @@ export function QuoteBuilderWidget({
                       key={item.id}
                       type="button"
                       onClick={() => addLineFromCatalog(item)}
-                      className="w-full max-w-full overflow-hidden flex items-center justify-between gap-2 rounded-lg border border-orange-100 bg-white px-2.5 py-1.5 text-left text-xs hover:bg-orange-50"
+                      className="w-full max-w-full overflow-hidden flex items-center justify-between gap-2 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-left text-xs hover:bg-[#FFF3A1]/40"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="line-clamp-2 break-words [overflow-wrap:anywhere] font-semibold text-slate-900">
+                        <div className="line-clamp-2 break-words [overflow-wrap:anywhere] font-semibold text-[#2C2621]">
                           {item.description}
                         </div>
-                        <div className="break-words text-[10px] text-slate-500">
+                        <div className="break-words text-[10px] text-[#6B6860]">
                           {item.category} ·{" "}
                           {formatPricingBreakdown({
                             pricing_mode: item.pricing_mode,
@@ -715,7 +819,7 @@ export function QuoteBuilderWidget({
                           })}
                         </div>
                       </div>
-                      <span className="shrink-0 font-bold text-orange-700">
+                      <span className="shrink-0 font-bold font-mono-nums tabular-nums text-[#D04B00]">
                         {formatCentsEs(item.unit_price_cents)}/{item.unit}
                       </span>
                     </button>
@@ -735,7 +839,7 @@ export function QuoteBuilderWidget({
               <div
                 key={`${line.catalog_item_id ?? "custom"}_${idx}`}
                 data-testid={`quote-line-${idx}`}
-                className="w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 space-y-2"
+                className="w-full max-w-full overflow-hidden ruled-notebook rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 pl-8 space-y-2"
               >
                 <div className="flex min-w-0 gap-2 items-start">
                   <ZoomableTextField
@@ -749,14 +853,14 @@ export function QuoteBuilderWidget({
                     value={line.description}
                     onValueChange={(next) => updateLine(idx, { description: next })}
                     placeholder="Descripción de trabajo o material"
-                    className="min-w-0 flex-1 resize-none rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium break-words"
+                    className="min-w-0 flex-1 resize-none rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-medium text-[#2C2621] break-words disabled:bg-[#F5F1E6]"
                   />
                   {canAct && draft.lines.length > 1 && (
                     <button
                       type="button"
                       disabled={isSubmitting}
                       onClick={() => removeLine(idx)}
-                      className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                      className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#9A2D08] hover:bg-[#FAD2D8]/50"
                     >
                       Quitar
                     </button>
@@ -765,7 +869,7 @@ export function QuoteBuilderWidget({
 
                 <div className="grid grid-cols-4 gap-1.5 items-center text-xs">
                   <div className="min-w-0">
-                    <label className="block text-[10px] text-slate-500">Cant.</label>
+                    <label className="block text-[10px] text-[#6B6860]">Cant.</label>
                     <input
                       type="number"
                       step="0.1"
@@ -778,22 +882,22 @@ export function QuoteBuilderWidget({
                           quantity_thousandths: qtyInputToThousandths(e.target.value),
                         })
                       }
-                      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                      className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
                     />
                   </div>
                   <div className="min-w-0">
-                    <label className="block text-[10px] text-slate-500">Ud</label>
+                    <label className="block text-[10px] text-[#6B6860]">Ud</label>
                     <input
                       type="text"
                       aria-label={`Unidad partida ${idx + 1}`}
                       disabled={!canAct || isSubmitting}
                       value={line.unit}
                       onChange={(e) => updateLine(idx, { unit: e.target.value || "ud" })}
-                      className="min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                      className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
                     />
                   </div>
                   <div className="min-w-0">
-                    <label className="block text-[10px] text-slate-500">Precio (€)</label>
+                    <label className="block text-[10px] text-[#6B6860]">Precio (€)</label>
                     <PriceInput
                       valueCents={line.unit_price_cents}
                       disabled={!canAct || isSubmitting}
@@ -807,8 +911,10 @@ export function QuoteBuilderWidget({
                     />
                   </div>
                   <div className="min-w-0 text-right">
-                    <div className="text-[10px] text-slate-500">Subtotal</div>
-                    <div className="truncate font-bold text-slate-900 tabular-nums">{formatCentsEs(lineSubtotal)}</div>
+                    <div className="text-[10px] text-[#6B6860]">Subtotal</div>
+                    <div className="truncate font-bold font-mono-nums text-[#2C2621] tabular-nums highlighter-yellow">
+                      {formatCentsEs(lineSubtotal)}
+                    </div>
                   </div>
                 </div>
 
@@ -820,7 +926,7 @@ export function QuoteBuilderWidget({
                     onChange={(e) =>
                       updateLine(idx, { category: e.target.value as CatalogCategory })
                     }
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px]"
+                    className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -829,14 +935,14 @@ export function QuoteBuilderWidget({
                     ))}
                   </select>
 
-                  <label className="min-w-0 inline-flex items-center gap-1.5 text-slate-700 cursor-pointer">
+                  <label className="min-w-0 inline-flex items-center gap-1.5 text-[#2C2621] cursor-pointer">
                     <input
                       type="checkbox"
                       data-testid={`quote-line-save-catalog-${idx}`}
                       disabled={!canAct || isSubmitting}
                       checked={line.save_to_catalog}
                       onChange={(e) => updateLine(idx, { save_to_catalog: e.target.checked })}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-orange-600"
+                      className="h-4 w-4 shrink-0 rounded border-[#E5DFD2] text-[#EA580C]"
                     />
                     <span className="break-words leading-tight">
                       {priceChanged
@@ -850,86 +956,402 @@ export function QuoteBuilderWidget({
           })}
         </div>
 
-        <div className="rounded-xl bg-slate-100 p-2.5 text-xs space-y-1">
-          <div className="flex justify-between text-slate-600">
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 text-xs space-y-1">
+          <div className="flex justify-between text-[#6B6860]">
             <span>Base imponible</span>
-            <span className="font-semibold text-slate-900">{formatCentsEs(totals.subtotalCents)}</span>
+            <span className="font-semibold font-mono-nums tabular-nums text-[#2C2621]">
+              {formatCentsEs(totals.subtotalCents)}
+            </span>
           </div>
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-[#6B6860]">
             <span>IVA ({draft.vat_rate} %)</span>
-            <span className="font-semibold text-slate-900">{formatCentsEs(totals.vatCents)}</span>
+            <span className="font-semibold font-mono-nums tabular-nums text-[#2C2621]">
+              {formatCentsEs(totals.vatCents)}
+            </span>
           </div>
-          <div className="flex justify-between border-t border-slate-200 pt-1 text-sm font-extrabold text-slate-900">
+          <div className="flex justify-between border-t border-dashed border-[#E5DFD2] pt-1 text-sm font-extrabold text-[#2C2621]">
             <span>Total presupuesto</span>
-            <span>{formatCentsEs(totals.totalCents)}</span>
+            <span className="font-mono-nums tabular-nums highlighter-yellow">
+              {formatCentsEs(totals.totalCents)}
+            </span>
           </div>
         </div>
 
-        {/* Validez y condiciones de pago */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+        {/* Condiciones y Datos del Documento */}
+        <div
+          data-testid="quote-document-conditions-section"
+          className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5"
+        >
           <button
             type="button"
-            data-testid="quote-toggle-payment-validity-btn"
-            onClick={() => setShowPaymentOptions((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 text-left text-xs font-bold text-slate-800 cursor-pointer"
+            data-testid="quote-toggle-document-conditions-btn"
+            onClick={() => setShowDocumentConditions((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 text-left cursor-pointer"
           >
-            <span>
-              Validez ({effectiveValidityDays} d) y forma de cobro
-              {effectivePaymentSchedule.length > 0
-                ? ` (${effectivePaymentSchedule.length} ${effectivePaymentSchedule.length === 1 ? "pago" : "pagos"})`
-                : ""}
-            </span>
-            <span className="text-[11px] font-semibold text-orange-700">
-              {showPaymentOptions ? "Ocultar" : "Editar"}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#2C2621]">
+                Condiciones y Datos del Documento
+              </div>
+              <div className="mt-0.5 text-[11px] text-[#6B6860] truncate">
+                Validez {effectiveValidityDays} días
+                {effectiveDurationValue != null && effectiveDurationValue > 0
+                  ? ` · ${effectiveDurationValue} ${effectiveDurationUnit === "semanas" ? "sem." : "días lab."}`
+                  : ""}
+                {effectiveShowIban && effectiveIban.trim() ? " · IBAN visible" : ""}
+                {effectiveAttachments.length > 0
+                  ? ` · ${effectiveAttachments.length} ${effectiveAttachments.length === 1 ? "anexo" : "anexos"}`
+                  : ""}
+              </div>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#D04B00]">
+              <span>{showDocumentConditions ? "Ocultar" : "Editar"}</span>
+              {showDocumentConditions ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
             </span>
           </button>
 
-          {showPaymentOptions && (
-            <div className="mt-3 pt-2.5 border-t border-slate-200">
-              <QuotePaymentValidityEditor
-                validityDays={effectiveValidityDays}
-                onChangeValidityDays={(days) =>
-                  setDraft((p) => ({ ...p, validity_days: days }))
-                }
-                paymentMethods={effectivePaymentMethods}
-                onChangePaymentMethods={(methods) =>
-                  setDraft((p) => ({ ...p, payment_methods: methods }))
-                }
-                paymentSchedule={effectivePaymentSchedule}
-                onChangePaymentSchedule={(schedule) =>
-                  setDraft((p) => ({ ...p, payment_schedule: schedule }))
-                }
-                emitterIban={defaultSettings?.emitter_iban ?? ""}
-                totalCentsForPreview={totals.totalCents}
-                disabled={!canAct || isSubmitting}
-                testIdPrefix="qb-pv"
-              />
+          {showDocumentConditions && (
+            <div className="mt-3 space-y-3 border-t border-[#E5DFD2] pt-3">
+              {/* 1. Descripción general del trabajo */}
+              <div>
+                <label
+                  className="block text-xs font-semibold text-[#2C2621]"
+                  htmlFor="qb-general-description"
+                >
+                  Descripción general del trabajo
+                </label>
+                <ZoomableTextField
+                  id="qb-general-description"
+                  as="input"
+                  multiline={false}
+                  maxLength={TEXT_LIMITS.DESCRIPTION}
+                  zoomLabel="Descripción general del trabajo"
+                  data-testid="quote-general-description-input"
+                  disabled={!canAct || isSubmitting}
+                  value={effectiveGeneralDescription}
+                  onValueChange={(next) =>
+                    setDraft((p) => ({ ...p, general_description: next }))
+                  }
+                  placeholder="Ej: Reforma eléctrica de vivienda..."
+                  className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] disabled:bg-[#F5F1E6]"
+                />
+              </div>
+
+              {/* 2. Tiempo estimado y 3. Validez del presupuesto */}
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="block text-xs font-semibold text-[#2C2621]"
+                    htmlFor="qb-estimated-duration"
+                  >
+                    Tiempo estimado (opcional)
+                  </label>
+                  <div className="mt-1 flex gap-1.5">
+                    <input
+                      id="qb-estimated-duration"
+                      data-testid="quote-duration-value-input"
+                      type="number"
+                      min="1"
+                      max="9999"
+                      step="1"
+                      disabled={!canAct || isSubmitting}
+                      value={effectiveDurationValue ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        if (!raw) {
+                          setDraft((p) => ({ ...p, estimated_duration_value: null }));
+                          return;
+                        }
+                        const parsed = Number.parseFloat(raw.replace(",", "."));
+                        if (Number.isFinite(parsed) && parsed > 0) {
+                          setDraft((p) => ({
+                            ...p,
+                            estimated_duration_value: Math.min(9999, parsed),
+                          }));
+                        }
+                      }}
+                      placeholder="Ej: 5"
+                      className="w-20 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
+                    />
+                    <select
+                      aria-label="Unidad de tiempo estimado"
+                      data-testid="quote-duration-unit-select"
+                      disabled={!canAct || isSubmitting}
+                      value={effectiveDurationUnit}
+                      onChange={(e) =>
+                        setDraft((p) => ({
+                          ...p,
+                          estimated_duration_unit: e.target.value as QuoteDurationUnit,
+                        }))
+                      }
+                      className="min-w-0 flex-1 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
+                    >
+                      <option value="dias_laborables">Días laborables</option>
+                      <option value="semanas">Semanas</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    className="block text-xs font-semibold text-[#2C2621]"
+                    htmlFor="qb-validity-days"
+                  >
+                    Validez del presupuesto (días)
+                  </label>
+                  <input
+                    id="qb-validity-days"
+                    data-testid="quote-validity-days-input"
+                    type="number"
+                    min="1"
+                    max="365"
+                    step="1"
+                    disabled={!canAct || isSubmitting}
+                    value={effectiveValidityDays}
+                    onChange={(e) => {
+                      const val = Math.max(
+                        1,
+                        Math.min(365, Math.round(Number(e.target.value) || 30))
+                      );
+                      setDraft((p) => ({ ...p, validity_days: val }));
+                    }}
+                    className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Condiciones de pago */}
+              <div>
+                <label
+                  className="block text-xs font-semibold text-[#2C2621]"
+                  htmlFor="qb-payment-terms"
+                >
+                  Condiciones de pago (opcional)
+                </label>
+                <ZoomableTextField
+                  id="qb-payment-terms"
+                  as="textarea"
+                  multiline
+                  rows={2}
+                  maxLength={TEXT_LIMITS.NOTES}
+                  zoomLabel="Condiciones de pago"
+                  data-testid="quote-payment-terms-input"
+                  disabled={!canAct || isSubmitting}
+                  value={effectivePaymentTermsText}
+                  onValueChange={(next) =>
+                    setDraft((p) => ({ ...p, payment_terms_text: next }))
+                  }
+                  placeholder="Ej: 50% al inicio de obra, 40% a mediados y 10% al finalizar"
+                  className="mt-1 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] disabled:bg-[#F5F1E6]"
+                />
+              </div>
+
+              {/* 5. Cuenta corriente (IBAN) y Banco + Toggle */}
+              <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-[#2C2621]">
+                    Cuenta corriente (IBAN) y Banco
+                  </span>
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#2C2621] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      data-testid="quote-show-iban-toggle"
+                      disabled={!canAct || isSubmitting}
+                      checked={effectiveShowIban}
+                      onChange={(e) =>
+                        setDraft((p) => ({ ...p, show_iban: e.target.checked }))
+                      }
+                      className="h-4 w-4 rounded border-[#E5DFD2] text-[#EA580C]"
+                    />
+                    <span>Mostrar IBAN en este presupuesto</span>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    aria-label="IBAN del presupuesto"
+                    data-testid="quote-iban-input"
+                    disabled={!canAct || isSubmitting}
+                    value={effectiveIban}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setDraft((p) => ({
+                        ...p,
+                        iban_override: val,
+                        show_iban: p.show_iban !== undefined ? p.show_iban : Boolean(val.trim()),
+                      }));
+                    }}
+                    placeholder="ES00 0000 0000 0000 0000 0000"
+                    className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] disabled:bg-[#EFECE4]"
+                  />
+                  <input
+                    type="text"
+                    aria-label="Entidad bancaria"
+                    data-testid="quote-bank-name-input"
+                    disabled={!canAct || isSubmitting}
+                    value={effectiveBankName}
+                    onChange={(e) =>
+                      setDraft((p) => ({ ...p, bank_name: e.target.value }))
+                    }
+                    placeholder="Entidad bancaria (ej. CaixaBank)"
+                    className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] disabled:bg-[#EFECE4]"
+                  />
+                </div>
+              </div>
+
+              {/* 6. Notas técnicas y Certificaciones / Anexos */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label
+                    className="block text-xs font-semibold text-[#2C2621]"
+                    htmlFor="qb-notes"
+                  >
+                    Notas técnicas y Certificaciones / Anexos
+                  </label>
+                  {canAct && (
+                    <>
+                      <input
+                        ref={attachmentInputRef}
+                        type="file"
+                        data-testid="quote-attachment-file-input"
+                        accept=".pdf,.txt,.md,.csv,.jpg,.jpeg,.png,.webp,application/pdf,text/plain,image/*"
+                        disabled={isSubmitting || extractingAttachment}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          void handleAttachDocument(file);
+                          e.target.value = "";
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        data-testid="quote-add-attachment-btn"
+                        disabled={isSubmitting || extractingAttachment}
+                        onClick={() => attachmentInputRef.current?.click()}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#4B7094]/40 bg-[#E0F2FE] px-2.5 py-1 text-[11px] font-semibold text-[#0369A1] hover:bg-[#BAE6FD]/70 cursor-pointer disabled:opacity-50"
+                      >
+                        <Paperclip className="h-3 w-3" />
+                        <span>
+                          {extractingAttachment
+                            ? "Extrayendo texto..."
+                            : "Añadir documento / certificación"}
+                        </span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <ZoomableTextField
+                  id="qb-notes"
+                  as="textarea"
+                  multiline
+                  rows={3}
+                  maxLength={TEXT_LIMITS.NOTES}
+                  zoomLabel="Notas técnicas y certificaciones"
+                  data-testid="quote-notes-input"
+                  disabled={!canAct || isSubmitting}
+                  value={draft.notes}
+                  onValueChange={(next) => setDraft((p) => ({ ...p, notes: next }))}
+                  placeholder="Ej: Certificado eléctrico (BRIE/CIE) no incluido. Desescombro y gestión de residuos incluidos..."
+                  className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] disabled:bg-[#F5F1E6]"
+                />
+
+                {attachmentNotice && (
+                  <div
+                    role="status"
+                    className="rounded-lg border border-[#BAE6FD] bg-[#E0F2FE]/60 px-2.5 py-1.5 text-[11px] text-[#0369A1]"
+                  >
+                    {attachmentNotice}
+                  </div>
+                )}
+
+                {effectiveAttachments.length > 0 && (
+                  <div className="space-y-1.5" data-testid="quote-attachments-list">
+                    {effectiveAttachments.map((att, idx) => (
+                      <div
+                        key={`${att.name}_${idx}`}
+                        className="flex items-start justify-between gap-2 rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-1.5 text-[11px]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-[#2C2621] truncate">
+                            {att.name}
+                          </div>
+                          {att.extractedText && (
+                            <div className="text-[10px] text-[#6B6860] line-clamp-2">
+                              {att.extractedText}
+                            </div>
+                          )}
+                        </div>
+                        {canAct && (
+                          <button
+                            type="button"
+                            aria-label={`Quitar anexo ${att.name}`}
+                            disabled={isSubmitting}
+                            onClick={() => handleRemoveAttachment(idx)}
+                            className="shrink-0 rounded p-1 text-[#9A2D08] hover:bg-[#FAD2D8]/50 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Métodos de pago y fraccionamiento (avanzado) */}
+              <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6]/60 p-2.5">
+                <button
+                  type="button"
+                  data-testid="quote-toggle-payment-validity-btn"
+                  onClick={() => setShowPaymentOptions((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2 text-left text-[11px] font-bold text-[#2C2621] cursor-pointer"
+                >
+                  <span>
+                    Métodos de pago y fraccionamiento automático
+                    {effectivePaymentSchedule.length > 0
+                      ? ` (${effectivePaymentSchedule.length} ${effectivePaymentSchedule.length === 1 ? "pago" : "pagos"})`
+                      : ""}
+                  </span>
+                  <span className="font-semibold text-[#D04B00]">
+                    {showPaymentOptions ? "Ocultar" : "Configurar"}
+                  </span>
+                </button>
+
+                {showPaymentOptions && (
+                  <div className="mt-2.5 pt-2.5 border-t border-[#E5DFD2]">
+                    <QuotePaymentValidityEditor
+                      validityDays={effectiveValidityDays}
+                      onChangeValidityDays={(days) =>
+                        setDraft((p) => ({ ...p, validity_days: days }))
+                      }
+                      paymentMethods={effectivePaymentMethods}
+                      onChangePaymentMethods={(methods) =>
+                        setDraft((p) => ({ ...p, payment_methods: methods }))
+                      }
+                      paymentSchedule={effectivePaymentSchedule}
+                      onChangePaymentSchedule={(schedule) =>
+                        setDraft((p) => ({ ...p, payment_schedule: schedule }))
+                      }
+                      emitterIban={effectiveIban}
+                      totalCentsForPreview={totals.totalCents}
+                      disabled={!canAct || isSubmitting}
+                      testIdPrefix="qb-pv"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700" htmlFor="qb-notes">
-            Notas
-          </label>
-          <ZoomableTextField
-            id="qb-notes"
-            as="textarea"
-            multiline
-            rows={2}
-            maxLength={TEXT_LIMITS.NOTES}
-            zoomLabel="Notas del presupuesto"
-            disabled={!canAct || isSubmitting}
-            value={draft.notes}
-            onValueChange={(next) => setDraft((p) => ({ ...p, notes: next }))}
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs disabled:bg-slate-50"
-          />
         </div>
 
         {validationError && (
           <div
             role="alert"
-            className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-medium text-rose-800"
+            className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 text-xs font-medium text-[#5A121C]"
           >
             {validationError}
           </div>
@@ -942,7 +1364,7 @@ export function QuoteBuilderWidget({
               data-testid="quote-reject-btn"
               disabled={isSubmitting}
               onClick={() => void handleReject()}
-              className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+              className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
             >
               Rechazar
             </button>
@@ -951,7 +1373,7 @@ export function QuoteBuilderWidget({
               data-testid="quote-approve-btn"
               disabled={isSubmitting}
               onClick={handleConfirm}
-              className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm active:bg-orange-700 disabled:opacity-50"
+              className="min-h-12 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
             >
               {isSubmitting
                 ? "Guardando PDF..."

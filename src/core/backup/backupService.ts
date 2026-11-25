@@ -146,6 +146,8 @@ export class BackupService {
         emitter_fiscal_address: settings.emitter_fiscal_address,
         emitter_phone: settings.emitter_phone,
         emitter_iban: settings.emitter_iban,
+        emitter_bank_name: settings.emitter_bank_name,
+        emitter_email: settings.emitter_email,
         emitter_logo_data_url: settings.emitter_logo_data_url,
       },
       app_settings_installer_acta: {
@@ -276,20 +278,21 @@ export class BackupService {
       await tx.run(
         `INSERT INTO app_settings (
           id, emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
-          emitter_iban, emitter_logo_data_url,
+          emitter_iban, emitter_bank_name, emitter_logo_data_url,
           last_active_thread_id, pending_camera_context_json, llm_enabled, llm_model_uri,
           default_vat_rate, irpf_reserve_rate, hourly_rate_cents, boot_mode,
           default_quote_validity_days, default_payment_methods_json, default_payment_schedule_json, active_tax_models_json,
           emitter_email, emitter_registry_number, emitter_tech_name, emitter_tech_dni,
           emitter_installer_card, emitter_signature_data_url, default_acta_warranty_months,
           updated_at_ms
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, NULL, ?, ?, ?, 'clean', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           emitter_name = excluded.emitter_name,
           emitter_nif = excluded.emitter_nif,
           emitter_fiscal_address = excluded.emitter_fiscal_address,
           emitter_phone = excluded.emitter_phone,
           emitter_iban = excluded.emitter_iban,
+          emitter_bank_name = excluded.emitter_bank_name,
           emitter_logo_data_url = excluded.emitter_logo_data_url,
           last_active_thread_id = NULL,
           pending_camera_context_json = NULL,
@@ -317,6 +320,7 @@ export class BackupService {
           plaintext.app_settings_emitter.emitter_fiscal_address,
           plaintext.app_settings_emitter.emitter_phone,
           plaintext.app_settings_emitter.emitter_iban ?? "",
+          plaintext.app_settings_emitter.emitter_bank_name ?? "",
           plaintext.app_settings_emitter.emitter_logo_data_url ?? null,
           plaintext.app_settings_tax?.default_vat_rate ?? 21,
           plaintext.app_settings_tax?.irpf_reserve_rate ?? 20,
@@ -327,7 +331,9 @@ export class BackupService {
           ),
           JSON.stringify(plaintext.app_settings_quote_defaults?.default_payment_schedule ?? []),
           JSON.stringify(plaintext.app_settings_tax_models ?? ["303", "130", "390", "347", "100"]),
-          plaintext.app_settings_installer_acta?.emitter_email ?? "",
+          plaintext.app_settings_emitter.emitter_email ||
+            plaintext.app_settings_installer_acta?.emitter_email ||
+            "",
           plaintext.app_settings_installer_acta?.emitter_registry_number ?? "",
           plaintext.app_settings_installer_acta?.emitter_tech_name ?? "",
           plaintext.app_settings_installer_acta?.emitter_tech_dni ?? "",
@@ -417,10 +423,12 @@ export class BackupService {
           `INSERT INTO quotes (
             id, quote_code, job_id, client_id, client_name_snapshot, client_nif_snapshot,
             client_address_snapshot, client_phone_snapshot, vat_rate, subtotal_cents,
-            vat_cents, total_cents, status, validity_days, payment_methods_json,
-            payment_schedule_json, notes, pdf_uri, sent_at_iso,
+            vat_cents, total_cents, status, general_description, estimated_duration_value,
+            estimated_duration_unit, validity_days, payment_methods_json,
+            payment_schedule_json, payment_terms_text, iban_override, bank_name,
+            show_iban, notes, attachments_json, pdf_uri, sent_at_iso,
             created_at_ms, updated_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             q.id,
             q.quote_code,
@@ -435,10 +443,18 @@ export class BackupService {
             q.vat_cents,
             q.total_cents,
             q.status,
+            q.general_description ?? "",
+            q.estimated_duration_value ?? null,
+            q.estimated_duration_unit ?? "dias_laborables",
             q.validity_days ?? null,
             q.payment_methods_json ?? "[]",
             q.payment_schedule_json ?? "[]",
+            q.payment_terms_text ?? "",
+            q.iban_override ?? "",
+            q.bank_name ?? "",
+            q.show_iban ?? 1,
             q.notes,
+            q.attachments_json ?? "[]",
             q.pdf_uri,
             q.sent_at_iso,
             q.created_at_ms,

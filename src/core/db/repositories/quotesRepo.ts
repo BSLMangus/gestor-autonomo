@@ -1,3 +1,4 @@
+import { parseQuoteAttachmentsJson } from "../../contracts/schemas";
 import { formatLocalDateIso, getLocalTodayIso, isValidIsoDate } from "../../fiscal/dateQuarter";
 import {
   computeQuoteValidUntilIso,
@@ -64,7 +65,7 @@ export class QuotesRepository {
     const filtered = searchNorm
       ? rows.filter((r) => {
           const haystack = normalizeSpanishText(
-            `${r.quote_code} ${r.client_name_snapshot} ${r.job_code} ${r.job_title} ${r.notes}`
+            `${r.quote_code} ${r.client_name_snapshot} ${r.job_code} ${r.job_title} ${r.general_description ?? ""} ${r.notes}`
           );
           return haystack.includes(searchNorm);
         })
@@ -175,10 +176,13 @@ export class QuotesRepository {
       emitter_nif: string;
       emitter_fiscal_address: string;
       emitter_phone: string;
+      emitter_email?: string;
       emitter_iban?: string;
+      emitter_bank_name?: string;
       emitter_logo_data_url?: string | null;
     }>(
-      `SELECT emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone, emitter_iban, emitter_logo_data_url
+      `SELECT emitter_name, emitter_nif, emitter_fiscal_address, emitter_phone,
+              emitter_email, emitter_iban, emitter_bank_name, emitter_logo_data_url
        FROM app_settings WHERE id = 1`
     );
     const emitter = settingsRows[0] ?? {
@@ -186,7 +190,9 @@ export class QuotesRepository {
       emitter_nif: "",
       emitter_fiscal_address: "",
       emitter_phone: "",
+      emitter_email: "",
       emitter_iban: "",
+      emitter_bank_name: "",
       emitter_logo_data_url: null,
     };
 
@@ -200,6 +206,12 @@ export class QuotesRepository {
     const paymentMethods = parseQuotePaymentMethodsJson(quote.payment_methods_json);
     const paymentSchedule = parseQuotePaymentScheduleJson(quote.payment_schedule_json);
     const validityDays = quote.validity_days ?? null;
+    const effectiveIban = (quote.iban_override ?? "").trim() || (emitter.emitter_iban ?? "").trim();
+    const effectiveBankName =
+      (quote.bank_name ?? "").trim() || (emitter.emitter_bank_name ?? "").trim();
+    const showIban =
+      quote.show_iban !== undefined ? quote.show_iban !== 0 : effectiveIban.length > 0;
+    const attachments = parseQuoteAttachmentsJson(quote.attachments_json);
 
     const pdfInput: PdfQuoteDocumentInput = {
       kind: "quote",
@@ -212,7 +224,9 @@ export class QuotesRepository {
         nif: emitter.emitter_nif,
         fiscalAddress: emitter.emitter_fiscal_address,
         phone: emitter.emitter_phone,
-        iban: emitter.emitter_iban ?? "",
+        email: emitter.emitter_email ?? "",
+        iban: effectiveIban,
+        bankName: effectiveBankName,
         logoDataUrl: emitter.emitter_logo_data_url ?? null,
       },
       client: {
@@ -220,15 +234,24 @@ export class QuotesRepository {
         nif: quote.client_nif_snapshot || client?.nif || "",
         fiscalAddress: quote.client_address_snapshot || client?.fiscal_address || "",
         phone: quote.client_phone_snapshot || client?.phone || "",
+        email: client?.email ?? "",
       },
       jobTitle: job.title,
+      generalDescription: quote.general_description ?? "",
+      estimatedDurationValue: quote.estimated_duration_value ?? null,
+      estimatedDurationUnit: quote.estimated_duration_unit ?? "dias_laborables",
       vatRate: quote.vat_rate,
       subtotalCents: quote.subtotal_cents,
       vatCents: quote.vat_cents,
       totalCents: quote.total_cents,
       paymentMethods,
       paymentSchedule,
+      paymentTermsText: quote.payment_terms_text ?? "",
+      ibanOverride: quote.iban_override ?? "",
+      bankName: effectiveBankName,
+      showIban,
       notes: quote.notes,
+      attachments,
       lines: items.map((item) => ({
         description: item.description,
         unit: item.unit,

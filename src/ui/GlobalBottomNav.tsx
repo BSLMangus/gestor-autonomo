@@ -22,17 +22,17 @@ export function GlobalBottomNav({
     <nav
       data-testid="global-bottom-nav"
       aria-label="Acciones globales"
-      className="flex h-16 shrink-0 items-center justify-between border-t border-outline-variant bg-surface-container-lowest px-6 pb-safe z-30"
+      className="nav-cream flex h-16 shrink-0 items-center justify-between border-t border-[#E2DDD0] bg-[#F5F1E6] px-6 pb-safe z-30"
     >
       <button
         type="button"
         data-testid="global-nav-home-btn"
         aria-current={isHome ? "page" : undefined}
         onClick={onNavigateHome}
-        className={`flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl transition-colors cursor-pointer ${
+        className={`flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-3 transition-colors cursor-pointer ${
           isHome
-            ? "text-on-primary-container"
-            : "text-on-surface-variant hover:text-on-surface"
+            ? "bg-[#FFF3A1]/75 text-[#4A2500] border border-[#E5DFD2] shadow-[0_1px_3px_rgba(44,38,33,0.06)]"
+            : "text-[#6B6860] hover:text-[#2C2621]"
         }`}
       >
         <Home
@@ -61,7 +61,7 @@ export function GlobalBottomNav({
         data-testid="global-nav-camera-btn"
         disabled={isSubmitting}
         onClick={onTriggerCamera}
-        className="flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-45 cursor-pointer"
+        className="flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-3 text-[#6B6860] hover:text-[#2C2621] transition-colors disabled:opacity-45 cursor-pointer"
       >
         <Camera className="h-[22px] w-[22px]" strokeWidth={1.9} aria-hidden="true" />
         <span className="text-[11px] leading-[14px] font-semibold tracking-[0.2px]">

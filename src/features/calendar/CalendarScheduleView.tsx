@@ -513,21 +513,21 @@ export function CalendarScheduleView({
   return (
     <div
       data-testid="calendar-schedule-view"
-      className="flex flex-1 flex-col overflow-y-auto no-scrollbar px-4 pt-4 pb-8 gap-4 bg-surface"
+      className="cotton-paper flex flex-1 flex-col overflow-y-auto no-scrollbar px-4 pt-4 pb-8 gap-4 bg-[#F9F7F2] text-[#2C2621] font-sans"
     >
       {/* Cabecera del módulo: Mes y + Añadir cita */}
       <section className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">
           {viewMode === "hacienda" ? (
             <div className="flex items-center gap-2 min-w-0">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900">
+              <span className="status-gold inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
                 <Landmark className="w-4 h-4" />
               </span>
               <div className="min-w-0">
-                <h2 className="text-[16px] font-semibold text-on-surface truncate">
+                <h2 className="text-[16px] font-semibold text-[#2C2621] truncate">
                   Calendario Fiscal AEAT
                 </h2>
-                <p className="text-[11px] text-on-surface-variant truncate">
+                <p className="text-[11px] text-[#6B6860] truncate">
                   {activeTaxModels.length} modelos activos · Territorio Común
                 </p>
               </div>
@@ -538,18 +538,18 @@ export function CalendarScheduleView({
                 type="button"
                 onClick={() => changeMonth(-1)}
                 aria-label="Mes anterior"
-                className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
+                className="paper-cream w-10 h-10 rounded-full bg-[#FFFDF7] border border-[#E5DFD2] inline-flex items-center justify-center text-[#2C2621] cursor-pointer hover:border-[#EA580C] shadow-xs"
               >
                 <ChevronLeft className="w-[18px] h-[18px]" />
               </button>
-              <h2 className="text-[17px] font-semibold text-on-surface px-1 min-w-[138px] text-center">
+              <h2 className="text-[17px] font-semibold text-[#2C2621] px-1 min-w-[138px] text-center">
                 {MONTH_NAMES_ES[monthIndex]} {year}
               </h2>
               <button
                 type="button"
                 onClick={() => changeMonth(1)}
                 aria-label="Mes siguiente"
-                className="w-10 h-10 rounded-full bg-surface-container-lowest border border-outline-variant inline-flex items-center justify-center text-on-surface cursor-pointer hover:border-terracotta"
+                className="paper-cream w-10 h-10 rounded-full bg-[#FFFDF7] border border-[#E5DFD2] inline-flex items-center justify-center text-[#2C2621] cursor-pointer hover:border-[#EA580C] shadow-xs"
               >
                 <ChevronRight className="w-[18px] h-[18px]" />
               </button>
@@ -560,7 +560,7 @@ export function CalendarScheduleView({
             type="button"
             data-testid="calendar-add-appointment-btn"
             onClick={() => openAddModal(selectedDateIso)}
-            className="min-h-[42px] px-3.5 rounded-full bg-secondary text-on-secondary font-semibold text-[12px] inline-flex items-center gap-1 shrink-0 cursor-pointer"
+            className="min-h-[42px] px-3.5 rounded-full bg-[#4B7094] hover:bg-[#3d5d7c] text-[#FFFDF9] font-semibold text-[12px] inline-flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" />
             <span>Añadir cita</span>
@@ -568,7 +568,7 @@ export function CalendarScheduleView({
         </div>
 
         {/* Toggle Mes | Semana | Lista obras | Hacienda */}
-        <div className="grid grid-cols-4 gap-1 bg-surface-container-lowest border border-outline-variant rounded-full p-1">
+        <div className="paper-cream grid grid-cols-4 gap-1 bg-[#FFFDF7] border border-[#E5DFD2] rounded-full p-1 shadow-xs">
           {(
             [
               { id: "month", label: "Mes" },
@@ -585,8 +585,8 @@ export function CalendarScheduleView({
               aria-pressed={viewMode === tab.id}
               className={`min-h-[38px] rounded-full font-semibold text-[12px] cursor-pointer transition-colors ${
                 viewMode === tab.id
-                  ? "bg-terracotta-soft text-on-primary-container"
-                  : "text-on-surface-variant hover:bg-surface-container"
+                  ? "bg-[#4B7094] text-[#FFFDF9]"
+                  : "text-[#6B6860] hover:bg-[#EFECE4]"
               }`}
             >
               {tab.label}
@@ -598,7 +598,7 @@ export function CalendarScheduleView({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 text-xs text-on-error-container"
+          className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-xs text-[#5A121C]"
         >
           {errorMsg}
         </div>
@@ -606,13 +606,23 @@ export function CalendarScheduleView({
 
       {/* Vista de Calendario Visual (Mes o Semana) */}
       {(viewMode === "month" || viewMode === "week") && (
-        <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-2">
-          <div className="grid grid-cols-7 text-center pb-1 border-b border-outline-variant">
+        <section className="relative paper-sheet paper-cream bg-[#FFFDF7] border border-[#E5DFD2] rounded-[20px] p-3.5 pt-5 flex flex-col gap-2 mt-1">
+          <div className="absolute -top-2 left-6 right-6 flex justify-between pointer-events-none" aria-hidden="true">
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+            <span className="w-2.5 h-4 rounded-full border-2 border-[#6B6860] bg-[#F9F7F2]" />
+          </div>
+
+          <div className="grid grid-cols-7 text-center pb-1 border-b border-[#E5DFD2]">
             {["L", "M", "X", "J", "V", "S", "D"].map((d, idx) => (
               <span
                 key={d}
                 className={`text-[11px] font-semibold ${
-                  idx >= 5 ? "text-outline" : "text-on-surface-variant"
+                  idx >= 5 ? "text-[#6B6860]" : "text-[#6B6860]"
                 }`}
               >
                 {d}
@@ -634,13 +644,13 @@ export function CalendarScheduleView({
               const isRangeEnd = highlightedJob?.end_date_iso === cell.dateIso;
 
               const statusDotColor = dayEntries.some((e) => e.status === "alargado")
-                ? "bg-amber-tax"
+                ? "chart-tangerine"
                 : dayEntries.some((e) => e.status === "antes")
-                  ? "bg-info"
+                  ? "chart-cobalt"
                   : dayEntries.some((e) => e.status === "en_hora")
-                    ? "bg-emerald-free"
+                    ? "chart-emerald"
                     : dayEntries.length > 0
-                      ? "bg-terracotta"
+                      ? "bg-[#EA580C]"
                       : "";
 
               const allTaxDone =
@@ -653,10 +663,10 @@ export function CalendarScheduleView({
                 dayMilestones.length === 0
                   ? ""
                   : allTaxDone
-                    ? "bg-emerald-600"
+                    ? "chart-emerald"
                     : dayMilestones.some((m) => m.milestoneKind === "end")
-                      ? "bg-rose-600"
-                      : "bg-amber-500";
+                      ? "bg-[#DC2626]"
+                      : "chart-gold";
 
               return (
                 <button
@@ -666,17 +676,17 @@ export function CalendarScheduleView({
                   onClick={() => setSelectedDateIso(cell.dateIso)}
                   className={`min-h-[44px] py-1 flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
                     isSelected
-                      ? "bg-terracotta text-white rounded-xl shadow-xs"
+                      ? "bg-[#EA580C] text-white rounded-xl shadow-xs"
                       : inHighlightRange
-                        ? `bg-terracotta-soft text-on-primary-container ${
+                        ? `bg-[#FFD6B0] text-[#4A2500] ${
                             isRangeStart ? "rounded-l-xl" : ""
                           } ${isRangeEnd ? "rounded-r-xl" : ""}`
                         : cell.inMonth
-                          ? "text-on-surface hover:bg-surface-container-low rounded-lg"
-                          : "text-outline/60"
+                          ? "text-[#2C2621] hover:bg-[#F5F1E6] rounded-lg"
+                          : "text-[#6B6860]/55"
                   }`}
                 >
-                  <span className="font-mono text-[12px] font-semibold tabular-nums">
+                  <span className="font-mono font-mono-nums text-[12px] font-semibold tabular-nums">
                     {cell.day}
                   </span>
                   <div className="flex items-center justify-center gap-0.5 min-h-[10px]">
@@ -692,7 +702,7 @@ export function CalendarScheduleView({
                     {dayEntries.length > 1 && (
                       <span
                         className={`text-[9px] font-mono font-bold leading-none ${
-                          isSelected ? "text-white" : "text-on-surface-variant"
+                          isSelected ? "text-white" : "text-[#6B6860]"
                         }`}
                       >
                         ×{dayEntries.length}
@@ -702,7 +712,7 @@ export function CalendarScheduleView({
                       <span
                         aria-label="Hito fiscal AEAT"
                         className={`w-1.5 h-1.5 rounded-full ${
-                          isSelected ? "bg-amber-200" : taxDotColor
+                          isSelected ? "bg-[#FFF3A1]" : taxDotColor
                         }`}
                       />
                     )}
@@ -712,11 +722,11 @@ export function CalendarScheduleView({
             })}
           </div>
 
-          <div className="pt-2 border-t border-outline-variant flex flex-col gap-1.5">
+          <div className="pt-2 border-t border-[#E5DFD2] flex flex-col gap-1.5">
             {highlightedJob && (
-              <div className="flex items-center gap-1.5 bg-terracotta-soft px-2.5 py-1 rounded-lg">
-                <span className="w-2 h-2 rounded-full bg-terracotta shrink-0" />
-                <span className="text-[11px] font-semibold text-on-primary-container truncate">
+              <div className="flex items-center gap-1.5 bg-[#FFD6B0] px-2.5 py-1 rounded-lg">
+                <span className="w-2 h-2 rounded-full chart-tangerine shrink-0" />
+                <span className="text-[11px] font-semibold text-[#4A2500] truncate">
                   {formatDateRangeEs(highlightedJob.start_date_iso, highlightedJob.end_date_iso)} ·{" "}
                   {highlightedJob.title}
                 </span>
@@ -724,24 +734,24 @@ export function CalendarScheduleView({
             )}
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5 px-0.5">
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-free" />
-                <span className="text-[11px] font-semibold text-on-surface-variant">En hora</span>
+                <span className="w-2 h-2 rounded-full chart-emerald" />
+                <span className="text-[11px] font-semibold text-[#6B6860]">En hora</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-tax" />
-                <span className="text-[11px] font-semibold text-on-surface-variant">
+                <span className="w-2 h-2 rounded-full chart-tangerine" />
+                <span className="text-[11px] font-semibold text-[#6B6860]">
                   Horas extra
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-info" />
-                <span className="text-[11px] font-semibold text-on-surface-variant">
+                <span className="w-2 h-2 rounded-full chart-cobalt" />
+                <span className="text-[11px] font-semibold text-[#6B6860]">
                   Antes de hora
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-rose-600" />
-                <span className="text-[11px] font-semibold text-on-surface-variant">
+                <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
+                <span className="text-[11px] font-semibold text-[#6B6860]">
                   Hacienda
                 </span>
               </div>
@@ -754,7 +764,7 @@ export function CalendarScheduleView({
         /* Vista Lista de obras con fechas */
         <section className="flex flex-col gap-2.5">
           {jobs.filter((j) => j.start_date_iso).length === 0 ? (
-            <div className="rounded-[20px] border border-dashed border-outline-variant bg-surface-container-lowest p-5 text-center text-[13px] text-on-surface-variant">
+            <div className="paper-sheet rounded-[20px] border border-dashed border-[#E5DFD2] bg-[#FFFDF7] p-5 text-center text-[13px] text-[#6B6860]">
               Aún no hay obras con fechas planificadas. Abre una obra o créala con fecha de inicio y fin.
             </div>
           ) : (
@@ -779,22 +789,22 @@ export function CalendarScheduleView({
                       if (job.start_date_iso) setSelectedDateIso(job.start_date_iso);
                       setViewMode("month");
                     }}
-                    className="bg-surface-warm-card border border-outline-variant rounded-2xl p-3.5 text-left flex items-center justify-between gap-2 hover:border-terracotta cursor-pointer"
+                    className="ruled-index border border-[#E5DFD2] rounded-2xl p-3.5 text-left flex items-center justify-between gap-2 hover:border-[#EA580C] cursor-pointer"
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="font-mono text-[11px] text-on-primary-container font-semibold">
+                      <span className="font-mono font-mono-nums text-[11px] text-[#D04B00] font-semibold tabular-nums">
                         {formatDateRangeEs(job.start_date_iso, job.end_date_iso)} · {job.job_code}
                       </span>
-                      <span className="text-[15px] font-semibold text-on-surface truncate">
+                      <span className="text-[15px] font-semibold text-[#2C2621] truncate">
                         {job.title}
                       </span>
                       {job.address && (
-                        <span className="text-[12px] text-on-surface-variant truncate">
+                        <span className="text-[12px] text-[#6B6860] truncate">
                           {job.address}
                         </span>
                       )}
                     </div>
-                    <span className="font-mono text-[12px] font-semibold text-on-surface bg-surface-container-lowest px-2.5 py-1 rounded-full border border-outline-variant shrink-0">
+                    <span className="font-mono font-mono-nums text-[12px] font-semibold text-[#2C2621] bg-[#F5F1E6] px-2.5 py-1 rounded-full border border-[#E5DFD2] shrink-0 tabular-nums">
                       {isSubDayJob
                         ? formatHoursFromThousandths(totalPlannedThousandths)
                         : `${distinctDays} días`}
@@ -819,37 +829,37 @@ export function CalendarScheduleView({
             }}
           />
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-950">
+          <div className="postit-note postit-yellow px-3.5 py-2.5 text-[11px] leading-relaxed text-[#3E3300]">
             Fechas orientativas para <strong>Territorio Común (AEAT)</strong>; festivos autonómicos
             o locales pueden trasladar vencimientos al siguiente día hábil.
           </div>
 
           {/* Control anual y filtros */}
-          <div className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3">
+          <div className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   aria-label="Año anterior"
                   onClick={() => setHaciendaYear((y) => y - 1)}
-                  className="w-9 h-9 rounded-full border border-outline-variant bg-white inline-flex items-center justify-center text-slate-700 hover:border-terracotta cursor-pointer"
+                  className="w-9 h-9 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] inline-flex items-center justify-center text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="font-mono text-sm font-bold px-2 tabular-nums">
+                <span className="font-mono font-mono-nums text-sm font-bold px-2 tabular-nums text-[#2C2621]">
                   {haciendaYear}
                 </span>
                 <button
                   type="button"
                   aria-label="Año siguiente"
                   onClick={() => setHaciendaYear((y) => y + 1)}
-                  className="w-9 h-9 rounded-full border border-outline-variant bg-white inline-flex items-center justify-center text-slate-700 hover:border-terracotta cursor-pointer"
+                  className="w-9 h-9 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] inline-flex items-center justify-center text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 rounded-full bg-surface-container p-0.5">
+              <div className="flex items-center gap-1 rounded-full border border-[#E5DFD2] bg-[#F5F1E6] p-0.5">
                 {(
                   [
                     { id: "all", label: "Todos" },
@@ -863,8 +873,8 @@ export function CalendarScheduleView({
                     onClick={() => setHaciendaFilter(f.id)}
                     className={`rounded-full px-2.5 py-1 text-[11px] font-semibold cursor-pointer ${
                       haciendaFilter === f.id
-                        ? "bg-white text-slate-900 shadow-xs"
-                        : "text-on-surface-variant"
+                        ? "bg-[#4B7094] text-[#FFFDF9] shadow-xs"
+                        : "text-[#6B6860]"
                     }`}
                   >
                     {f.label}
@@ -875,10 +885,10 @@ export function CalendarScheduleView({
 
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-700">
+                <span className="text-[11px] font-bold text-[#2C2621]">
                   Modelos activos ({activeTaxModels.length}/13)
                 </span>
-                <span className="text-[10px] text-slate-500">Pulsa para activar/desactivar</span>
+                <span className="text-[10px] text-[#6B6860]">Pulsa para activar/desactivar</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {TAX_MODEL_CATALOG.map((m) => {
@@ -892,8 +902,8 @@ export function CalendarScheduleView({
                       title={m.title}
                       className={`rounded-full border px-2.5 py-1 text-[11px] font-bold cursor-pointer transition-colors ${
                         active
-                          ? "border-amber-500 bg-amber-100 text-amber-950"
-                          : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                          ? "status-gold border-[#D97706]/50"
+                          : "border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860] hover:bg-[#F5F1E6]"
                       }`}
                     >
                       Mod. {m.code}
@@ -906,7 +916,7 @@ export function CalendarScheduleView({
 
           {/* Lista cronológica de obligaciones */}
           {haciendaObligations.length === 0 ? (
-            <div className="rounded-[20px] border border-dashed border-outline-variant bg-surface-container-lowest p-5 text-center text-[13px] text-on-surface-variant">
+            <div className="paper-sheet rounded-[20px] border border-dashed border-[#E5DFD2] bg-[#FFFDF7] p-5 text-center text-[13px] text-[#6B6860]">
               No hay obligaciones fiscales para mostrar con los filtros actuales.
             </div>
           ) : (
@@ -925,35 +935,35 @@ export function CalendarScheduleView({
                   <div
                     key={ob.obligationKey}
                     data-testid={`tax-obligation-${ob.obligationKey}`}
-                    className={`rounded-[18px] border p-3.5 shadow-xs ${
+                    className={`paper-sheet rounded-[18px] border p-3.5 ${
                       isPresented
-                        ? "border-emerald-200 bg-emerald-50/40"
+                        ? "border-[#059669]/35 bg-[#D4EDDA]/35"
                         : isNotApplicable
-                          ? "border-slate-200 bg-slate-50/70 opacity-75"
+                          ? "border-[#E5DFD2] bg-[#F5F1E6]/70 opacity-75"
                           : isOverdue
-                            ? "border-rose-300 bg-rose-50/70"
+                            ? "border-[#DC2626]/35 bg-[#FAD2D8]/40"
                             : isOpenNow
-                              ? "border-amber-300 bg-amber-50/60"
-                              : "border-outline-variant bg-surface-container-lowest"
+                              ? "border-[#D97706]/40 bg-[#FFF3A1]/35"
+                              : "border-[#E5DFD2] bg-[#FFFDF7]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[10px] font-bold text-white">
+                          <span className="rounded-full bg-[#4B7094] px-2 py-0.5 font-mono text-[10px] font-bold text-[#FFFDF9]">
                             {ob.meta.shortLabel}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                          <span className="rounded-full bg-[#EAE5D9] px-2 py-0.5 text-[10px] font-bold text-[#3D352E]">
                             {ob.periodLabel}
                           </span>
-                          <span className="text-[10px] font-semibold text-slate-500">
+                          <span className="text-[10px] font-semibold text-[#6B6860]">
                             {ob.meta.category}
                           </span>
                         </div>
-                        <h4 className="mt-1 text-[13px] font-bold text-slate-900">
+                        <h4 className="mt-1 text-[13px] font-bold text-[#2C2621]">
                           {ob.meta.title}
                         </h4>
-                        <p className="mt-0.5 font-mono text-[11px] text-slate-700">
+                        <p className="mt-0.5 font-mono font-mono-nums text-[11px] text-[#6B6860] tabular-nums">
                           {ob.isSingleDueDate
                             ? `Vencimiento único: ${ob.endDateIso}`
                             : `Plazo: ${ob.startDateIso} → ${ob.endDateIso}`}
@@ -962,23 +972,23 @@ export function CalendarScheduleView({
                             : ""}
                         </p>
                         {ob.debitCutoffIso && (
-                          <p className="mt-0.5 text-[11px] font-semibold text-amber-800">
+                          <p className="mt-0.5 text-[11px] font-semibold text-[#78350F]">
                             Domiciliación bancaria hasta {ob.debitCutoffIso}
                           </p>
                         )}
                       </div>
 
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                        className={`paper-stamp shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-bold ${
                           isPresented
-                            ? "bg-emerald-600 text-white"
+                            ? "status-emerald"
                             : isNotApplicable
-                              ? "bg-slate-400 text-white"
+                              ? "bg-[#EAE5D9] text-[#3D352E] border border-[#E5DFD2]"
                               : isOverdue
-                                ? "bg-rose-600 text-white"
+                                ? "status-tangerine"
                                 : isOpenNow
-                                  ? "bg-amber-600 text-white"
-                                  : "bg-slate-200 text-slate-800"
+                                  ? "status-gold"
+                                  : "status-cobalt"
                         }`}
                       >
                         {isPresented
@@ -993,12 +1003,12 @@ export function CalendarScheduleView({
                       </span>
                     </div>
 
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-black/5 pt-2">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-dashed border-[#E5DFD2] pt-2">
                       <button
                         type="button"
                         disabled={isBusy || ob.status === "presentado"}
                         onClick={() => void handleSetObligationStatus(ob, "presentado")}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-45 cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#047857] disabled:opacity-45 cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Presentado
@@ -1007,7 +1017,7 @@ export function CalendarScheduleView({
                         type="button"
                         disabled={isBusy || ob.status === "pendiente"}
                         onClick={() => void handleSetObligationStatus(ob, "pendiente")}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-45 cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1 text-[11px] font-semibold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-45 cursor-pointer"
                       >
                         <RotateCcw className="w-3 h-3" />
                         Pendiente
@@ -1016,7 +1026,7 @@ export function CalendarScheduleView({
                         type="button"
                         disabled={isBusy || ob.status === "no_aplica"}
                         onClick={() => void handleSetObligationStatus(ob, "no_aplica")}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-45 cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1 text-[11px] font-semibold text-[#6B6860] hover:border-[#EA580C] disabled:opacity-45 cursor-pointer"
                       >
                         <Ban className="w-3 h-3" />
                         No aplica
@@ -1032,14 +1042,14 @@ export function CalendarScheduleView({
 
       {/* Tarjeta de Agenda del Día Seleccionado */}
       {viewMode !== "hacienda" && (
-      <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3">
+      <section className="postit-note postit-yellow p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-semibold text-on-primary-container">
+            <span className="text-[12px] font-semibold text-[#3E3300]">
               {formatFullDayLabelEs(selectedDateIso)}
               {selectedDateIso === effectiveTodayIso ? " · Hoy" : ""}
             </span>
-            <h3 className="text-[17px] font-semibold text-on-surface truncate">
+            <h3 className="text-[17px] font-semibold text-[#2C2621] truncate">
               {selectedEntries.length > 1
                 ? `${selectedEntries.length} trabajos / citas hoy`
                 : primaryDayJob?.title ??
@@ -1047,28 +1057,28 @@ export function CalendarScheduleView({
             </h3>
           </div>
           {selectedEntries.length <= 1 && primaryDayJob && (
-            <span className="font-mono text-[11px] text-on-surface-variant bg-surface-container px-2 py-1 rounded-lg tabular-nums shrink-0">
+            <span className="paper-cream font-mono font-mono-nums text-[11px] text-[#2C2621] bg-[#FFFDF7] border border-[#E5DFD2] px-2 py-1 rounded-lg tabular-nums shrink-0">
               {primaryDayJob.job_code}
             </span>
           )}
         </div>
 
         {selectedTaxMilestones.length > 0 && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/75 p-2.5 flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-amber-950">
-              <Landmark className="w-3.5 h-3.5 text-amber-700" />
+          <div className="rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7]/85 p-2.5 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#78350F]">
+              <Landmark className="w-3.5 h-3.5 text-[#D97706]" />
               <span>Hitos Hacienda AEAT este día</span>
             </div>
             {selectedTaxMilestones.map((m) => (
               <div
                 key={`${m.obligation.obligationKey}_${m.milestoneKind}`}
-                className="flex items-center justify-between gap-2 rounded-xl bg-white/90 px-2.5 py-1.5 border border-amber-200/70"
+                className="flex items-center justify-between gap-2 rounded-xl bg-[#FFFDF7] px-2.5 py-1.5 border border-[#E5DFD2]"
               >
                 <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-900">
+                  <span className="text-xs font-bold text-[#2C2621]">
                     {m.obligation.meta.shortLabel} ({m.obligation.periodLabel})
                   </span>
-                  <span className="block text-[11px] text-slate-600">
+                  <span className="block text-[11px] text-[#6B6860]">
                     {m.milestoneKind === "start"
                       ? "Apertura de plazo de presentación"
                       : m.milestoneKind === "debit"
@@ -1081,12 +1091,12 @@ export function CalendarScheduleView({
                     type="button"
                     disabled={taxBusyKey === m.obligation.obligationKey}
                     onClick={() => void handleSetObligationStatus(m.obligation, "presentado")}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-700 cursor-pointer"
+                    className="shrink-0 rounded-lg bg-[#059669] px-2 py-1 text-[10px] font-bold text-white hover:bg-[#047857] cursor-pointer"
                   >
                     Presentado
                   </button>
                 ) : (
-                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                  <span className="status-emerald shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold">
                     {m.obligation.status === "presentado" ? "Presentado" : "No aplica"}
                   </span>
                 )}
@@ -1103,23 +1113,23 @@ export function CalendarScheduleView({
                 <div
                   key={dayEntry.id}
                   data-testid={`calendar-day-entry-${dayEntry.id}`}
-                  className="flex flex-col gap-2 bg-surface-container-low rounded-2xl p-3 border border-outline-variant/60"
+                  className="flex flex-col gap-2 bg-[#FFFDF7]/90 rounded-2xl p-3 border border-[#E5DFD2]"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[13px] font-semibold text-on-surface truncate">
+                        <span className="text-[13px] font-semibold text-[#2C2621] truncate">
                           {entryJob?.title ?? "Cita rápida / visita"}
                         </span>
                         {entryJob && (
-                          <span className="font-mono text-[10px] text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded-md">
+                          <span className="font-mono text-[10px] text-[#6B6860] bg-[#F5F1E6] border border-[#E5DFD2] px-1.5 py-0.5 rounded-md tabular-nums">
                             {entryJob.job_code}
                           </span>
                         )}
                       </div>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-on-surface-variant" />
-                        <span className="font-mono text-[14px] font-semibold text-on-surface tabular-nums">
+                        <Clock className="w-3.5 h-3.5 text-[#6B6860]" />
+                        <span className="font-mono font-mono-nums text-[14px] font-semibold text-[#2C2621] tabular-nums">
                           {dayEntry.planned_start} – {dayEntry.actual_end ?? dayEntry.planned_end}
                         </span>
                       </div>
@@ -1128,10 +1138,10 @@ export function CalendarScheduleView({
                       <span
                         className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                           dayEntry.status === "alargado"
-                            ? "bg-warning-container text-on-warning-container"
+                            ? "status-tangerine"
                             : dayEntry.status === "antes"
-                              ? "bg-info-container text-on-info-container"
-                              : "bg-success-container text-on-success-container"
+                              ? "status-cobalt"
+                              : "status-emerald"
                         }`}
                       >
                         {dayEntry.actual_hours_thousandths !== null
@@ -1146,7 +1156,7 @@ export function CalendarScheduleView({
                           setDeleteEntryError(null);
                           setDeleteEntryTarget(dayEntry);
                         }}
-                        className="w-8 h-8 rounded-full border border-outline-variant bg-surface-container-lowest text-rose-700 hover:bg-rose-50 inline-flex items-center justify-center cursor-pointer"
+                        className="w-8 h-8 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] text-[#DC2626] hover:bg-[#FAD2D8] inline-flex items-center justify-center cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1155,15 +1165,15 @@ export function CalendarScheduleView({
 
                   {entryJob?.address && (
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <MapPin className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
-                      <span className="text-[12px] text-on-surface-variant truncate">
+                      <MapPin className="w-3.5 h-3.5 text-[#6B6860] shrink-0" />
+                      <span className="text-[12px] text-[#6B6860] truncate">
                         {entryJob.address}
                       </span>
                     </div>
                   )}
 
                   {dayEntry.notes && (
-                    <p className="text-[12px] text-on-surface-variant pt-1 border-t border-outline-variant/60">
+                    <p className="text-[12px] text-[#6B6860] pt-1 border-t border-dashed border-[#E5DFD2]">
                       {dayEntry.notes}
                     </p>
                   )}
@@ -1184,7 +1194,7 @@ export function CalendarScheduleView({
                         },
                       })
                     }
-                    className="min-h-[42px] w-full px-3 rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[13px] flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                    className="min-h-[42px] w-full px-3 rounded-xl bg-[#4B7094] hover:bg-[#3d5d7c] text-[#FFFDF9] font-semibold text-[13px] flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                   >
                     <CalendarPlus className="w-4 h-4" />
                     <span>Registrar salida / Ajustar horas</span>
@@ -1197,7 +1207,7 @@ export function CalendarScheduleView({
               type="button"
               data-testid="calendar-add-another-btn"
               onClick={() => openAddModal(selectedDateIso)}
-              className="min-h-[42px] w-full rounded-xl border border-dashed border-outline-variant text-xs font-semibold text-on-surface hover:border-terracotta flex items-center justify-center gap-1.5 cursor-pointer"
+              className="min-h-[42px] w-full rounded-xl border border-dashed border-[#6B6860]/50 bg-[#FFFDF7]/75 text-xs font-semibold text-[#2C2621] hover:border-[#EA580C] flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Añadir otro trabajo / visita este día</span>
@@ -1205,14 +1215,14 @@ export function CalendarScheduleView({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] text-on-surface-variant">
+            <p className="text-[13px] text-[#3E3300]">
               No hay jornadas programadas para el {formatShortDateEs(selectedDateIso)}.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => openAddModal(selectedDateIso)}
-                className="min-h-[46px] rounded-xl bg-secondary text-white font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[46px] rounded-xl bg-[#4B7094] text-[#FFFDF9] font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Cita / trabajo</span>
@@ -1232,7 +1242,7 @@ export function CalendarScheduleView({
                     },
                   })
                 }
-                className="min-h-[46px] rounded-xl bg-primary text-white font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[46px] rounded-xl bg-[#D04B00] hover:bg-[#EA580C] text-white font-semibold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <CalendarPlus className="w-4 h-4" />
                 <span>Registrar parte</span>
@@ -1244,18 +1254,21 @@ export function CalendarScheduleView({
       )}
 
       {/* Gráfica Visual de Desviación de Plazos y Horas */}
-      <section className="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3.5">
+      <section className="relative ruled-notebook border border-[#E5DFD2] rounded-[20px] p-4 pl-10 flex flex-col gap-3.5">
+        <span className="absolute left-2.5 top-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
+        <span className="absolute left-2.5 bottom-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-on-surface">
+          <h3 className="text-[15px] font-semibold text-[#2C2621]">
             Plazos y horas: previsto vs real
           </h3>
-          <span className="font-mono text-[12px] text-on-surface-variant tabular-nums">
+          <span className="font-mono font-mono-nums text-[12px] text-[#6B6860] tabular-nums">
             {formatCentsEs(hourlyRateCents)}/h
           </span>
         </div>
 
         {jobSummaries.length === 0 ? (
-          <p className="text-[13px] text-on-surface-variant">
+          <p className="text-[13px] text-[#6B6860]">
             Crea o planifica una obra con fechas para comparar las horas previstas frente a las reales.
           </p>
         ) : (
@@ -1273,20 +1286,20 @@ export function CalendarScheduleView({
                 <div
                   key={job.id}
                   className={`flex flex-col gap-1.5 ${
-                    idx > 0 ? "pt-3 border-t border-outline-variant" : ""
+                    idx > 0 ? "pt-3 border-t border-[#E5DFD2]" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-medium text-on-surface truncate">
+                    <span className="text-[13px] font-medium text-[#2C2621] truncate">
                       {job.job_code} · {job.title}
                     </span>
                     <span
                       className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 tabular-nums ${
                         isOver
-                          ? "bg-warning-container text-on-warning-container"
+                          ? "status-tangerine"
                           : isEarly
-                            ? "bg-info-container text-on-info-container"
-                            : "bg-success-container text-on-success-container"
+                            ? "status-cobalt"
+                            : "status-emerald"
                       }`}
                     >
                       {isOver || isEarly
@@ -1299,43 +1312,43 @@ export function CalendarScheduleView({
 
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-on-surface-variant w-14">
+                      <span className="text-[11px] font-semibold text-[#6B6860] w-14">
                         Previsto
                       </span>
-                      <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                      <div className="flex-1 h-2.5 rounded-full bg-[#EFECE4] border border-[#E5DFD2] overflow-hidden">
                         <div
-                          className="h-full bg-secondary rounded-full transition-all duration-300"
+                          className="h-full chart-cobalt rounded-full transition-all duration-300"
                           style={{ width: `${plannedPct}%` }}
                         />
                       </div>
-                      <span className="font-mono text-[12px] text-on-surface tabular-nums w-14 text-right">
+                      <span className="font-mono font-mono-nums text-[12px] text-[#2C2621] tabular-nums w-14 text-right">
                         {formatHoursFromThousandths(summary.planned_hours_thousandths)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-on-surface-variant w-14">
+                      <span className="text-[11px] font-semibold text-[#6B6860] w-14">
                         Real
                       </span>
-                      <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                      <div className="flex-1 h-2.5 rounded-full bg-[#EFECE4] border border-[#E5DFD2] overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${
                             isOver
-                              ? "bg-amber-tax"
+                              ? "chart-tangerine"
                               : isEarly
-                                ? "bg-info"
-                                : "bg-emerald-free"
+                                ? "chart-cobalt"
+                                : "chart-emerald"
                           }`}
                           style={{ width: `${actualPct}%` }}
                         />
                       </div>
                       <span
-                        className={`font-mono text-[12px] tabular-nums w-14 text-right ${
+                        className={`font-mono font-mono-nums text-[12px] tabular-nums w-14 text-right ${
                           isOver
-                            ? "text-on-warning-container"
+                            ? "text-[#9A2D08]"
                             : isEarly
-                              ? "text-on-info-container"
-                              : "text-on-success-container"
+                              ? "text-[#1E3A8A]"
+                              : "text-[#14532D]"
                         }`}
                       >
                         {formatHoursFromThousandths(summary.actual_hours_thousandths)}
@@ -1351,31 +1364,31 @@ export function CalendarScheduleView({
 
       {/* Modal Añadir cita */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-secondary/45 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#2C2621]/45 flex items-end sm:items-center justify-center p-4">
           <form
             onSubmit={(e) => void handleSaveAppointment(e)}
-            className="w-full max-w-[380px] max-h-[88vh] overflow-y-auto bg-surface-container-lowest rounded-[24px] p-5 border border-outline-variant shadow-2xl flex flex-col gap-3.5"
+            className="clipboard-panel w-full max-w-[380px] max-h-[88vh] overflow-y-auto bg-[#FFFDF7] rounded-[24px] p-5 border border-[#DFD9CA] flex flex-col gap-3.5"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-[16px] font-semibold text-on-surface">Añadir cita o trabajo</h3>
+              <h3 className="text-[16px] font-semibold text-[#2C2621]">Añadir cita o trabajo</h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="w-10 h-10 rounded-full hover:bg-surface-container flex items-center justify-center cursor-pointer"
+                className="w-10 h-10 rounded-full text-[#6B6860] hover:bg-[#EFECE4] flex items-center justify-center cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-1 bg-surface-container-low border border-outline-variant rounded-full p-1">
+            <div className="grid grid-cols-2 gap-1 bg-[#F5F1E6] border border-[#E5DFD2] rounded-full p-1">
               <button
                 type="button"
                 data-testid="calendar-modal-mode-sameday"
                 onClick={() => setNewModalMode("same_day")}
                 className={`min-h-[34px] rounded-full text-[11px] font-semibold cursor-pointer ${
                   newModalMode === "same_day"
-                    ? "bg-secondary text-on-secondary"
-                    : "text-on-surface-variant"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "text-[#6B6860]"
                 }`}
               >
                 Mismo día / horas
@@ -1386,8 +1399,8 @@ export function CalendarScheduleView({
                 onClick={() => setNewModalMode("multi_day")}
                 className={`min-h-[34px] rounded-full text-[11px] font-semibold cursor-pointer ${
                   newModalMode === "multi_day"
-                    ? "bg-secondary text-on-secondary"
-                    : "text-on-surface-variant"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "text-[#6B6860]"
                 }`}
               >
                 Varios días
@@ -1397,7 +1410,7 @@ export function CalendarScheduleView({
             {errorMsg && (
               <div
                 role="alert"
-                className="rounded-xl border border-coral-alert/30 bg-error-container px-3 py-2 text-[12px] font-semibold text-on-error-container"
+                className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-[12px] font-semibold text-[#5A121C]"
               >
                 {errorMsg}
               </div>
@@ -1486,12 +1499,12 @@ export function CalendarScheduleView({
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-on-surface">Obra</span>
+                <span className="text-[12px] font-semibold text-[#2C2621]">Obra</span>
                 <button
                   type="button"
                   data-testid="calendar-quick-job-toggle"
                   onClick={() => setQuickCreateJob((v) => !v)}
-                  className="text-[11px] font-semibold text-on-primary-container underline cursor-pointer"
+                  className="text-[11px] font-semibold text-[#D04B00] underline cursor-pointer"
                 >
                   {quickCreateJob ? "Elegir obra existente" : "+ Crear obra rápida"}
                 </button>
@@ -1504,13 +1517,13 @@ export function CalendarScheduleView({
                   value={quickJobTitle}
                   onChange={(e) => setQuickJobTitle(e.target.value)}
                   placeholder="Título del trabajo rápido (ej. Cambio de grifo)"
-                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
+                  className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                 />
               ) : (
                 <select
                   value={newJobId}
                   onChange={(e) => setNewJobId(e.target.value)}
-                  className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
+                  className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                 >
                   <option value="">Sin obra específica (visita puntual)</option>
                   {jobs.map((j) => (
@@ -1525,7 +1538,7 @@ export function CalendarScheduleView({
             {newModalMode === "same_day" ? (
               <>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[12px] font-semibold text-on-surface">Fecha</span>
+                  <span className="text-[12px] font-semibold text-[#2C2621]">Fecha</span>
                   <input
                     type="date"
                     data-testid="calendar-modal-date-input"
@@ -1534,7 +1547,7 @@ export function CalendarScheduleView({
                       setNewDate(e.target.value);
                       setNewEndDate(e.target.value);
                     }}
-                    className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 font-mono text-[13px]"
+                    className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                 </label>
 
@@ -1554,7 +1567,7 @@ export function CalendarScheduleView({
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
-                    <span className="text-[12px] font-semibold text-on-surface">Inicio</span>
+                    <span className="text-[12px] font-semibold text-[#2C2621]">Inicio</span>
                     <input
                       type="date"
                       value={newDate}
@@ -1565,27 +1578,27 @@ export function CalendarScheduleView({
                           setNewEndDate(next);
                         }
                       }}
-                      className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-2.5 font-mono text-[13px]"
+                      className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-2.5 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[12px] font-semibold text-on-surface">Fin</span>
+                    <span className="text-[12px] font-semibold text-[#2C2621]">Fin</span>
                     <input
                       type="date"
                       value={newEndDate}
                       onChange={(e) => setNewEndDate(e.target.value)}
-                      className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-2.5 font-mono text-[13px]"
+                      className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-2.5 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                     />
                   </label>
                 </div>
-                <div className="rounded-xl border border-outline-variant bg-terracotta-soft px-3 py-2 text-[11px] font-medium text-on-primary-container">
+                <div className="rounded-xl border border-[#E5DFD2] bg-[#FFD6B0] px-3 py-2 text-[11px] font-medium text-[#4A2500]">
                   Se generarán las jornadas laborables según tu horario habitual ({scheduleDefaults.morning_start}–{scheduleDefaults.afternoon_end || scheduleDefaults.morning_end}).
                 </div>
               </div>
             )}
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="cal-new-notes" className="text-[12px] font-semibold text-on-surface">
+              <label htmlFor="cal-new-notes" className="text-[12px] font-semibold text-[#2C2621]">
                 Nota rápida
               </label>
               <ZoomableTextField
@@ -1597,7 +1610,7 @@ export function CalendarScheduleView({
                 value={newNotes}
                 onValueChange={setNewNotes}
                 placeholder="Ej. Visita medición o entrega de llaves"
-                className="min-h-[44px] rounded-xl bg-surface-container-low border border-outline-variant px-3 text-[13px]"
+                className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
 
@@ -1605,7 +1618,7 @@ export function CalendarScheduleView({
               type="submit"
               data-testid="calendar-modal-submit-btn"
               disabled={busy}
-              className="min-h-[48px] rounded-xl bg-primary text-white font-semibold text-[14px] disabled:opacity-50 cursor-pointer"
+              className="min-h-[48px] rounded-xl bg-[#D04B00] hover:bg-[#EA580C] text-white font-semibold text-[14px] disabled:opacity-50 cursor-pointer shadow-xs"
             >
               Guardar en calendario
             </button>

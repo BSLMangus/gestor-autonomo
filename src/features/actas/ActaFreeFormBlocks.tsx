@@ -117,7 +117,7 @@ function CollapsibleBlockCard({
   return (
     <section
       data-testid={testId}
-      className="rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-xs overflow-hidden"
+      className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] overflow-hidden font-sans"
     >
       <button
         type="button"
@@ -126,25 +126,25 @@ function CollapsibleBlockCard({
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <span
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono-nums text-[12px] font-bold ${
               completed
-                ? "bg-success-container text-on-success-container"
-                : "bg-surface-container text-on-surface-variant"
+                ? "status-emerald"
+                : "bg-[#EFECE4] text-[#6B6860] border border-[#E5DFD2]"
             }`}
           >
             {completed ? <Check className="h-4 w-4" /> : index}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-bold text-on-surface">{title}</div>
-            <div className="truncate text-[11px] text-on-surface-variant">{subtitle}</div>
+            <div className="truncate text-[13px] font-bold text-[#2C2621]">{title}</div>
+            <div className="truncate text-[11px] text-[#6B6860]">{subtitle}</div>
           </div>
         </div>
-        <span className="shrink-0 text-on-surface-variant">
+        <span className="shrink-0 text-[#6B6860]">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-outline-variant/60 p-3.5 space-y-3">{children}</div>
+        <div className="border-t border-[#E5DFD2] p-3.5 space-y-3">{children}</div>
       )}
     </section>
   );
@@ -162,8 +162,8 @@ function YesNoToggle({
   testId?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface-container-low/60 px-3 py-2">
-      <span className="min-w-0 flex-1 text-[12px] font-semibold text-on-surface">{label}</span>
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2">
+      <span className="min-w-0 flex-1 text-[12px] font-semibold text-[#2C2621]">{label}</span>
       <div className="flex shrink-0 gap-1">
         <button
           type="button"
@@ -171,8 +171,8 @@ function YesNoToggle({
           onClick={() => onChange(true)}
           className={`min-h-[36px] min-w-[46px] rounded-lg px-2.5 text-[12px] font-bold cursor-pointer ${
             value
-              ? "bg-emerald-free text-white"
-              : "border border-outline-variant bg-white text-on-surface-variant"
+              ? "bg-[#059669] text-white"
+              : "border border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860]"
           }`}
         >
           Sí
@@ -183,8 +183,8 @@ function YesNoToggle({
           onClick={() => onChange(false)}
           className={`min-h-[36px] min-w-[46px] rounded-lg px-2.5 text-[12px] font-bold cursor-pointer ${
             !value
-              ? "bg-coral-alert text-white"
-              : "border border-outline-variant bg-white text-on-surface-variant"
+              ? "bg-[#DC2626] text-white"
+              : "border border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860]"
           }`}
         >
           No
@@ -213,8 +213,8 @@ function UnitNumberInput({
 }) {
   return (
     <label className="space-y-1">
-      <span className="block text-[11px] font-semibold text-on-surface-variant">{label}</span>
-      <div className="flex min-h-[44px] items-center overflow-hidden rounded-xl border border-outline-variant bg-white">
+      <span className="block text-[11px] font-semibold text-[#6B6860]">{label}</span>
+      <div className="flex min-h-[44px] items-center overflow-hidden rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] focus-within:border-[#EA580C]">
         <input
           type="number"
           step={step}
@@ -231,9 +231,9 @@ function UnitNumberInput({
             const parsed = Number.parseFloat(raw.replace(",", "."));
             onChange(Number.isFinite(parsed) && parsed >= 0 ? parsed : null);
           }}
-          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-xs font-semibold text-on-surface outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono-nums text-xs font-semibold text-[#2C2621] outline-none"
         />
-        <span className="shrink-0 border-l border-outline-variant bg-surface-container-low px-2.5 py-2 font-mono text-[11px] font-bold text-on-surface-variant">
+        <span className="shrink-0 border-l border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-2 font-mono text-[11px] font-bold text-[#6B6860]">
           {unit}
         </span>
       </div>
@@ -452,7 +452,7 @@ export function ActaFreeFormBlocks({
   };
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 font-sans text-[#2C2621]">
       {/* Bloque 1: Identificación y Trazabilidad */}
       <CollapsibleBlockCard
         index={1}
@@ -464,7 +464,7 @@ export function ActaFreeFormBlocks({
         testId="acta-block-1"
       >
         <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Especialidad técnica
           </span>
           <div className="grid grid-cols-3 gap-1.5">
@@ -482,8 +482,8 @@ export function ActaFreeFormBlocks({
                 onClick={() => handleSpecialtyChange(opt.id)}
                 className={`min-h-[44px] rounded-xl border text-[12px] font-bold cursor-pointer ${
                   data.especialidad === opt.id
-                    ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                    : "border-outline-variant bg-surface-container-low text-on-surface"
+                    ? "border-[#EA580C] bg-[#FFD6B0] text-[#4A2500]"
+                    : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                 }`}
               >
                 {opt.label}
@@ -493,7 +493,7 @@ export function ActaFreeFormBlocks({
         </div>
 
         <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Tipo de actuación
           </span>
           <div className="grid grid-cols-2 gap-1.5">
@@ -507,8 +507,8 @@ export function ActaFreeFormBlocks({
                 }
                 className={`min-h-[42px] rounded-xl border px-2.5 text-[11px] font-semibold cursor-pointer ${
                   data.tipo_actuacion === opt.value
-                    ? "border-secondary bg-secondary text-on-secondary"
-                    : "border-outline-variant bg-surface-container-low text-on-surface"
+                    ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                    : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                 }`}
               >
                 {opt.label}
@@ -518,7 +518,7 @@ export function ActaFreeFormBlocks({
         </div>
 
         <label className="block space-y-1">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Fecha de emisión
           </span>
           <input
@@ -530,13 +530,13 @@ export function ActaFreeFormBlocks({
                 onChangeData((prev) => ({ ...prev, fecha_emision: e.target.value }));
               }
             }}
-            className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-white px-3 font-mono text-xs text-on-surface"
+            className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </label>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-on-surface-variant">
+            <span className="text-[11px] font-semibold text-[#6B6860]">
               Alcance y ubicación exacta en obra
             </span>
           </div>
@@ -550,7 +550,7 @@ export function ActaFreeFormBlocks({
             onValueChange={(next) =>
               onChangeData((prev) => ({ ...prev, alcance_ubicacion: next }))
             }
-            className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs text-on-surface"
+            className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
           <InlineVoiceFormTrigger
             voiceAdapter={voiceAdapter}
@@ -590,13 +590,13 @@ export function ActaFreeFormBlocks({
         testId="acta-block-2"
       >
         {/* Sub-bloque Instalador */}
-        <div className="rounded-xl border border-outline-variant bg-surface-container-low/40 p-3 space-y-2.5">
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[12px] font-bold text-on-surface">
+            <span className="text-[12px] font-bold text-[#2C2621]">
               Empresa / Profesional Instalador
             </span>
             {installerProfileAlreadySaved && (
-              <span className="rounded-full bg-success-container px-2 py-0.5 text-[10px] font-semibold text-on-success-container">
+              <span className="paper-stamp status-emerald rounded-full px-2.5 py-0.5 text-[10px] font-bold">
                 Ficha habitual cargada
               </span>
             )}
@@ -605,7 +605,7 @@ export function ActaFreeFormBlocks({
           {!installerProfileAlreadySaved && (
             <div
               data-testid="acta-inline-installer-banner"
-              className="rounded-xl border border-amber-300 bg-warning-container p-2.5 text-[11px] font-semibold text-on-warning-container"
+              className="postit-note postit-yellow border border-[#D97706]/30 p-2.5 text-[11px] font-semibold text-[#3E3300]"
             >
               Aún no tienes tu ficha de instalador guardada. Rellénala aquí mismo y guárdala para que las próximas actas salgan autorrellenadas.
             </div>
@@ -622,7 +622,7 @@ export function ActaFreeFormBlocks({
                 instalador: { ...prev.instalador, nombre_razon_social: e.target.value },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           <div className="grid grid-cols-2 gap-2">
@@ -637,7 +637,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, nif_cif: e.target.value.toUpperCase() },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 font-mono text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <input
               type="tel"
@@ -649,7 +649,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, telefono: e.target.value },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
@@ -663,7 +663,7 @@ export function ActaFreeFormBlocks({
                 instalador: { ...prev.instalador, domicilio_fiscal: e.target.value },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           <div className="grid grid-cols-2 gap-2">
@@ -677,7 +677,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, email: e.target.value },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <input
               type="text"
@@ -690,7 +690,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, num_registro_empresa: e.target.value },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
@@ -706,7 +706,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, tecnico_nombre: e.target.value },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <input
               type="text"
@@ -719,7 +719,7 @@ export function ActaFreeFormBlocks({
                   instalador: { ...prev.instalador, tecnico_dni: e.target.value.toUpperCase() },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 font-mono text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
@@ -733,16 +733,16 @@ export function ActaFreeFormBlocks({
                 instalador: { ...prev.instalador, num_carne_instalador: e.target.value },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           {installerErr && (
-            <div role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[11px] font-semibold text-on-error-container">
+            <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-[11px] font-semibold text-[#5A121C]">
               {installerErr}
             </div>
           )}
           {installerMsg && (
-            <div className="flex items-center gap-1.5 rounded-xl bg-success-container px-3 py-2 text-[11px] font-semibold text-on-success-container">
+            <div className="flex items-center gap-1.5 rounded-xl status-emerald px-3 py-2 text-[11px] font-semibold">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
               <span>{installerMsg}</span>
             </div>
@@ -753,7 +753,7 @@ export function ActaFreeFormBlocks({
             data-testid="acta-save-installer-profile-btn"
             disabled={savingInstallerProfile}
             onClick={() => void handleSaveInstallerAsDefault()}
-            className="inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-secondary/30 bg-white px-3 text-[12px] font-bold text-on-surface hover:border-terracotta disabled:opacity-50 cursor-pointer"
+            className="inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-[#4B7094]/30 bg-[#FFFDF7] px-3 text-[12px] font-bold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-50 cursor-pointer"
           >
             <Save className="h-3.5 w-3.5 shrink-0" />
             <span>
@@ -767,13 +767,13 @@ export function ActaFreeFormBlocks({
         </div>
 
         {/* Sub-bloque Cliente */}
-        <div className="rounded-xl border border-outline-variant bg-surface-container-low/40 p-3 space-y-2.5">
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[12px] font-bold text-on-surface">
+            <span className="text-[12px] font-bold text-[#2C2621]">
               Titular / Cliente de la instalación
             </span>
             {linkedClientId && (
-              <span className="rounded-full bg-success-container px-2 py-0.5 text-[10px] font-semibold text-on-success-container">
+              <span className="paper-stamp status-emerald rounded-full px-2.5 py-0.5 text-[10px] font-bold">
                 Vinculado a cliente
               </span>
             )}
@@ -782,10 +782,10 @@ export function ActaFreeFormBlocks({
           {!linkedClientId && (
             <div
               data-testid="acta-inline-client-bar"
-              className="rounded-xl border border-outline-variant bg-white p-2.5 space-y-2"
+              className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 space-y-2"
             >
               <label className="block space-y-1">
-                <span className="block text-[11px] font-semibold text-on-surface-variant">
+                <span className="block text-[11px] font-semibold text-[#6B6860]">
                   Seleccionar cliente existente o rellenar datos abajo para crearlo
                 </span>
                 <select
@@ -803,7 +803,7 @@ export function ActaFreeFormBlocks({
                       email: chosen.email || undefined,
                     });
                   }}
-                  className="min-h-[40px] w-full rounded-lg border border-outline-variant bg-surface-container-low px-2.5 text-xs"
+                  className="min-h-[40px] w-full rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                 >
                   <option value="">Elegir cliente del directorio...</option>
                   {allClients.map((c) => (
@@ -828,7 +828,7 @@ export function ActaFreeFormBlocks({
                 cliente: { ...prev.cliente, nombre_razon_social: e.target.value },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           <div className="grid grid-cols-2 gap-2">
@@ -843,7 +843,7 @@ export function ActaFreeFormBlocks({
                   cliente: { ...prev.cliente, nif_cif: e.target.value.toUpperCase() },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 font-mono text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
             <input
               type="tel"
@@ -855,7 +855,7 @@ export function ActaFreeFormBlocks({
                   cliente: { ...prev.cliente, telefono: e.target.value || undefined },
                 }))
               }
-              className="min-h-[42px] rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
@@ -870,7 +870,7 @@ export function ActaFreeFormBlocks({
                 cliente: { ...prev.cliente, direccion_emplazamiento: e.target.value },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           <input
@@ -883,16 +883,16 @@ export function ActaFreeFormBlocks({
                 cliente: { ...prev.cliente, email: e.target.value || undefined },
               }))
             }
-            className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+            className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
           />
 
           {clientErr && (
-            <div role="alert" className="rounded-xl bg-error-container px-3 py-2 text-[11px] font-semibold text-on-error-container">
+            <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-[11px] font-semibold text-[#5A121C]">
               {clientErr}
             </div>
           )}
           {clientMsg && (
-            <div className="flex items-center gap-1.5 rounded-xl bg-success-container px-3 py-2 text-[11px] font-semibold text-on-success-container">
+            <div className="flex items-center gap-1.5 rounded-xl status-emerald px-3 py-2 text-[11px] font-semibold">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
               <span>{clientMsg}</span>
             </div>
@@ -904,7 +904,7 @@ export function ActaFreeFormBlocks({
               data-testid="acta-create-inline-client-btn"
               disabled={savingInlineClient}
               onClick={() => void handleCreateInlineClient()}
-              className="inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-secondary px-3 text-[12px] font-bold text-on-secondary disabled:opacity-50 cursor-pointer"
+              className="inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#4B7094] px-3 text-[12px] font-bold text-[#FFFDF9] disabled:opacity-50 cursor-pointer"
             >
               <UserPlus className="h-3.5 w-3.5 shrink-0" />
               <span>
@@ -932,8 +932,8 @@ export function ActaFreeFormBlocks({
         testId="acta-block-3"
       >
         {needsElec && (
-          <div className="space-y-3 rounded-xl border border-outline-variant bg-surface-container-low/40 p-3">
-            <div className="text-[12px] font-bold text-on-surface">Instalación Eléctrica</div>
+          <div className="ruled-notebook space-y-3 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3">
+            <div className="text-[12px] font-bold text-[#2C2621]">Instalación Eléctrica</div>
 
             <div className="grid grid-cols-2 gap-1.5">
               {(["230V Monofásica", "400V Trifásica"] as const).map((tens) => (
@@ -943,8 +943,8 @@ export function ActaFreeFormBlocks({
                   onClick={() => updateMemElec({ tension_nominal: tens })}
                   className={`min-h-[42px] rounded-xl border text-[12px] font-bold cursor-pointer ${
                     memElec.tension_nominal === tens
-                      ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                      : "border-outline-variant bg-white text-on-surface"
+                      ? "border-[#EA580C] bg-[#FFD6B0] text-[#4A2500]"
+                      : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                   }`}
                 >
                   {tens}
@@ -961,7 +961,7 @@ export function ActaFreeFormBlocks({
                 testId="acta-iga-input"
               />
               <label className="space-y-1">
-                <span className="block text-[11px] font-semibold text-on-surface-variant">
+                <span className="block text-[11px] font-semibold text-[#6B6860]">
                   Diferencial (calibre)
                 </span>
                 <input
@@ -969,7 +969,7 @@ export function ActaFreeFormBlocks({
                   value={memElec.diferencial_calibre}
                   onChange={(e) => updateMemElec({ diferencial_calibre: e.target.value })}
                   placeholder="40A / 30mA Clase A"
-                  className="min-h-[44px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+                  className="min-h-[44px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
                 />
               </label>
             </div>
@@ -983,8 +983,8 @@ export function ActaFreeFormBlocks({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-on-surface-variant">
-                  Circuitos del cuadro ({memElec.circuitos.length})
+                <span className="text-[11px] font-semibold text-[#6B6860]">
+                  Circuitos del cuadro (<span className="font-mono-nums">{memElec.circuitos.length}</span>)
                 </span>
                 <button
                   type="button"
@@ -1001,7 +1001,7 @@ export function ActaFreeFormBlocks({
                       ],
                     })
                   }
-                  className="inline-flex min-h-[34px] items-center gap-1 rounded-lg bg-secondary px-2.5 text-[11px] font-bold text-on-secondary cursor-pointer"
+                  className="inline-flex min-h-[34px] items-center gap-1 rounded-lg bg-[#4B7094] px-2.5 text-[11px] font-bold text-[#FFFDF9] cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Añadir circuito</span>
@@ -1016,9 +1016,9 @@ export function ActaFreeFormBlocks({
                     onClick={() =>
                       updateMemElec({ circuitos: [...memElec.circuitos, { ...preset }] })
                     }
-                    className="rounded-full border border-outline-variant bg-white px-2.5 py-1 text-[10px] font-semibold text-on-surface hover:border-terracotta cursor-pointer"
+                    className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-1 text-[10px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
                   >
-                    + {preset.nombre} ({preset.calibre_a}A / {preset.seccion_mm2}mm²)
+                    + {preset.nombre} (<span className="font-mono-nums">{preset.calibre_a}A / {preset.seccion_mm2}mm²</span>)
                   </button>
                 ))}
               </div>
@@ -1026,7 +1026,7 @@ export function ActaFreeFormBlocks({
               {memElec.circuitos.map((circ, idx) => (
                 <div
                   key={`circ-${idx}`}
-                  className="grid grid-cols-12 gap-1.5 rounded-xl border border-outline-variant bg-white p-2"
+                  className="grid grid-cols-12 gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2"
                 >
                   <input
                     type="text"
@@ -1037,7 +1037,7 @@ export function ActaFreeFormBlocks({
                       next[idx] = { ...circ, nombre: e.target.value };
                       updateMemElec({ circuitos: next });
                     }}
-                    className="col-span-5 min-h-[38px] rounded-lg border border-outline-variant px-2 text-[11px]"
+                    className="col-span-5 min-h-[38px] rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 text-[11px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                   <input
                     type="number"
@@ -1052,7 +1052,7 @@ export function ActaFreeFormBlocks({
                       };
                       updateMemElec({ circuitos: next });
                     }}
-                    className="col-span-3 min-h-[38px] rounded-lg border border-outline-variant px-2 text-[11px]"
+                    className="col-span-3 min-h-[38px] rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 font-mono-nums text-[11px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                   <input
                     type="number"
@@ -1068,7 +1068,7 @@ export function ActaFreeFormBlocks({
                       };
                       updateMemElec({ circuitos: next });
                     }}
-                    className="col-span-3 min-h-[38px] rounded-lg border border-outline-variant px-2 text-[11px]"
+                    className="col-span-3 min-h-[38px] rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 font-mono-nums text-[11px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                   <button
                     type="button"
@@ -1078,7 +1078,7 @@ export function ActaFreeFormBlocks({
                         circuitos: memElec.circuitos.filter((_, i) => i !== idx),
                       })
                     }
-                    className="col-span-1 flex items-center justify-center rounded-lg text-coral-alert hover:bg-error-container cursor-pointer"
+                    className="col-span-1 flex items-center justify-center rounded-lg text-[#DC2626] hover:bg-[#FAD2D8] cursor-pointer"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1087,7 +1087,7 @@ export function ActaFreeFormBlocks({
             </div>
 
             <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Receptores y equipos conectados
               </span>
               <ZoomableTextField
@@ -1097,7 +1097,7 @@ export function ActaFreeFormBlocks({
                 placeholder="Ej. Alumbrado LED, tomas de cocina, termo eléctrico, aire acondicionado..."
                 value={memElec.receptores_conectados}
                 onValueChange={(next) => updateMemElec({ receptores_conectados: next })}
-                className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs"
+                className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
               <InlineVoiceFormTrigger
                 voiceAdapter={voiceAdapter}
@@ -1120,13 +1120,13 @@ export function ActaFreeFormBlocks({
         )}
 
         {needsFont && (
-          <div className="space-y-3 rounded-xl border border-outline-variant bg-surface-container-low/40 p-3">
-            <div className="text-[12px] font-bold text-on-surface">
+          <div className="ruled-notebook space-y-3 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3">
+            <div className="text-[12px] font-bold text-[#2C2621]">
               Instalación de Fontanería y ACS
             </div>
 
             <div className="space-y-1">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Redes intervenidas
               </span>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -1144,8 +1144,8 @@ export function ActaFreeFormBlocks({
                       }}
                       className={`min-h-[40px] rounded-xl border text-[12px] font-bold cursor-pointer ${
                         active
-                          ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                          : "border-outline-variant bg-white text-on-surface"
+                          ? "border-[#EA580C] bg-[#FFD6B0] text-[#4A2500]"
+                          : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                       }`}
                     >
                       {red}
@@ -1156,7 +1156,7 @@ export function ActaFreeFormBlocks({
             </div>
 
             <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Material de tuberías
               </span>
               <div className="flex flex-wrap gap-1">
@@ -1167,8 +1167,8 @@ export function ActaFreeFormBlocks({
                     onClick={() => updateMemFont({ material_tuberias: mat })}
                     className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold cursor-pointer ${
                       memFont.material_tuberias === mat
-                        ? "border-secondary bg-secondary text-on-secondary"
-                        : "border-outline-variant bg-white text-on-surface"
+                        ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                        : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
                     }`}
                   >
                     {mat}
@@ -1181,7 +1181,7 @@ export function ActaFreeFormBlocks({
                 placeholder="Ej. Multicapa PEX-Al-PEX / Cobre"
                 value={memFont.material_tuberias}
                 onChange={(e) => updateMemFont({ material_tuberias: e.target.value })}
-                className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
 
@@ -1190,7 +1190,7 @@ export function ActaFreeFormBlocks({
               placeholder="Diámetros instalados (ej. 20mm montante, 16mm derivaciones)"
               value={memFont.diametros_mm}
               onChange={(e) => updateMemFont({ diametros_mm: e.target.value })}
-              className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
 
             <input
@@ -1198,11 +1198,11 @@ export function ActaFreeFormBlocks({
               placeholder="Ubicación de llaves de corte (ej. Falso techo baño y cocina)"
               value={memFont.ubicacion_llaves_corte}
               onChange={(e) => updateMemFont({ ubicacion_llaves_corte: e.target.value })}
-              className="min-h-[42px] w-full rounded-xl border border-outline-variant bg-white px-3 text-xs"
+              className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
 
             <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold text-on-surface-variant">
+              <span className="block text-[11px] font-semibold text-[#6B6860]">
                 Equipos sanitarios y aparataje instalado
               </span>
               <ZoomableTextField
@@ -1212,7 +1212,7 @@ export function ActaFreeFormBlocks({
                 placeholder="Ej. Termo eléctrico 80L, plato de ducha, lavabo, inodoro, grifería..."
                 value={memFont.equipos_sanitarios}
                 onValueChange={(next) => updateMemFont({ equipos_sanitarios: next })}
-                className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs"
+                className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
               <InlineVoiceFormTrigger
                 voiceAdapter={voiceAdapter}
@@ -1246,8 +1246,8 @@ export function ActaFreeFormBlocks({
         testId="acta-block-4"
       >
         {needsElec && (
-          <div className="space-y-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 p-3">
-            <div className="text-[12px] font-bold text-on-surface">Pruebas Eléctricas</div>
+          <div className="space-y-2.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
+            <div className="text-[12px] font-bold text-[#2C2621]">Pruebas Eléctricas</div>
             <YesNoToggle
               label="Inspección visual de bornes y etiquetado"
               value={pruElec.inspeccion_visual_bornes_etiquetado}
@@ -1297,8 +1297,8 @@ export function ActaFreeFormBlocks({
         )}
 
         {needsFont && (
-          <div className="space-y-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 p-3">
-            <div className="text-[12px] font-bold text-on-surface">
+          <div className="space-y-2.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
+            <div className="text-[12px] font-bold text-[#2C2621]">
               Pruebas de Estanqueidad y Fontanería
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1382,9 +1382,9 @@ export function ActaFreeFormBlocks({
         onToggle={() => toggleBlock(6)}
         testId="acta-block-6"
       >
-        <div className="rounded-xl border border-outline-variant bg-surface-container-low/60 p-2.5 space-y-2">
+        <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-on-surface-variant">
+            <span className="text-[11px] font-semibold text-[#6B6860]">
               Plazo de garantía (meses)
             </span>
             <div className="flex gap-1">
@@ -1403,10 +1403,10 @@ export function ActaFreeFormBlocks({
                         : prev.clausula_recepcion_cliente,
                     }))
                   }
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold cursor-pointer ${
+                  className={`rounded-lg px-2.5 py-1 font-mono-nums text-[11px] font-bold cursor-pointer ${
                     data.plazo_garantia_meses === m
-                      ? "bg-secondary text-on-secondary"
-                      : "border border-outline-variant bg-white text-on-surface"
+                      ? "bg-[#4B7094] text-[#FFFDF9]"
+                      : "border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621]"
                   }`}
                 >
                   {m}m
@@ -1435,7 +1435,7 @@ export function ActaFreeFormBlocks({
         </div>
 
         <label className="block space-y-1">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Instrucciones básicas de uso y mantenimiento
           </span>
           <ZoomableTextField
@@ -1446,12 +1446,12 @@ export function ActaFreeFormBlocks({
             onValueChange={(next) =>
               onChangeData((prev) => ({ ...prev, instrucciones_mantenimiento: next }))
             }
-            className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs"
+            className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </label>
 
         <label className="block space-y-1">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Declaración de conformidad (REBT / CTE)
           </span>
           <ZoomableTextField
@@ -1462,12 +1462,12 @@ export function ActaFreeFormBlocks({
             onValueChange={(next) =>
               onChangeData((prev) => ({ ...prev, clausula_conformidad: next }))
             }
-            className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs"
+            className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </label>
 
         <label className="block space-y-1">
-          <span className="block text-[11px] font-semibold text-on-surface-variant">
+          <span className="block text-[11px] font-semibold text-[#6B6860]">
             Cláusula de recepción y garantía
           </span>
           <ZoomableTextField
@@ -1478,7 +1478,7 @@ export function ActaFreeFormBlocks({
             onValueChange={(next) =>
               onChangeData((prev) => ({ ...prev, clausula_recepcion_cliente: next }))
             }
-            className="w-full rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs"
+            className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
           />
         </label>
 
@@ -1492,7 +1492,7 @@ export function ActaFreeFormBlocks({
               clausula_recepcion_cliente: buildActaRecepcionTemplate(prev.plazo_garantia_meses),
             }))
           }
-          className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 text-[11px] font-semibold text-on-surface-variant cursor-pointer"
+          className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 text-[11px] font-semibold text-[#6B6860] cursor-pointer"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>Restaurar plantillas oficiales</span>
@@ -1522,8 +1522,8 @@ export function ActaFreeFormBlocks({
               onClick={() => onChangeEstado("borrador")}
               className={`min-h-[42px] rounded-xl border text-[12px] font-bold cursor-pointer ${
                 estado === "borrador"
-                  ? "border-terracotta bg-terracotta-soft text-on-primary-container"
-                  : "border-outline-variant bg-white text-on-surface"
+                  ? "border-[#EA580C] bg-[#FFD6B0] text-[#4A2500]"
+                  : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
               }`}
             >
               En borrador
@@ -1533,8 +1533,8 @@ export function ActaFreeFormBlocks({
               onClick={() => onChangeEstado("completada")}
               className={`min-h-[42px] rounded-xl border text-[12px] font-bold cursor-pointer ${
                 estado === "completada"
-                  ? "border-secondary bg-secondary text-on-secondary"
-                  : "border-outline-variant bg-white text-on-surface"
+                  ? "border-[#4B7094] bg-[#4B7094] text-[#FFFDF9]"
+                  : "border-[#E5DFD2] bg-[#F5F1E6] text-[#2C2621]"
               }`}
             >
               Marcar completada
@@ -1543,13 +1543,13 @@ export function ActaFreeFormBlocks({
         )}
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <div className="rounded-xl border border-outline-variant bg-surface-container-low/40 p-3 space-y-2">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-on-surface">
+              <span className="text-[11px] font-bold text-[#2C2621]">
                 Firma del instalador
               </span>
               {firmaInstaladorBase64 && (
-                <span className="rounded-full bg-success-container px-2 py-0.5 text-[10px] font-semibold text-on-success-container">
+                <span className="paper-stamp status-emerald rounded-full px-2.5 py-0.5 text-[10px] font-bold">
                   Lista
                 </span>
               )}
@@ -1558,30 +1558,30 @@ export function ActaFreeFormBlocks({
               <img
                 src={firmaInstaladorBase64}
                 alt="Firma del instalador"
-                className="h-20 w-full rounded-lg border border-outline-variant bg-white p-1 object-contain"
+                className="h-20 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] p-1 object-contain"
               />
             )}
             <button
               type="button"
               data-testid="acta-open-installer-signature-btn"
               onClick={onOpenInstallerSignature}
-              className="inline-flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 text-[12px] font-semibold text-on-surface cursor-pointer"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[12px] font-semibold text-[#2C2621] cursor-pointer"
             >
               <PenTool className="h-3.5 w-3.5" />
               <span>{firmaInstaladorBase64 ? "Cambiar firma instalador" : "Firmar instalador"}</span>
             </button>
           </div>
 
-          <div className="rounded-xl border border-outline-variant bg-surface-container-low/40 p-3 space-y-2">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-on-surface">
+              <span className="text-[11px] font-bold text-[#2C2621]">
                 Firma del cliente *
               </span>
               {firmaClienteBase64 && (
                 <button
                   type="button"
                   onClick={onClearClientSignature}
-                  className="text-[10px] font-semibold text-coral-alert cursor-pointer"
+                  className="text-[10px] font-semibold text-[#DC2626] cursor-pointer"
                 >
                   Borrar
                 </button>
@@ -1591,14 +1591,14 @@ export function ActaFreeFormBlocks({
               <img
                 src={firmaClienteBase64}
                 alt="Firma del cliente"
-                className="h-20 w-full rounded-lg border border-outline-variant bg-white p-1 object-contain"
+                className="h-20 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] p-1 object-contain"
               />
             )}
             <button
               type="button"
               data-testid="acta-open-client-signature-btn"
               onClick={onOpenClientSignature}
-              className="inline-flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-terracotta/40 bg-terracotta-soft px-3 text-[12px] font-bold text-on-primary-container cursor-pointer"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-[#EA580C]/40 bg-[#FFD6B0] px-3 text-[12px] font-bold text-[#4A2500] cursor-pointer"
             >
               <PenTool className="h-3.5 w-3.5" />
               <span>{firmaClienteBase64 ? "Repetir firma cliente" : "Recoger firma del cliente"}</span>
@@ -1611,7 +1611,7 @@ export function ActaFreeFormBlocks({
           data-testid="acta-generate-share-pdf-btn"
           disabled={pdfBusy}
           onClick={() => void onGenerateAndSharePdf()}
-          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-4 text-[13px] font-bold text-white shadow-sm disabled:opacity-50 cursor-pointer"
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-[13px] font-bold text-white shadow-sm disabled:opacity-50 cursor-pointer transition-colors"
         >
           <Share2 className="h-4 w-4 shrink-0" />
           <span>{pdfBusy ? "Generando PDF A4..." : "Generar y Compartir PDF"}</span>

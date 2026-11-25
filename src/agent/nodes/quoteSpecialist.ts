@@ -1,5 +1,6 @@
 import { AIMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { parseQuoteAttachmentsJson } from "../../core/contracts/schemas";
 import { TEXT_LIMITS, truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
@@ -102,11 +103,19 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             : presetNewClientName
               ? `Trabajos para ${presetNewClientName}`
               : "",
+          general_description: "",
+          estimated_duration_value: null,
+          estimated_duration_unit: "dias_laborables",
           vat_rate: defaultVatRate,
           validity_days: appSettings.default_quote_validity_days,
           payment_methods: appSettings.default_payment_methods,
           payment_schedule: appSettings.default_payment_schedule,
+          payment_terms_text: "",
+          iban_override: appSettings.emitter_iban,
+          bank_name: appSettings.emitter_bank_name,
+          show_iban: appSettings.emitter_iban.trim().length > 0,
           notes: "",
+          attachments: [],
           lines: [],
         };
         return {
@@ -141,11 +150,19 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             client_id: job.client_id,
             job_id: job.id,
             job_title: job.title,
+            general_description: "",
+            estimated_duration_value: null,
+            estimated_duration_unit: "dias_laborables",
             vat_rate: defaultVatRate,
             validity_days: appSettings.default_quote_validity_days,
             payment_methods: appSettings.default_payment_methods,
             payment_schedule: appSettings.default_payment_schedule,
+            payment_terms_text: "",
+            iban_override: appSettings.emitter_iban,
+            bank_name: appSettings.emitter_bank_name,
+            show_iban: appSettings.emitter_iban.trim().length > 0,
             notes: "",
+            attachments: [],
             lines: [],
           };
           return {
@@ -170,11 +187,22 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             client_id: existingQuote.client_id,
             job_id: job.id,
             job_title: job.title,
+            general_description: existingQuote.general_description ?? "",
+            estimated_duration_value: existingQuote.estimated_duration_value ?? null,
+            estimated_duration_unit: existingQuote.estimated_duration_unit ?? "dias_laborables",
             vat_rate: existingQuote.vat_rate,
             validity_days: existingQuote.validity_days ?? appSettings.default_quote_validity_days,
             payment_methods: parseQuotePaymentMethodsJson(existingQuote.payment_methods_json),
             payment_schedule: parseQuotePaymentScheduleJson(existingQuote.payment_schedule_json),
+            payment_terms_text: existingQuote.payment_terms_text ?? "",
+            iban_override: (existingQuote.iban_override ?? "").trim() || appSettings.emitter_iban,
+            bank_name: (existingQuote.bank_name ?? "").trim() || appSettings.emitter_bank_name,
+            show_iban:
+              existingQuote.show_iban !== undefined
+                ? existingQuote.show_iban !== 0
+                : ((existingQuote.iban_override ?? "").trim() || appSettings.emitter_iban).length > 0,
             notes: existingQuote.notes,
+            attachments: parseQuoteAttachmentsJson(existingQuote.attachments_json),
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
               description: item.description,
@@ -403,11 +431,22 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             client_id: q.client_id,
             job_id: q.job_id,
             job_title: j?.title ?? "Obra en borrador",
+            general_description: q.general_description ?? "",
+            estimated_duration_value: q.estimated_duration_value ?? null,
+            estimated_duration_unit: q.estimated_duration_unit ?? "dias_laborables",
             vat_rate: q.vat_rate,
             validity_days: q.validity_days ?? appSettings.default_quote_validity_days,
             payment_methods: parseQuotePaymentMethodsJson(q.payment_methods_json),
             payment_schedule: parseQuotePaymentScheduleJson(q.payment_schedule_json),
+            payment_terms_text: q.payment_terms_text ?? "",
+            iban_override: (q.iban_override ?? "").trim() || appSettings.emitter_iban,
+            bank_name: (q.bank_name ?? "").trim() || appSettings.emitter_bank_name,
+            show_iban:
+              q.show_iban !== undefined
+                ? q.show_iban !== 0
+                : ((q.iban_override ?? "").trim() || appSettings.emitter_iban).length > 0,
             notes: q.notes,
+            attachments: parseQuoteAttachmentsJson(q.attachments_json),
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
               description: item.description,
@@ -612,14 +651,22 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           : {}),
         job_id: targetJobId,
         job_title: defaultTitle,
+        general_description: "",
+        estimated_duration_value: null,
+        estimated_duration_unit: "dias_laborables",
         vat_rate: vatRate,
         validity_days: appSettings.default_quote_validity_days,
         payment_methods: appSettings.default_payment_methods,
         payment_schedule: appSettings.default_payment_schedule,
+        payment_terms_text: "",
+        iban_override: appSettings.emitter_iban,
+        bank_name: appSettings.emitter_bank_name,
+        show_iban: appSettings.emitter_iban.trim().length > 0,
         notes:
           vatRate === 10
             ? "IVA 10 % sujeto a requisitos de reforma en vivienda."
             : "",
+        attachments: [],
         lines: draftLines,
       };
 

@@ -45,7 +45,9 @@ import type {
   PendingSlotFillSchema,
   PricingSettingsInputSchema,
   QuickActionSchema,
+  QuoteAttachmentSchema,
   QuoteDefaultsInputSchema,
+  QuoteDurationUnitSchema,
   QuoteItemRowSchema,
   QuotePaymentInstallmentSchema,
   QuotePaymentMethodSchema,
@@ -98,6 +100,8 @@ export type SiteLogCategory = z.infer<typeof SiteLogCategorySchema>;
 export type CatalogCategory = z.infer<typeof CatalogCategorySchema>;
 export type CatalogPricingMode = z.infer<typeof CatalogPricingModeSchema>;
 export type QuoteVatRate = z.infer<typeof QuoteVatRateSchema>;
+export type QuoteDurationUnit = z.infer<typeof QuoteDurationUnitSchema>;
+export type QuoteAttachment = z.infer<typeof QuoteAttachmentSchema>;
 export type QuotePaymentMethod = z.infer<typeof QuotePaymentMethodSchema>;
 export type QuotePaymentInstallment = z.infer<typeof QuotePaymentInstallmentSchema>;
 export type QuotePaymentSchedule = z.infer<typeof QuotePaymentScheduleSchema>;
@@ -265,6 +269,7 @@ export interface AppSettingsRecord {
   emitter_fiscal_address: string;
   emitter_phone: string;
   emitter_iban: string;
+  emitter_bank_name: string;
   emitter_logo_data_url: string | null;
   active_account_id: string | null;
   last_active_thread_id: string | null;

@@ -142,17 +142,17 @@ export function DocumentImportReviewWidget(props: {
   return (
     <section
       data-testid="document-import-review-widget"
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900 space-y-4"
+      className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 text-[#2C2621] font-sans space-y-4"
     >
-      <div className="border-b border-slate-100 pb-2.5 flex items-start justify-between gap-2">
+      <div className="border-b border-[#E5DFD2] pb-2.5 flex items-start justify-between gap-2">
         <div>
-          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-semibold text-orange-900">
+          <span className="inline-flex items-center rounded-sm paper-stamp status-tangerine px-2.5 py-0.5 text-[11px] font-semibold">
             Revisión de Importación IA Local
           </span>
-          <h3 className="mt-1 text-base font-bold text-slate-900">
+          <h3 className="mt-1.5 text-base font-bold text-[#2C2621]">
             Partidas y tarifas extraídas ({draft.items.length})
           </h3>
-          <div className="mt-0.5 text-[11px] text-slate-500">
+          <div className="mt-0.5 text-[11px] text-[#6B6860]">
             Documentos:{" "}
             {draft.source_files.map((f) => `${f.name} (${f.pages_processed} p.)`).join(" · ") ||
               "Análisis local"}
@@ -161,7 +161,7 @@ export function DocumentImportReviewWidget(props: {
       </div>
 
       {draft.warnings.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950 space-y-1">
+        <div className="rounded-xl border border-[#D97706]/35 bg-[#FFF3A1] p-2.5 text-xs text-[#3E3300] space-y-1">
           {draft.warnings.map((w, idx) => (
             <div key={idx}>{w}</div>
           ))}
@@ -170,11 +170,11 @@ export function DocumentImportReviewWidget(props: {
 
       {draft.detected_services.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-slate-600">Servicios detectados:</span>
+          <span className="text-[11px] font-semibold text-[#6B6860]">Servicios detectados:</span>
           {draft.detected_services.map((srv) => (
             <span
               key={srv}
-              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-800"
+              className="rounded-full status-cobalt px-2.5 py-0.5 text-[11px] font-semibold"
             >
               {srv}
             </span>
@@ -184,10 +184,10 @@ export function DocumentImportReviewWidget(props: {
 
       {/* Tarifa base €/h e impuestos detectados */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div className="ruled-index rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-slate-800">Tarifa base (€/hora)</span>
-            <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+            <span className="text-xs font-bold text-[#2C2621]">Tarifa base (€/hora)</span>
+            <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#2C2621] cursor-pointer">
               <input
                 type="checkbox"
                 data-testid="import-apply-hourly-toggle"
@@ -201,7 +201,7 @@ export function DocumentImportReviewWidget(props: {
                       p.inferred_hourly_rate_cents ?? currentHourlyRateCents,
                   }))
                 }
-                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                className="h-4 w-4 rounded border-[#E5DFD2] text-[#EA580C]"
               />
               Aplicar a mi perfil
             </label>
@@ -221,16 +221,16 @@ export function DocumentImportReviewWidget(props: {
                   inferred_hourly_rate_cents: eurInputToCents(e.target.value) || 100,
                 }))
               }
-              className="w-28 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-bold"
+              className="w-28 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-sm font-bold font-mono-nums tabular-nums text-[#2C2621]"
             />
-            <span className="text-xs font-semibold text-slate-600">€/hora</span>
+            <span className="text-xs font-semibold text-[#6B6860]">€/hora</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div className="ruled-index rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-slate-800">IVA / IRPF detectado</span>
-            <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+            <span className="text-xs font-bold text-[#2C2621]">IVA / IRPF detectado</span>
+            <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#2C2621] cursor-pointer">
               <input
                 type="checkbox"
                 data-testid="import-apply-tax-toggle"
@@ -242,14 +242,14 @@ export function DocumentImportReviewWidget(props: {
                     apply_tax_defaults: e.target.checked,
                   }))
                 }
-                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                className="h-4 w-4 rounded border-[#E5DFD2] text-[#EA580C]"
               />
               Actualizar por defecto
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] text-slate-600" htmlFor="imp-vat">
+              <label className="block text-[10px] text-[#6B6860]" htmlFor="imp-vat">
                 IVA (%)
               </label>
               <input
@@ -269,11 +269,11 @@ export function DocumentImportReviewWidget(props: {
                     }));
                   }
                 }}
-                className="mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold"
+                className="mt-0.5 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-semibold font-mono-nums tabular-nums text-[#2C2621]"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-600" htmlFor="imp-irpf">
+              <label className="block text-[10px] text-[#6B6860]" htmlFor="imp-irpf">
                 IRPF (%)
               </label>
               <input
@@ -293,7 +293,7 @@ export function DocumentImportReviewWidget(props: {
                     }));
                   }
                 }}
-                className="mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold"
+                className="mt-0.5 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-semibold font-mono-nums tabular-nums text-[#2C2621]"
               />
             </div>
           </div>
@@ -303,14 +303,14 @@ export function DocumentImportReviewWidget(props: {
       {/* Partidas extraídas editables */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800">
+          <span className="text-xs font-bold text-[#2C2621]">
             Partidas ({selectedCount} de {draft.items.length} seleccionadas)
           </span>
           <button
             type="button"
             disabled={busy}
             onClick={handleAddManualItem}
-            className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white"
+            className="rounded-lg bg-[#4B7094] px-2.5 py-1 text-xs font-semibold text-[#FFFDF9]"
           >
             + Añadir fila
           </button>
@@ -330,7 +330,9 @@ export function DocumentImportReviewWidget(props: {
                 key={item.temp_id}
                 data-testid={`import-item-row-${idx}`}
                 className={`rounded-xl border p-2.5 space-y-2 ${
-                  item.selected ? "border-slate-300 bg-slate-50/70" : "border-slate-200 bg-slate-100/50 opacity-65"
+                  item.selected
+                    ? "ruled-index border-[#E5DFD2] bg-[#FFFDF7]"
+                    : "border-[#E5DFD2] bg-[#F5F1E6]/70 opacity-65"
                 }`}
               >
                 <div className="flex items-start gap-2">
@@ -340,7 +342,7 @@ export function DocumentImportReviewWidget(props: {
                     checked={item.selected}
                     disabled={busy}
                     onChange={(e) => updateItem(idx, { selected: e.target.checked })}
-                    className="mt-1.5 h-4 w-4 rounded border-slate-300 text-orange-600"
+                    className="mt-1.5 h-4 w-4 rounded border-[#E5DFD2] text-[#EA580C]"
                   />
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex gap-1.5 items-center">
@@ -354,7 +356,7 @@ export function DocumentImportReviewWidget(props: {
                         value={item.description}
                         onValueChange={(next) => updateItem(idx, { description: next })}
                         placeholder="Descripción de la partida *"
-                        className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                        className="flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-semibold text-[#2C2621]"
                       />
                       <button
                         type="button"
@@ -365,7 +367,7 @@ export function DocumentImportReviewWidget(props: {
                             items: p.items.filter((_, i) => i !== idx),
                           }))
                         }
-                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-rose-700"
+                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#9A2D08]"
                       >
                         Quitar
                       </button>
@@ -373,7 +375,7 @@ export function DocumentImportReviewWidget(props: {
 
                     <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                       {item.existing_match_id && (
-                        <span className="rounded-md bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-900">
+                        <span className="rounded-md status-cobalt px-1.5 py-0.5 font-semibold">
                           Actualiza partida existente
                         </span>
                       )}
@@ -384,7 +386,7 @@ export function DocumentImportReviewWidget(props: {
                         onChange={(e) =>
                           updateItem(idx, { category: e.target.value as CatalogCategory })
                         }
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px]"
+                        className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
                       >
                         {CATEGORIES.map((cat) => (
                           <option key={cat} value={cat}>
@@ -398,7 +400,7 @@ export function DocumentImportReviewWidget(props: {
                         disabled={busy}
                         value={item.unit}
                         onChange={(e) => updateItem(idx, { unit: e.target.value || "ud" })}
-                        className="w-14 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px]"
+                        className="w-14 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
                       />
                       <select
                         aria-label={`Modo cálculo ${idx + 1}`}
@@ -409,13 +411,13 @@ export function DocumentImportReviewWidget(props: {
                             pricing_mode: e.target.value as CatalogPricingMode,
                           })
                         }
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px]"
+                        className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
                       >
                         <option value="fixed">Importe fijo</option>
                         <option value="hourly_plus_materials">Horas × Tarifa + Mat.</option>
                       </select>
                       <div className="flex items-center gap-1">
-                        <span className="text-slate-500">IVA</span>
+                        <span className="text-[#6B6860]">IVA</span>
                         <input
                           type="number"
                           min="0"
@@ -431,16 +433,16 @@ export function DocumentImportReviewWidget(props: {
                               });
                             }
                           }}
-                          className="w-14 rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-[11px]"
+                          className="w-14 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 text-[11px] font-mono-nums text-[#2C2621]"
                         />
-                        <span className="text-slate-500">%</span>
+                        <span className="text-[#6B6860]">%</span>
                       </div>
                     </div>
 
                     {item.pricing_mode === "hourly_plus_materials" ? (
                       <div className="grid grid-cols-3 gap-2 text-xs">
                         <div>
-                          <label className="block text-[10px] text-slate-600">Horas est.</label>
+                          <label className="block text-[10px] text-[#6B6860]">Horas est.</label>
                           <input
                             type="number"
                             step="0.25"
@@ -452,11 +454,11 @@ export function DocumentImportReviewWidget(props: {
                                 estimated_hours_thousandths: hoursInputToThousandths(e.target.value),
                               })
                             }
-                            className="mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                            className="mt-0.5 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums text-[#2C2621]"
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-600">Materiales (€)</label>
+                          <label className="block text-[10px] text-[#6B6860]">Materiales (€)</label>
                           <input
                             type="number"
                             step="0.5"
@@ -466,12 +468,12 @@ export function DocumentImportReviewWidget(props: {
                             onChange={(e) =>
                               updateItem(idx, { materials_cents: eurInputToCents(e.target.value) })
                             }
-                            className="mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                            className="mt-0.5 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums text-[#2C2621]"
                           />
                         </div>
                         <div className="flex flex-col justify-end text-right">
-                          <span className="text-[10px] text-slate-500">Total calculado</span>
-                          <span className="font-bold text-slate-900">
+                          <span className="text-[10px] text-[#6B6860]">Total calculado</span>
+                          <span className="font-bold font-mono-nums tabular-nums text-[#2C2621]">
                             {formatCentsEs(livePriceCents)}/{item.unit}
                           </span>
                         </div>
@@ -479,7 +481,7 @@ export function DocumentImportReviewWidget(props: {
                     ) : (
                       <div className="flex items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-1.5">
-                          <label className="text-[11px] text-slate-600">Precio (€):</label>
+                          <label className="text-[11px] text-[#6B6860]">Precio (€):</label>
                           <input
                             type="number"
                             step="0.5"
@@ -489,10 +491,10 @@ export function DocumentImportReviewWidget(props: {
                             onChange={(e) =>
                               updateItem(idx, { unit_price_cents: eurInputToCents(e.target.value) })
                             }
-                            className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold"
+                            className="w-24 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-bold font-mono-nums tabular-nums text-[#2C2621]"
                           />
                         </div>
-                        <span className="text-[11px] text-slate-500">
+                        <span className="text-[11px] font-mono-nums text-[#6B6860]">
                           {formatPricingBreakdown({
                             pricing_mode: item.pricing_mode,
                             estimated_hours_thousandths: item.estimated_hours_thousandths,
@@ -514,7 +516,7 @@ export function DocumentImportReviewWidget(props: {
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-medium text-rose-800"
+          className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2.5 text-xs font-medium text-[#5A121C]"
         >
           {errorMsg}
         </div>
@@ -526,7 +528,7 @@ export function DocumentImportReviewWidget(props: {
           data-testid="import-widget-cancel-btn"
           disabled={busy}
           onClick={onCancel}
-          className="min-h-12 rounded-xl border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700"
+          className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
         >
           Cancelar
         </button>
@@ -535,7 +537,7 @@ export function DocumentImportReviewWidget(props: {
           data-testid="import-widget-save-btn"
           disabled={busy}
           onClick={() => void handleConfirm()}
-          className="min-h-12 flex-1 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+          className="min-h-12 flex-1 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] px-4 text-sm font-bold text-white shadow-sm disabled:opacity-50"
         >
           {busy ? "Guardando tarifario..." : "Confirmar e importar"}
         </button>

@@ -85,7 +85,7 @@ export function InstallerActaSettingsCard({
   return (
     <div
       data-testid="installer-acta-settings-card"
-      className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm space-y-3"
+      className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-3 font-sans"
     >
       <button
         type="button"
@@ -94,27 +94,27 @@ export function InstallerActaSettingsCard({
         className="flex w-full items-start justify-between gap-2 text-left cursor-pointer"
       >
         <div className="min-w-0 flex-1">
-          <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-600 flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-orange-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wide text-[#2C2621] flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#EA580C]" />
             <span>Datos de instalador y actas técnicas</span>
           </h3>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-[#6B6860]">
             {hasSavedProfile
               ? `${techName || "Técnico sin nombre"}${registryNumber ? ` · Reg. ${registryNumber}` : ""} · Garantía ${warrantyMonths || "24"} meses`
               : "REIE/RII, técnico responsable, carné y garantía predeterminada para tus actas."}
           </p>
         </div>
-        <span className="mt-0.5 text-slate-500">
+        <span className="mt-0.5 text-[#6B6860]">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>
       </button>
 
       {expanded && (
-        <div className="space-y-2.5 pt-1 border-t border-slate-100">
+        <div className="space-y-2.5 pt-2 border-t border-[#E5DFD2]">
           <div className="space-y-1">
             <label
               htmlFor="installer-email"
-              className="block text-[11px] font-bold text-slate-700"
+              className="block text-[11px] font-bold text-[#2C2621]"
             >
               Correo electrónico profesional
             </label>
@@ -126,7 +126,7 @@ export function InstallerActaSettingsCard({
               placeholder={activeAccountEmail || "instalador@empresa.es"}
               value={emitterEmail}
               onChange={(e) => setEmitterEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+              className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
@@ -134,7 +134,7 @@ export function InstallerActaSettingsCard({
             <div className="space-y-1">
               <label
                 htmlFor="installer-registry"
-                className="block text-[11px] font-bold text-slate-700"
+                className="block text-[11px] font-bold text-[#2C2621]"
               >
                 Nº registro empresa (REIE / RII)
               </label>
@@ -146,13 +146,13 @@ export function InstallerActaSettingsCard({
                 placeholder="Ej. REIE-28-04192"
                 value={registryNumber}
                 onChange={(e) => setRegistryNumber(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
             <div className="space-y-1">
               <label
                 htmlFor="installer-card"
-                className="block text-[11px] font-bold text-slate-700"
+                className="block text-[11px] font-bold text-[#2C2621]"
               >
                 Nº carné instalador
               </label>
@@ -164,7 +164,7 @@ export function InstallerActaSettingsCard({
                 placeholder="Ej. CI-BT-11420"
                 value={installerCard}
                 onChange={(e) => setInstallerCard(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
           </div>
@@ -173,7 +173,7 @@ export function InstallerActaSettingsCard({
             <div className="space-y-1">
               <label
                 htmlFor="installer-tech-name"
-                className="block text-[11px] font-bold text-slate-700"
+                className="block text-[11px] font-bold text-[#2C2621]"
               >
                 Técnico responsable
               </label>
@@ -185,13 +185,13 @@ export function InstallerActaSettingsCard({
                 placeholder="Nombre y apellidos"
                 value={techName}
                 onChange={(e) => setTechName(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
             <div className="space-y-1">
               <label
                 htmlFor="installer-tech-dni"
-                className="block text-[11px] font-bold text-slate-700"
+                className="block text-[11px] font-bold text-[#2C2621]"
               >
                 DNI / NIE técnico
               </label>
@@ -203,16 +203,16 @@ export function InstallerActaSettingsCard({
                 placeholder="Ej. 12345678Z"
                 value={techDni}
                 onChange={(e) => setTechDni(e.target.value.toUpperCase())}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs"
+                className="min-h-[42px] w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2 font-mono tabular-nums text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+          <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <label
                 htmlFor="installer-warranty-months"
-                className="text-[11px] font-bold text-slate-700"
+                className="text-[11px] font-bold text-[#2C2621]"
               >
                 Garantía por defecto (meses)
               </label>
@@ -222,10 +222,10 @@ export function InstallerActaSettingsCard({
                     key={months}
                     type="button"
                     onClick={() => setWarrantyMonths(String(months))}
-                    className={`rounded-lg px-2 py-1 text-[11px] font-bold cursor-pointer ${
+                    className={`rounded-lg px-2 py-1 font-mono-nums text-[11px] font-bold cursor-pointer ${
                       Number.parseInt(warrantyMonths, 10) === months
-                        ? "bg-slate-900 text-white"
-                        : "bg-white border border-slate-300 text-slate-700"
+                        ? "bg-[#4B7094] text-[#FFFDF9]"
+                        : "bg-[#FFFDF7] border border-[#E5DFD2] text-[#6B6860]"
                     }`}
                   >
                     {months}m
@@ -241,21 +241,21 @@ export function InstallerActaSettingsCard({
               max="120"
               value={warrantyMonths}
               onChange={(e) => setWarrantyMonths(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+              className="min-h-[40px] w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </div>
 
           {signatureDataUrl ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+            <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-slate-700">
+                <span className="text-[11px] font-semibold text-[#2C2621]">
                   Firma habitual del instalador guardada
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSignatureModalOpen(true)}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#4B7094] cursor-pointer"
                   >
                     <PenTool className="h-3 w-3" />
                     <span>Cambiar</span>
@@ -264,7 +264,7 @@ export function InstallerActaSettingsCard({
                     type="button"
                     data-testid="installer-acta-clear-signature-btn"
                     onClick={() => setSignatureDataUrl(null)}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#DC2626] cursor-pointer"
                   >
                     <Trash2 className="h-3 w-3" />
                     <span>Borrar firma</span>
@@ -274,7 +274,7 @@ export function InstallerActaSettingsCard({
               <img
                 src={signatureDataUrl}
                 alt="Firma habitual del instalador"
-                className="max-h-16 rounded border border-slate-200 bg-white p-1 object-contain"
+                className="max-h-16 rounded border border-[#E5DFD2] bg-[#FFFDF7] p-1 object-contain"
               />
             </div>
           ) : (
@@ -282,7 +282,7 @@ export function InstallerActaSettingsCard({
               type="button"
               data-testid="installer-acta-open-signature-btn"
               onClick={() => setSignatureModalOpen(true)}
-              className="flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-[11px] font-semibold text-slate-700 cursor-pointer"
+              className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#E5DFD2] bg-[#F5F1E6] px-3 text-[11px] font-semibold text-[#2C2621] cursor-pointer"
             >
               <PenTool className="h-3.5 w-3.5" />
               <span>Dibujar firma habitual del instalador</span>
@@ -304,14 +304,14 @@ export function InstallerActaSettingsCard({
           {errorMsg && (
             <div
               role="alert"
-              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800"
+              className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-xs font-semibold text-[#5A121C]"
             >
               {errorMsg}
             </div>
           )}
 
           {savedMsg && (
-            <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+            <div className="flex items-center gap-1.5 rounded-xl status-emerald px-3 py-2 text-xs font-semibold">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
               <span>{savedMsg}</span>
             </div>
@@ -322,7 +322,7 @@ export function InstallerActaSettingsCard({
             data-testid="save-installer-acta-btn"
             disabled={saving}
             onClick={() => void handleSave()}
-            className="min-h-[42px] w-full rounded-xl bg-slate-900 px-3 text-xs font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
+            className="min-h-[44px] w-full rounded-xl bg-[#4B7094] px-3 text-xs font-bold text-[#FFFDF9] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
           >
             <Save className="h-3.5 w-3.5" />
             <span>{saving ? "Guardando..." : "Guardar ficha de instalador"}</span>

@@ -29,6 +29,33 @@ export const CatalogCategorySchema = z.enum([
 export const CatalogPricingModeSchema = z.enum(["fixed", "hourly_plus_materials"]);
 export const QuoteVatRateSchema = z.number().min(0).max(100);
 export const QuoteValidityDaysSchema = z.number().int().min(1).max(365);
+export const QuoteDurationUnitSchema = z.enum(["dias_laborables", "semanas"]);
+export const QuoteAttachmentSchema = z.object({
+  name: z.string().trim().min(1).max(TEXT_LIMITS.TITLE),
+  mimeType: z.string().trim().min(1).max(120),
+  extractedText: z.string().max(TEXT_LIMITS.NOTES).optional(),
+});
+
+export function parseQuoteAttachmentsJson(
+  raw: string | null | undefined
+): Array<z.infer<typeof QuoteAttachmentSchema>> {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const out: Array<z.infer<typeof QuoteAttachmentSchema>> = [];
+    for (const item of parsed) {
+      const check = QuoteAttachmentSchema.safeParse(item);
+      if (check.success) {
+        out.push(check.data);
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export const QuotePaymentMethodSchema = z.enum(["transferencia", "efectivo", "bizum", "tarjeta"]);
 export const QuotePaymentInstallmentSchema = z.object({
   label: z
@@ -331,10 +358,14 @@ export const Gate1QuoteDraftPayloadSchema = z.object({
       phone: z.string().max(TEXT_LIMITS.PHONE).optional(),
       nif: z.string().max(TEXT_LIMITS.TAX_ID).optional(),
       fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
+      email: z.string().max(TEXT_LIMITS.EMAIL).optional(),
     })
     .optional(),
   job_id: z.string().min(1).nullable(),
   job_title: z.string().max(TEXT_LIMITS.TITLE),
+  general_description: z.string().max(TEXT_LIMITS.DESCRIPTION).optional(),
+  estimated_duration_value: z.number().positive().max(9999).nullable().optional(),
+  estimated_duration_unit: QuoteDurationUnitSchema.optional(),
   vat_rate: QuoteVatRateSchema,
   validity_days: QuoteValidityDaysSchema.nullable().optional(),
   payment_methods: z.array(QuotePaymentMethodSchema).max(4).optional(),
@@ -347,7 +378,12 @@ export const Gate1QuoteDraftPayloadSchema = z.object({
     )
     .max(4)
     .optional(),
+  payment_terms_text: z.string().max(TEXT_LIMITS.NOTES).optional(),
+  iban_override: z.string().max(42).optional(),
+  bank_name: z.string().max(TEXT_LIMITS.SHORT_LABEL).optional(),
+  show_iban: z.boolean().optional(),
   notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
+  attachments: z.array(QuoteAttachmentSchema).max(10).optional(),
   lines: z.array(Gate1QuoteLineDraftSchema).min(0),
 });
 
@@ -407,6 +443,7 @@ export const Gate1QuoteCommitPayloadSchema = Gate1QuoteDraftPayloadSchema.extend
       phone: z.string().max(TEXT_LIMITS.PHONE).optional(),
       nif: z.union([z.literal(""), SpanishTaxIdSchema]).optional(),
       fiscal_address: z.string().max(TEXT_LIMITS.ADDRESS).optional(),
+      email: z.string().trim().max(TEXT_LIMITS.EMAIL).optional(),
     })
     .optional(),
   lines: z.array(Gate1QuoteLineCommitSchema).min(1),
@@ -660,6 +697,16 @@ export const EmitterProfileInputSchema = z.object({
     .transform((v) => v.replace(/\s+/g, "").toUpperCase())
     .optional()
     .default(""),
+  emitter_bank_name: z.string().trim().max(TEXT_LIMITS.SHORT_LABEL).optional(),
+  emitter_email: z
+    .string()
+    .trim()
+    .max(TEXT_LIMITS.EMAIL)
+    .refine(
+      (v) => v === "" || z.string().email().safeParse(v).success,
+      "Correo electrónico inválido"
+    )
+    .optional(),
   emitter_logo_data_url: z
     .string()
     .max(450_000)
@@ -846,10 +893,18 @@ export const QuoteRowSchema = z.object({
   vat_cents: z.number().int().nonnegative(),
   total_cents: z.number().int().nonnegative(),
   status: QuoteStatusSchema,
+  general_description: z.string().optional().default(""),
+  estimated_duration_value: z.number().positive().nullable().optional().default(null),
+  estimated_duration_unit: QuoteDurationUnitSchema.optional().default("dias_laborables"),
   validity_days: QuoteValidityDaysSchema.nullable().optional().default(null),
   payment_methods_json: z.string().optional().default("[]"),
   payment_schedule_json: z.string().optional().default("[]"),
+  payment_terms_text: z.string().optional().default(""),
+  iban_override: z.string().optional().default(""),
+  bank_name: z.string().optional().default(""),
+  show_iban: z.union([z.literal(0), z.literal(1)]).optional().default(1),
   notes: z.string(),
+  attachments_json: z.string().optional().default("[]"),
   pdf_uri: z.string().nullable(),
   sent_at_iso: IsoDateSchema.nullable(),
   created_at_ms: z.number().int().nonnegative(),

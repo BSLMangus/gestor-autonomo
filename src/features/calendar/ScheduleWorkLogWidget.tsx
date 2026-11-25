@@ -498,33 +498,33 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
   return (
     <section
       data-testid="schedule-worklog-widget"
-      className="rounded-[24px] border border-outline-variant bg-surface-container-lowest p-4 shadow-sm text-on-surface space-y-4"
+      className="clipboard-panel rounded-[24px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 text-[#2C2621] font-sans space-y-4"
     >
       {/* Cabecera */}
-      <div className="flex items-center justify-between gap-2 border-b border-outline-variant pb-3">
+      <div className="flex items-center justify-between gap-2 border-b border-[#E5DFD2] pb-3">
         <div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-terracotta-soft px-2.5 py-0.5 text-[11px] font-semibold text-on-primary-container">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#FFD6B0] px-2.5 py-0.5 text-[11px] font-semibold text-[#4A2500]">
             <CalendarPlus className="w-3.5 h-3.5" />
             {mode === "plan_range" ? "Planificar fechas en agenda" : "Parte del día"}
           </span>
-          <h3 className="mt-1 text-[16px] font-semibold text-on-surface">
+          <h3 className="mt-1 text-[16px] font-semibold text-[#2C2621]">
             {selectedJob ? `${selectedJob.job_code} · ${selectedJob.title}` : "Agenda y jornada"}
           </h3>
         </div>
-        <span className="rounded-full bg-surface-container px-2.5 py-1 font-mono text-[12px] font-semibold text-on-surface tabular-nums">
+        <span className="status-gold rounded-full px-2.5 py-1 font-mono font-mono-nums text-[12px] font-semibold tabular-nums">
           {formatCentsEs(hourlyRateCents)}/h
         </span>
       </div>
 
       {/* Selector de modo y obra */}
-      <div className="grid grid-cols-2 gap-1.5 rounded-full border border-outline-variant bg-surface-container-low p-1">
+      <div className="grid grid-cols-2 gap-1.5 rounded-full border border-[#E5DFD2] bg-[#F5F1E6] p-1">
         <button
           type="button"
           onClick={() => setMode("daily_log")}
-          className={`min-h-[38px] rounded-full text-xs font-semibold cursor-pointer ${
+          className={`min-h-[38px] rounded-full text-xs font-semibold cursor-pointer transition-colors ${
             mode === "daily_log"
-              ? "bg-secondary text-on-secondary"
-              : "text-on-surface-variant"
+              ? "bg-[#4B7094] text-[#FFFDF9]"
+              : "text-[#6B6860] hover:bg-[#EFECE4]"
           }`}
         >
           Parte de hoy
@@ -532,10 +532,10 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
         <button
           type="button"
           onClick={() => setMode("plan_range")}
-          className={`min-h-[38px] rounded-full text-xs font-semibold cursor-pointer ${
+          className={`min-h-[38px] rounded-full text-xs font-semibold cursor-pointer transition-colors ${
             mode === "plan_range"
-              ? "bg-secondary text-on-secondary"
-              : "text-on-surface-variant"
+              ? "bg-[#4B7094] text-[#FFFDF9]"
+              : "text-[#6B6860] hover:bg-[#EFECE4]"
           }`}
         >
           Planificar rango
@@ -543,12 +543,12 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-[12px] font-semibold text-on-surface">Obra vinculada</span>
+        <span className="text-[12px] font-semibold text-[#2C2621]">Obra vinculada</span>
         <select
           data-testid="schedule-widget-job-select"
           value={selectedJobId}
           onChange={(e) => setSelectedJobId(e.target.value)}
-          className="min-h-[46px] rounded-xl border border-outline-variant bg-surface-container-low px-3 text-[13px] font-medium"
+          className="min-h-[46px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-[13px] font-medium text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
         >
           <option value="">Sin obra específica (agenda general)</option>
           {jobs.map((j) => (
@@ -562,7 +562,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl border border-coral-alert/30 bg-error-container p-3 text-xs font-semibold text-on-error-container"
+          className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-xs font-semibold text-[#5A121C]"
         >
           {errorMsg}
         </div>
@@ -572,7 +572,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
         <>
           <div className="grid grid-cols-2 gap-2.5">
             <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-semibold text-on-surface">Fecha inicio</span>
+              <span className="text-[12px] font-semibold text-[#2C2621]">Fecha inicio</span>
               <input
                 type="date"
                 data-testid="schedule-plan-start-input"
@@ -584,23 +584,23 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                     setEndDateIso(next);
                   }
                 }}
-                className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono text-[13px]"
+                className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-semibold text-on-surface">Fecha fin</span>
+              <span className="text-[12px] font-semibold text-[#2C2621]">Fecha fin</span>
               <input
                 type="date"
                 data-testid="schedule-plan-end-input"
                 value={endDateIso}
                 onChange={(e) => setEndDateIso(e.target.value)}
-                className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono text-[13px]"
+                className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
           </div>
 
           {isSameDayRange && (
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
+            <div className="rounded-2xl border border-[#E5DFD2] bg-[#F5F1E6] p-3">
               <SubDayDurationPicker
                 startTime={planStartTime}
                 endTime={planEndTime}
@@ -615,13 +615,14 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
             </div>
           )}
 
-          <div className="rounded-2xl border border-outline-variant bg-terracotta-soft p-3.5 flex items-start gap-2.5">
-            <CalendarCheck2 className="w-5 h-5 text-on-primary-container shrink-0 mt-0.5" />
-            <div className="text-[13px] text-on-primary-container">
+          <div className="relative ruled-notebook rounded-2xl border border-[#E5DFD2] p-3.5 pl-10 flex items-start gap-2.5">
+            <span className="absolute left-2.5 top-4 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
+            <CalendarCheck2 className="w-5 h-5 text-[#D04B00] shrink-0 mt-0.5" />
+            <div className="text-[13px] text-[#2C2621]">
               {isSameDayRange ? (
                 <>
                   Cita puntual de{" "}
-                  <strong className="font-mono tabular-nums">
+                  <strong className="highlighter-yellow font-mono tabular-nums">
                     {formatHoursFromThousandths(planPreview.totalThousandths)}
                   </strong>{" "}
                   ({planStartTime} a {planEndTime}).
@@ -633,7 +634,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                     {planPreview.days} jornadas laborables
                   </strong>{" "}
                   (
-                  <strong className="font-mono tabular-nums">
+                  <strong className="highlighter-yellow font-mono tabular-nums">
                     {formatHoursFromThousandths(planPreview.totalThousandths)}
                   </strong>{" "}
                   previstas) de {defaults.morning_start} a{" "}
@@ -648,7 +649,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               type="button"
               disabled={busy || isSubmitting}
               onClick={() => runtime.onDismissOverlay?.()}
-              className="min-h-[48px] rounded-xl bg-surface-container text-on-surface font-semibold text-[14px] cursor-pointer"
+              className="min-h-[48px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] font-semibold text-[14px] cursor-pointer hover:border-[#EA580C]"
             >
               Cancelar
             </button>
@@ -657,7 +658,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               data-testid="schedule-plan-save-btn"
               disabled={busy || isSubmitting || !planSpanValid || (!selectedJobId && !isSameDayRange)}
               onClick={() => void handleSavePlanRange()}
-              className="col-span-2 min-h-[48px] rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[14px] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
+              className="col-span-2 min-h-[48px] rounded-xl bg-[#4B7094] hover:bg-[#3d5d7c] text-[#FFFDF9] font-semibold text-[14px] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer shadow-xs"
             >
               <Save className="w-4 h-4" />
               <span>{isSameDayRange ? "Guardar cita en calendario" : "Generar bloques en calendario"}</span>
@@ -667,20 +668,21 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
       ) : (
         <>
           <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-semibold text-on-surface">Fecha del parte</span>
+            <span className="text-[12px] font-semibold text-[#2C2621]">Fecha del parte</span>
             <input
               type="date"
               data-testid="schedule-daily-date-input"
               value={dateIso}
               onChange={(e) => setDateIso(e.target.value)}
-              className="min-h-[44px] rounded-xl border border-outline-variant bg-surface-container-low px-3 font-mono text-[13px]"
+              className="min-h-[44px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
           </label>
 
           {jobEntries.length > 0 && (
-            <div className="rounded-2xl border border-outline-variant bg-surface-warm-card p-3 text-[12px] text-on-surface">
+            <div className="relative ruled-notebook rounded-2xl border border-[#E5DFD2] p-3 pl-10 text-[12px] text-[#2C2621]">
+              <span className="absolute left-2.5 top-3.5 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
               Planificación de obra: <strong>{jobEntries.length} días</strong> ·{" "}
-              <strong className="font-mono tabular-nums">
+              <strong className="highlighter-yellow font-mono tabular-nums">
                 {formatHoursFromThousandths(totalJobPlannedThousandths)} previstas
               </strong>
             </div>
@@ -688,37 +690,37 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
 
           {/* Salida prevista vs real */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-surface-container-low rounded-2xl p-3 flex flex-col gap-0.5">
-              <span className="text-[11px] font-semibold text-on-surface-variant">
+            <div className="postit-note postit-blue p-3 flex flex-col gap-0.5 text-[#143552]">
+              <span className="text-[11px] font-semibold text-[#143552]">
                 Previsto ({plannedStart} – {plannedEnd})
               </span>
-              <span className="font-mono text-[22px] font-bold text-on-surface tabular-nums">
+              <span className="font-mono font-mono-nums text-[22px] font-bold text-[#2C2621] tabular-nums">
                 {plannedEnd}
               </span>
-              <span className="font-mono text-[12px] text-on-surface-variant tabular-nums">
+              <span className="font-mono font-mono-nums text-[12px] text-[#143552] tabular-nums">
                 {formatHoursFromThousandths(plannedThousandths)}
               </span>
             </div>
 
             <div
-              className={`rounded-2xl p-3 border border-outline-variant flex flex-col gap-0.5 ${
+              className={`postit-note p-3 flex flex-col gap-0.5 ${
                 effectiveDeltaThousandths > 0
-                  ? "bg-warning-container text-on-warning-container"
+                  ? "postit-peach text-[#4A2500]"
                   : effectiveDeltaThousandths < 0
-                    ? "bg-info-container text-on-info-container"
-                    : "bg-success-container text-on-success-container"
+                    ? "postit-blue text-[#143552]"
+                    : "postit-green text-[#1B3A24]"
               }`}
             >
               <span className="text-[11px] font-semibold">Salida real</span>
               <span
                 data-testid="schedule-actual-end-display"
-                className="font-mono text-[22px] font-bold tabular-nums"
+                className="font-mono font-mono-nums text-[22px] font-bold tabular-nums"
               >
                 {actualEnd}
               </span>
               <span
                 data-testid="schedule-actual-hours-display"
-                className="font-mono text-[12px] tabular-nums"
+                className="font-mono font-mono-nums text-[12px] tabular-nums"
               >
                 {formatHoursFromThousandths(actualThousandths)}
               </span>
@@ -728,7 +730,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
           {/* Edición manual de hora inicio/fin reales */}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-on-surface-variant">Inicio real</span>
+              <span className="text-[11px] font-semibold text-[#6B6860]">Inicio real</span>
               <input
                 type="time"
                 data-testid="schedule-actual-start-input"
@@ -740,11 +742,11 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                   setActualStart(nextStart);
                   setActualEndOverride(keptEnd);
                 }}
-                className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[13px]"
+                className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-on-surface-variant">Salida real</span>
+              <span className="text-[11px] font-semibold text-[#6B6860]">Salida real</span>
               <input
                 type="time"
                 data-testid="schedule-actual-end-input"
@@ -754,7 +756,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                   if (!nextEnd) return;
                   setActualEndOverride(nextEnd);
                 }}
-                className="min-h-[40px] rounded-xl border border-outline-variant bg-surface-container-low px-2.5 font-mono text-[13px]"
+                className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 font-mono tabular-nums text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </label>
           </div>
@@ -772,10 +774,10 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                     setActualEndOverride(null);
                     setDeltaThousandths(opt.deltaThousandths);
                   }}
-                  className={`min-h-[44px] rounded-xl font-mono text-[12px] font-semibold tabular-nums transition-colors cursor-pointer ${
+                  className={`min-h-[44px] rounded-xl font-mono font-mono-nums text-[12px] font-semibold tabular-nums transition-colors cursor-pointer ${
                     active
-                      ? "bg-terracotta-soft border-2 border-terracotta text-on-primary-container"
-                      : "bg-surface-container-low border border-outline-variant text-on-surface hover:border-terracotta"
+                      ? "bg-[#FFD6B0] border-2 border-[#EA580C] text-[#4A2500] font-bold"
+                      : "bg-[#FFFDF7] border border-[#E5DFD2] text-[#2C2621] hover:border-[#EA580C]"
                   }`}
                 >
                   {opt.label}
@@ -786,33 +788,35 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
 
           {/* Banner dinámico impacto económico */}
           {effectiveDeltaThousandths > 0 ? (
-            <div className="rounded-2xl bg-warning-container border border-outline-variant p-3 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-on-warning-container shrink-0" />
-              <span className="text-[12px] font-semibold text-on-warning-container">
+            <div className="status-tangerine rounded-2xl p-3 flex items-center gap-2">
+              <Clock className="w-5 h-5 shrink-0" />
+              <span className="text-[12px] font-semibold">
                 Jornada alargada {formatSignedHoursFromThousandths(effectiveDeltaThousandths)} (+
                 {formatCentsEs(impactCents)} según tu tarifa/hora)
               </span>
             </div>
           ) : effectiveDeltaThousandths < 0 ? (
-            <div className="rounded-2xl bg-info-container border border-outline-variant p-3 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-on-info-container shrink-0" />
-              <span className="text-[12px] font-semibold text-on-info-container">
+            <div className="status-cobalt rounded-2xl p-3 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              <span className="text-[12px] font-semibold">
                 Terminado {formatHoursFromThousandths(Math.abs(effectiveDeltaThousandths))} antes de lo previsto (
                 {formatCentsEs(impactCents)})
               </span>
             </div>
           ) : (
-            <div className="rounded-2xl bg-success-container border border-outline-variant p-3 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-on-success-container shrink-0" />
-              <span className="text-[12px] font-semibold text-on-success-container">
+            <div className="status-emerald rounded-2xl p-3 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              <span className="text-[12px] font-semibold">
                 Jornada cumplida según horario habitual ({formatHoursFromThousandths(plannedThousandths)})
               </span>
             </div>
           )}
 
           {/* Motivo de desviación y nota */}
-          <div className="space-y-2.5">
-            <div className="text-[13px] font-semibold text-on-surface">Motivo del cambio</div>
+          <div className="relative ruled-notebook rounded-2xl border border-[#E5DFD2] p-3.5 pl-10 space-y-2.5">
+            <span className="absolute left-2.5 top-4 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
+            <span className="absolute left-2.5 bottom-4 w-2 h-2 rounded-full paper-hole border" aria-hidden="true" />
+            <div className="text-[13px] font-semibold text-[#2C2621]">Motivo del cambio</div>
             <div className="flex flex-wrap gap-1.5">
               {DEVIATION_REASONS.map((item) => {
                 const selected = reason === item;
@@ -824,8 +828,8 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
                     aria-pressed={selected}
                     className={`min-h-[38px] px-3 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
                       selected
-                        ? "bg-terracotta-soft border border-terracotta text-on-primary-container"
-                        : "bg-surface-container-low border border-outline-variant text-on-surface"
+                        ? "bg-[#4B7094] text-[#FFFDF9]"
+                        : "bg-[#EAE5D9] border border-[#E5DFD2] text-[#3D352E]"
                     }`}
                   >
                     {item}
@@ -844,18 +848,18 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               value={notes}
               onValueChange={setNotes}
               placeholder="Anota qué ocurrió en obra hoy..."
-              className="w-full rounded-xl bg-surface-container-low border border-outline-variant p-3 text-[13px] text-on-surface focus:outline-none focus:border-terracotta"
+              className="w-full rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] p-3 text-[13px] text-[#2C2621] placeholder:text-[#6B6860] focus:outline-none focus:border-[#EA580C]"
             />
 
-            <label className="flex items-center gap-2.5 min-h-[46px] px-3 rounded-xl bg-surface-container-low cursor-pointer">
+            <label className="flex items-center gap-2.5 min-h-[46px] px-3 rounded-xl bg-[#FFF3A1] border border-[#E5DFD2] cursor-pointer">
               <input
                 type="checkbox"
                 data-testid="schedule-link-diary-checkbox"
                 checked={alsoLogInSiteLogs}
                 onChange={(e) => setAlsoLogInSiteLogs(e.target.checked)}
-                className="w-4 h-4 rounded border-outline accent-terracotta shrink-0"
+                className="w-4 h-4 rounded border-[#6B6860] accent-[#EA580C] shrink-0"
               />
-              <span className="text-[12px] font-medium text-on-surface">
+              <span className="text-[12px] font-medium text-[#2C2621]">
                 Vincular esta nota al Diario de Obra
               </span>
             </label>
@@ -866,7 +870,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               type="button"
               disabled={busy || isSubmitting}
               onClick={() => runtime.onDismissOverlay?.()}
-              className="min-h-[48px] rounded-xl bg-surface-container text-on-surface font-semibold text-[14px] cursor-pointer"
+              className="min-h-[48px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] font-semibold text-[14px] cursor-pointer hover:border-[#EA580C]"
             >
               Cancelar
             </button>
@@ -875,7 +879,7 @@ export function ScheduleWorkLogWidget({ widget, runtime, isSubmitting }: WidgetC
               data-testid="schedule-daily-save-btn"
               disabled={busy || isSubmitting}
               onClick={() => void handleSaveDailyLog()}
-              className="col-span-2 min-h-[48px] rounded-xl bg-primary hover:bg-terracotta text-white font-semibold text-[14px] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer"
+              className="col-span-2 min-h-[48px] rounded-xl bg-[#4B7094] hover:bg-[#3d5d7c] text-[#FFFDF9] font-semibold text-[14px] flex items-center justify-center gap-1.5 disabled:opacity-45 cursor-pointer shadow-xs"
             >
               <Save className="w-4 h-4" />
               <span>Guardar parte del día</span>

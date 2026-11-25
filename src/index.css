@@ -3,64 +3,101 @@
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
 @import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 @import "@fontsource/jetbrains-mono/600.css";
+@import "@fontsource/jetbrains-mono/700.css";
 @import "tailwindcss";
 
 @theme {
+  /* Core Tactile Stationery Palette */
+  --color-warm-canvas: #F9F7F2;
+  --color-card-white: #FFFDF7;
+  --color-border-subtle: #E5DFD2;
+  --color-slate-ink: #2C2621;
+
   --color-terracotta: #EA580C;
-  --color-terracotta-soft: #FFF7ED;
+  --color-terracotta-soft: #FFD6B0;
   --color-primary: #D04B00;
   --color-on-primary: #FFFFFF;
-  --color-primary-container: #FFF7ED;
-  --color-on-primary-container: #7F2B00;
+  --color-primary-container: #FFD6B0;
+  --color-on-primary-container: #4A2500;
 
-  --color-secondary: #0F172A;
-  --color-on-secondary: #FFFFFF;
-  --color-secondary-container: #F1F5F9;
-  --color-on-secondary-container: #0F172A;
+  --color-secondary: #4B7094;
+  --color-on-secondary: #FFFDF9;
+  --color-secondary-container: #EAE5D9;
+  --color-on-secondary-container: #3D352E;
 
-  --color-surface: #FAF9F6;
-  --color-surface-container-lowest: #FFFFFF;
-  --color-surface-warm-card: #F4F0EA;
-  --color-surface-container-low: #F8FAFC;
-  --color-surface-container: #F1F5F9;
-  --color-on-surface: #0F172A;
-  --color-on-surface-variant: #475569;
-  --color-outline: #64748B;
-  --color-outline-variant: #E2E8F0;
+  --color-surface: #F9F7F2;
+  --color-surface-container-lowest: #FFFDF7;
+  --color-surface-warm-card: #FFFDF7;
+  --color-surface-container-low: #F5F1E6;
+  --color-surface-container: #EFECE4;
+  --color-on-surface: #2C2621;
+  --color-on-surface-variant: #6B6860;
+  --color-outline: #6B6860;
+  --color-outline-variant: #E5DFD2;
 
   --color-emerald-free: #059669;
+  --color-emerald-soft: #D4EDDA;
   --color-success: #059669;
-  --color-success-container: #ECFDF5;
-  --color-on-success-container: #003825;
+  --color-on-success: #1C1C1C;
+  --color-success-container: #D4EDDA;
+  --color-on-success-container: #1B3A24;
 
   --color-amber-tax: #D97706;
+  --color-amber-soft: #FFF3A1;
   --color-warning: #D97706;
-  --color-warning-container: #FFFBEB;
-  --color-on-warning-container: #4D2600;
+  --color-on-warning: #1A1C1A;
+  --color-warning-container: #FFF3A1;
+  --color-on-warning-container: #3E3300;
 
   --color-coral-alert: #DC2626;
+  --color-coral-soft: #FAD2D8;
   --color-error: #DC2626;
-  --color-error-container: #FEF2F2;
-  --color-on-error-container: #690005;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #FAD2D8;
+  --color-on-error-container: #5A121C;
 
   --color-info: #2563EB;
-  --color-info-container: #EFF6FF;
-  --color-on-info-container: #1E3A8A;
+  --color-on-info: #FFFFFF;
+  --color-info-container: #CBE4F9;
+  --color-on-info-container: #143552;
 
+  /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Radius tokens */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  /* Spacing tokens */
+  --spacing-gutter-xs: 4px;
+  --spacing-gutter-sm: 8px;
+  --spacing-gutter-md: 12px;
+  --spacing-gutter-lg: 16px;
+  --spacing-gutter-xl: 24px;
+  --spacing-section: 24px;
+  --spacing-page-margin: 16px;
+
+  /* Motion timing tokens */
+  --ease-state-change: ease-out;
+  --ease-surface-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-surface-exit: cubic-bezier(0.3, 0, 1, 1);
 }
 
 :root {
-  --bg-canvas: #FAF9F6;
-  --bg-card: #FFFFFF;
-  --border-card: #E2E8F0;
-  --ink-primary: #0F172A;
+  --bg-canvas: #F9F7F2;
+  --bg-card: #FFFDF7;
+  --border-card: #E5DFD2;
+  --ink-primary: #2C2621;
+  --ink-secondary: #6B6860;
   --accent-amber: #D97706;
   --accent-emerald: #059669;
   --accent-crimson: #DC2626;
-  --bg-tax-box: #FFFBEB;
+  --bg-tax-box: #FFF3A1;
   --accent-hitl: #EA580C;
 }
 
@@ -72,6 +109,7 @@
     max-width: 100%;
     overflow-x: hidden;
     font-family: var(--font-sans);
+    font-style: normal;
     background-color: var(--bg-canvas);
     color: var(--ink-primary);
     -webkit-tap-highlight-color: transparent;
@@ -120,7 +158,7 @@ dialog:modal {
 dialog::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
-  background-color: rgba(15, 23, 42, 0.55);
+  background-color: rgba(44, 38, 33, 0.45);
 }
 
 /* Responsive data tables with sticky headers and container adaptation (modern-web-guidance: responsive-table) */
@@ -146,7 +184,7 @@ dialog::backdrop {
 .table-wrapper tbody th {
   position: sticky;
   inset-inline-start: 0;
-  background: #ffffff;
+  background: #FFFDF7;
 }
 
 @container (width < 420px) {
@@ -165,15 +203,15 @@ dialog::backdrop {
 
   .table-wrapper.responsive-stack tr {
     margin-block-end: 0.75rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #E5DFD2;
     border-radius: 0.75rem;
     padding: 0.5rem 0.75rem;
-    background: #ffffff;
+    background: #FFFDF7;
   }
 
   .table-wrapper.responsive-stack tbody th {
     position: static;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #EFECE4;
     padding-bottom: 0.35rem;
     margin-bottom: 0.35rem;
     font-weight: 700;
@@ -182,6 +220,229 @@ dialog::backdrop {
   .table-wrapper.responsive-stack td[data-label]::before {
     content: attr(data-label) ": ";
     font-weight: 600;
-    color: #475569;
+    color: #6B6860;
+  }
+}
+
+/* ObraLocal AI — Tactile Stationery & Desk-Organizer Layer */
+@layer components {
+  body.cotton-paper,
+  .cotton-paper {
+    background-color: #F9F7F2;
+    background-image:
+      radial-gradient(rgba(107, 104, 96, 0.06) 1px, transparent 0),
+      radial-gradient(rgba(180, 165, 140, 0.05) 1px, transparent 0);
+    background-size: 24px 24px;
+    background-position: 0 0, 12px 12px;
+  }
+
+  .paper-sheet,
+  [class*="shadow-[0_2px_10px"] {
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .paper-sheet::after,
+  [class*="shadow-[0_2px_10px"]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.07) 0%, rgba(255, 255, 255, 0.45) 55%, rgba(249, 247, 242, 0.92) 56%);
+    border-top-left-radius: 6px;
+    pointer-events: none;
+  }
+
+  /* Sticky note curl & pastel fills */
+  .postit-note {
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04);
+    border-radius: 4px 4px 14px 4px;
+  }
+
+  .postit-note::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0%, rgba(255, 255, 255, 0.45) 55%, rgba(249, 247, 242, 0.95) 56%);
+    border-top-left-radius: 6px;
+    pointer-events: none;
+  }
+
+  .postit-yellow { background-color: #FFF3A1; }
+  .postit-peach { background-color: #FFD6B0; }
+  .postit-blue { background-color: #CBE4F9; }
+  .postit-green { background-color: #D4EDDA; }
+  .postit-lavender { background-color: #E5D4F3; }
+  .postit-rose { background-color: #FAD2D8; }
+
+  /* Cream ruled-notebook & index-card texture */
+  .ruled-notebook {
+    position: relative;
+    background-color: #FFFDF7;
+    background-image:
+      linear-gradient(to right, transparent 28px, rgba(220, 100, 90, 0.16) 28px, rgba(220, 100, 90, 0.16) 29px, transparent 29px),
+      repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(180, 170, 150, 0.22) 28px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .ruled-index {
+    position: relative;
+    background-color: #FFFDF7;
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 25px, rgba(180, 170, 150, 0.20) 26px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .paper-hole {
+    background-color: #E9E4D8;
+    border-color: #D4CEC0;
+  }
+
+  .paper-cream {
+    background-color: #FFFDF7;
+  }
+
+  /* Soft yellow highlighter stroke */
+  .highlighter-yellow {
+    background: linear-gradient(180deg, transparent 32%, rgba(255, 236, 102, 0.78) 33%, rgba(255, 236, 102, 0.78) 88%, transparent 89%);
+    padding: 0 4px;
+    border-radius: 2px;
+  }
+
+  /* Unified semantic chart & expense colors */
+  .chart-emerald { background-color: #1E8E5A; }
+  .chart-cobalt { background-color: #2B6CB0; }
+  .chart-violet { background-color: #8B5CF6; }
+  .chart-gold { background-color: #D99B26; }
+  .chart-mustard { background-color: #E6B84C; }
+  .chart-tangerine { background-color: #E85D2A; }
+
+  .badge-expense {
+    background-color: #FFEAE2;
+    color: #9A2D08;
+    border: 1px solid rgba(232, 93, 42, 0.28);
+  }
+
+  .nav-cream,
+  nav.fixed.bottom-0 {
+    background-color: #F5F1E6 !important;
+    border-color: #E2DDD0 !important;
+  }
+
+  /* Translucent washi tape fasteners */
+  .washi-tape {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1.5deg);
+    width: 54px;
+    height: 16px;
+    backdrop-filter: blur(1px);
+    border-left: 1px dashed rgba(0, 0, 0, 0.08);
+    border-right: 1px dashed rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .washi-amber { background-color: rgba(255, 243, 161, 0.78); }
+  .washi-peach { background-color: rgba(255, 214, 176, 0.78); }
+  .washi-blue { background-color: rgba(203, 228, 249, 0.78); }
+  .washi-green { background-color: rgba(212, 237, 218, 0.78); }
+  .washi-lavender { background-color: rgba(229, 212, 243, 0.78); }
+  .washi-rose { background-color: rgba(250, 210, 216, 0.78); }
+
+  /* Clean sans-serif margin annotation */
+  .font-hand {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-style: normal;
+    letter-spacing: 0.015em;
+  }
+
+  /* Tiny alternating paper tilts */
+  .tilt-left { transform: rotate(-0.65deg); }
+  .tilt-right { transform: rotate(0.65deg); }
+  .tilt-subtle-left { transform: rotate(-0.4deg); }
+  .tilt-subtle-right { transform: rotate(0.4deg); }
+
+  /* Physical paper receipt / slip with serrated zig-zag edges */
+  .receipt-slip {
+    position: relative;
+    background-color: #FFFDF7;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  .receipt-slip::before,
+  .receipt-slip::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background-size: 16px 8px;
+    background-repeat: repeat-x;
+    pointer-events: none;
+  }
+  .receipt-slip::before {
+    top: -7px;
+    background-image: linear-gradient(135deg, #FFFDF7 50%, transparent 50%), linear-gradient(225deg, #FFFDF7 50%, transparent 50%);
+    background-position: 0 0;
+  }
+  .receipt-slip::after {
+    bottom: -7px;
+    background-image: linear-gradient(315deg, #FFFDF7 50%, transparent 50%), linear-gradient(45deg, #FFFDF7 50%, transparent 50%);
+    background-position: 0 0;
+  }
+
+  /* Pinned clipboard panel for modals, drawers & AI overlays */
+  .clipboard-panel {
+    position: relative;
+    background-color: #FFFDF7;
+    border: 1px solid #DFD9CA;
+    box-shadow: 0 10px 28px rgba(30, 30, 30, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Rubber-stamp style approval & status badges */
+  .paper-stamp {
+    border: 1.5px dashed currentColor;
+    transform: rotate(-1.5deg);
+    letter-spacing: 0.03em;
+  }
+
+  /* Unified semantic status pills (zero black) */
+  .status-emerald {
+    background-color: #D4EDDA;
+    color: #14532D;
+    border: 1px solid rgba(30, 142, 90, 0.30);
+  }
+  .status-cobalt {
+    background-color: #CBE4F9;
+    color: #1E3A8A;
+    border: 1px solid rgba(43, 108, 176, 0.30);
+  }
+  .status-gold {
+    background-color: #FEF3C7;
+    color: #78350F;
+    border: 1px solid rgba(217, 155, 38, 0.35);
+  }
+  .status-mustard {
+    background-color: #FFF3A1;
+    color: #713F12;
+    border: 1px solid rgba(230, 184, 76, 0.45);
+  }
+  .status-tangerine {
+    background-color: #FFEAE2;
+    color: #9A2D08;
+    border: 1px solid rgba(232, 93, 42, 0.32);
+  }
+  .status-violet {
+    background-color: #E5D4F3;
+    color: #4C1D95;
+    border: 1px solid rgba(139, 92, 246, 0.35);
   }
 }

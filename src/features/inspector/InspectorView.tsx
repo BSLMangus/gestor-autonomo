@@ -45,36 +45,36 @@ function getColloquialStatusBadge(tr: AgentTraceRecord): {
   if (tr.error_code) {
     return {
       label: "Con incidencia",
-      classes: "bg-rose-100 text-rose-900",
+      classes: "status-tangerine",
     };
   }
   if (tr.hitl_outcome === "approved") {
     return {
       label: "Confirmado por ti",
-      classes: "bg-emerald-100 text-emerald-900",
+      classes: "status-emerald",
     };
   }
   if (tr.hitl_outcome === "edited") {
     return {
       label: "Editado y confirmado por ti",
-      classes: "bg-emerald-100 text-emerald-900",
+      classes: "status-emerald",
     };
   }
   if (tr.hitl_outcome === "rejected") {
     return {
       label: "Cancelado por ti",
-      classes: "bg-slate-200 text-slate-800",
+      classes: "bg-[#EFECE4] text-[#6B6860] border border-[#E5DFD2]",
     };
   }
   if (tr.turn_phase === "pre_interrupt" || tr.hitl_outcome === "pending") {
     return {
       label: "Listo para tu confirmación",
-      classes: "bg-amber-100 text-amber-900",
+      classes: "status-mustard",
     };
   }
   return {
     label: "Completado automáticamente",
-    classes: "bg-sky-100 text-sky-900",
+    classes: "status-cobalt",
   };
 }
 
@@ -167,29 +167,39 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
   };
 
   return (
-    <div data-testid="inspector-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-4 text-xs bg-surface">
+    <div
+      data-testid="inspector-view"
+      className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 space-y-4 text-xs cotton-paper text-[#2C2621]"
+    >
       {/* Cabecera explicativa en lenguaje claro */}
-      <section className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] space-y-1">
-        <h2 className="text-[16px] font-semibold text-on-surface">
+      <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-1">
+        <h2 className="font-sans text-[16px] font-bold text-[#2C2621]">
           Actividad y Aprendizaje del Asistente
         </h2>
-        <p className="text-[12px] leading-relaxed text-on-surface-variant">
+        <p className="text-[12px] leading-relaxed text-[#6B6860]">
           Aquí puedes consultar en palabras sencillas cada gestión que ha preparado el asistente por ti y los precios que ha aprendido cuando corriges un presupuesto.
         </p>
       </section>
 
       {/* Precios aprendidos en tu Tarifario */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+      <section className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-9 space-y-2">
+        <div
+          className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+        </div>
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">
+          <h3 className="text-sm font-bold text-[#2C2621]">
             Precios aprendidos en tu tarifario ({feedbacks.length})
           </h3>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-[#6B6860]">
             Cuando cambias un precio al revisar un presupuesto y marcas guardarlo, el asistente recuerda el nuevo precio para la próxima vez.
           </p>
         </div>
         {feedbacks.length === 0 ? (
-          <div className="text-slate-500">Aún no has modificado precios del tarifario.</div>
+          <div className="text-[#6B6860]">Aún no has modificado precios del tarifario.</div>
         ) : (
           feedbacks.map((fb) => {
             const humanQuoteCode = fb.quote_id ? quoteCodeById[fb.quote_id] : null;
@@ -197,19 +207,19 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
               <div
                 key={fb.id}
                 data-testid={`feedback-row-${fb.id}`}
-                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2"
+                className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2"
               >
                 <div className="min-w-0 pr-2">
-                  <div className="truncate font-bold text-slate-900">{fb.item_description}</div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="truncate font-bold text-[#2C2621]">{fb.item_description}</div>
+                  <div className="font-mono text-[11px] text-[#6B6860]">
                     {humanQuoteCode
                       ? `Actualizado en presupuesto ${humanQuoteCode}`
                       : "Actualizado automáticamente en tu tarifario"}
                   </div>
                 </div>
-                <div className="shrink-0 font-bold text-slate-800">
+                <div className="shrink-0 font-mono font-bold text-[#2C2621] tabular-nums">
                   {formatCentsEs(fb.old_unit_price_cents)} →{" "}
-                  <span className="text-orange-700">{formatCentsEs(fb.new_unit_price_cents)}</span>
+                  <span className="text-[#D04B00]">{formatCentsEs(fb.new_unit_price_cents)}</span>
                 </div>
               </div>
             );
@@ -218,19 +228,26 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
       </section>
 
       {/* Historial de acciones del asistente en lenguaje coloquial */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+      <section className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-4 pl-9 space-y-2">
+        <div
+          className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+          <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+        </div>
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">
+          <h3 className="text-sm font-bold text-[#2C2621]">
             Historial de tareas del asistente ({traces.length})
           </h3>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-[#6B6860]">
             Resumen paso a paso de lo que ha ido preparando o confirmando el asistente.
           </p>
         </div>
 
         <div className="space-y-2">
           {traces.length === 0 ? (
-            <div className="text-slate-500">Todavía no hay actividad registrada.</div>
+            <div className="text-[#6B6860]">Todavía no hay actividad registrada.</div>
           ) : (
             traces.map((tr) => {
               const badge = getColloquialStatusBadge(tr);
@@ -245,10 +262,10 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
                 <div
                   key={tr.trace_id}
                   data-testid={`trace-row-${tr.trace_id}`}
-                  className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5"
+                  className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 space-y-1.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="font-bold text-slate-900">
+                    <div className="font-bold text-[#2C2621]">
                       {getColloquialIntentTitle(tr.routed_intent)}
                     </div>
                     <span
@@ -257,10 +274,10 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
                       {badge.label}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-slate-700">
+                  <p className="text-[11px] leading-relaxed text-[#6B6860]">
                     {getColloquialDescription(tr)}
                   </p>
-                  <div className="text-[10px] text-slate-500">
+                  <div className="font-mono text-[10px] text-[#6B6860] tabular-nums">
                     {dateLabel}
                     {tr.rag_snippets.length > 0
                       ? ` · Consultó ${tr.rag_snippets.length} dato(s) de tu negocio`
@@ -274,13 +291,13 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
       </section>
 
       {/* Comprobación rápida de funcionamiento */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
+      <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900">
+            <h3 className="text-sm font-bold text-[#2C2621]">
               Comprobación del asistente
             </h3>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-[#6B6860]">
               Verifica automáticamente que los cálculos de IVA, búsquedas y presupuestos funcionan bien.
             </p>
           </div>
@@ -289,25 +306,25 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
             data-testid="run-evals-btn"
             disabled={evalRunning}
             onClick={() => void handleRunEvals()}
-            className="min-h-10 shrink-0 rounded-xl bg-slate-900 px-3 font-bold text-white disabled:opacity-50"
+            className="min-h-10 shrink-0 rounded-xl bg-[#4B7094] hover:bg-[#3F5F7E] px-3 font-bold text-[#FFFDF9] disabled:opacity-50 cursor-pointer transition-colors"
           >
             {evalRunning ? "Comprobando..." : "Comprobar ahora"}
           </button>
         </div>
 
         {evalError && (
-          <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2 text-rose-800">
+          <div role="alert" className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] p-2 text-[#5A121C]">
             {evalError}
           </div>
         )}
 
         {evalReport && (
           <div data-testid="eval-report-panel" className="space-y-2 pt-1">
-            <div className="flex items-center justify-between rounded-xl bg-slate-100 px-3 py-2 font-bold">
-              <span data-testid="eval-summary-score">
+            <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 font-bold">
+              <span data-testid="eval-summary-score" className="font-mono tabular-nums">
                 {evalReport.passed} / {evalReport.total_cases} PASS ({evalReport.duration_ms} ms)
               </span>
-              <span className="text-emerald-700">Todo comprobado</span>
+              <span className="text-[#14532D]">Todo comprobado</span>
             </div>
 
             <div className="space-y-1">
@@ -317,16 +334,16 @@ export function InspectorView({ executor, refreshTick = 0 }: InspectorViewProps)
                   data-testid={`eval-case-${r.id}`}
                   className={`flex items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${
                     r.passed
-                      ? "border-emerald-200 bg-emerald-50/70"
-                      : "border-rose-300 bg-rose-50"
+                      ? "border-[#1E8E5A]/30 bg-[#D4EDDA]/60"
+                      : "border-[#DC2626]/30 bg-[#FAD2D8]"
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900">{r.details}</div>
+                    <div className="font-bold text-[#2C2621]">{r.details}</div>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      r.passed ? "bg-emerald-700 text-white" : "bg-rose-700 text-white"
+                      r.passed ? "bg-[#1E8E5A] text-[#FFFDF9]" : "bg-[#DC2626] text-[#FFFDF9]"
                     }`}
                   >
                     {r.passed ? "OK" : "Revisar"}

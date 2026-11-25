@@ -51,7 +51,7 @@ function ActaPhotoThumbnail({
 
   if (!url) {
     return (
-      <div className="flex h-28 w-full items-center justify-center rounded-xl border border-outline-variant bg-surface-container text-[11px] text-on-surface-variant">
+      <div className="flex h-28 w-full items-center justify-center rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] text-[11px] text-[#6B6860]">
         Cargando imagen...
       </div>
     );
@@ -61,7 +61,7 @@ function ActaPhotoThumbnail({
     <img
       src={url}
       alt={alt}
-      className="h-28 w-full rounded-xl border border-outline-variant object-cover"
+      className="h-28 w-full rounded-xl border border-[#E5DFD2] object-cover"
     />
   );
 }
@@ -118,16 +118,16 @@ export function ActaPhotosSection({
   };
 
   return (
-    <div data-testid="acta-photos-section" className="space-y-3">
-      <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
+    <div data-testid="acta-photos-section" className="space-y-3 font-sans">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-[#6B6860]">
         <span>Recomendado de 2 a 4 fotografías de cuadro, tuberías o pruebas.</span>
-        <span className="font-mono font-bold text-on-surface">{fotos.length}/4</span>
+        <span className="font-mono-nums font-bold text-[#2C2621]">{fotos.length}/4</span>
       </div>
 
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl bg-error-container px-3 py-2 text-[11px] font-semibold text-on-error-container"
+          className="rounded-xl border border-[#DC2626]/30 bg-[#FAD2D8] px-3 py-2 text-[11px] font-semibold text-[#5A121C]"
         >
           {errorMsg}
         </div>
@@ -139,7 +139,7 @@ export function ActaPhotosSection({
             <div
               key={foto.id}
               data-testid={`acta-photo-card-${foto.id}`}
-              className="rounded-xl border border-outline-variant bg-surface-container-low/50 p-2.5 space-y-2"
+              className="paper-sheet rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 space-y-2"
             >
               <ActaPhotoThumbnail
                 fileBridge={fileBridge}
@@ -158,14 +158,14 @@ export function ActaPhotosSection({
                     );
                     onChangeFotos(next);
                   }}
-                  className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-outline-variant bg-white px-2.5 text-[11px]"
+                  className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 text-[11px] text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
                 />
                 <button
                   type="button"
                   data-testid={`acta-remove-photo-${foto.id}`}
                   aria-label="Eliminar foto"
                   onClick={() => void handleRemovePhoto(foto)}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-coral-alert/30 bg-white text-coral-alert hover:bg-error-container cursor-pointer"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#DC2626]/30 bg-[#FFFDF7] text-[#DC2626] hover:bg-[#FAD2D8] cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -181,7 +181,7 @@ export function ActaPhotosSection({
           data-testid="acta-add-photo-btn"
           disabled={busy || !cameraAdapter}
           onClick={() => void handleAddPhoto()}
-          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-terracotta/50 bg-terracotta-soft px-4 text-[12px] font-bold text-on-primary-container disabled:opacity-50 cursor-pointer"
+          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#EA580C]/50 bg-[#FFD6B0]/60 px-4 text-[12px] font-bold text-[#4A2500] disabled:opacity-50 cursor-pointer"
         >
           {fotos.length === 0 ? (
             <Camera className="h-4 w-4 shrink-0" />

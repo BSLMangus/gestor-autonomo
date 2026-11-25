@@ -23,24 +23,24 @@ interface TaxAlertsBannerProps {
 function urgencyContainerClass(urgency: TaxAlertUrgency): string {
   switch (urgency) {
     case "critical":
-      return "border-rose-200 bg-rose-50/90 text-rose-950";
+      return "paper-sheet border-[#DC2626]/30 bg-[#FAD2D8]/55 text-[#5A121C]";
     case "warning":
-      return "border-amber-200 bg-amber-50/90 text-amber-950";
+      return "paper-sheet border-[#D97706]/35 bg-[#FFF3A1]/75 text-[#3E3300]";
     case "info":
     default:
-      return "border-indigo-200 bg-indigo-50/80 text-indigo-950";
+      return "paper-sheet border-[#4B7094]/30 bg-[#CBE4F9]/65 text-[#143552]";
   }
 }
 
 function urgencyBadgeClass(urgency: TaxAlertUrgency): string {
   switch (urgency) {
     case "critical":
-      return "bg-rose-600 text-white";
+      return "status-tangerine";
     case "warning":
-      return "bg-amber-600 text-white";
+      return "status-mustard";
     case "info":
     default:
-      return "bg-indigo-600 text-white";
+      return "status-cobalt";
   }
 }
 
@@ -130,22 +130,22 @@ export function TaxAlertsBanner({
   return (
     <section
       aria-label="Avisos fiscales AEAT"
-      className={`rounded-2xl border p-3.5 shadow-xs ${urgencyContainerClass(topUrgency)}`}
+      className={`rounded-2xl border p-3.5 ${urgencyContainerClass(topUrgency)}`}
     >
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/80 text-slate-800 shadow-xs">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] text-[#2C2621] shadow-xs">
             {topUrgency === "critical" ? (
-              <AlertTriangle className="h-4 w-4 text-rose-600" />
+              <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
             ) : (
-              <Landmark className="h-4 w-4 text-amber-700" />
+              <Landmark className="h-4 w-4 text-[#D97706]" />
             )}
           </span>
           <div className="min-w-0">
-            <h3 className="text-xs font-extrabold uppercase tracking-wide">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-[#2C2621]">
               Hacienda · {alerts.length} {alerts.length === 1 ? "aviso activo" : "avisos activos"}
             </h3>
-            <p className="text-[11px] opacity-80 truncate">
+            <p className="text-[11px] opacity-85 truncate">
               Recordatorios AEAT según tus modelos configurados
             </p>
           </div>
@@ -154,7 +154,7 @@ export function TaxAlertsBanner({
           <button
             type="button"
             onClick={() => onOpenTaxCalendar(visibleAlerts[0]?.obligation.endDateIso)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-800 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-[11px] font-bold text-[#2C2621] hover:bg-[#F5F1E6] cursor-pointer"
           >
             <Calendar className="h-3.5 w-3.5" />
             Ver en Hacienda
@@ -168,24 +168,24 @@ export function TaxAlertsBanner({
           return (
             <div
               key={alert.alertKey}
-              className="rounded-xl border border-black/10 bg-white/85 p-2.5 text-slate-900"
+              className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 text-[#2C2621]"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-1.5">
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${urgencyBadgeClass(alert.urgency)}`}
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${urgencyBadgeClass(alert.urgency)}`}
                     >
                       {alert.obligation.meta.shortLabel} · {alert.obligation.periodLabel}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-500">
+                    <span className="text-[10px] font-semibold text-[#6B6860]">
                       {alert.obligation.meta.category}
                     </span>
                   </div>
-                  <p className="text-xs font-bold leading-snug text-slate-900">
+                  <p className="text-xs font-bold leading-snug text-[#2C2621]">
                     {alert.headline}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-600">{alert.detail}</p>
+                  <p className="mt-0.5 text-[11px] text-[#6B6860]">{alert.detail}</p>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -193,7 +193,7 @@ export function TaxAlertsBanner({
                     type="button"
                     disabled={isBusy}
                     onClick={() => void handleMarkPresented(alert)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#1E8E5A] px-2.5 py-1.5 text-[11px] font-bold text-[#FFFDF9] hover:bg-[#059669] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Presentado
@@ -204,7 +204,7 @@ export function TaxAlertsBanner({
                     aria-label={`Descartar aviso ${alert.obligation.meta.shortLabel}`}
                     title="Descartar aviso"
                     onClick={() => void handleDismiss(alert)}
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                    className="inline-flex items-center justify-center rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] p-1.5 text-[#6B6860] hover:bg-[#F5F1E6] hover:text-[#2C2621] disabled:opacity-50 cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -219,7 +219,7 @@ export function TaxAlertsBanner({
         <button
           type="button"
           onClick={() => onOpenTaxCalendar()}
-          className="mt-2 text-[11px] font-bold underline underline-offset-2 opacity-90 hover:opacity-100"
+          className="mt-2 text-[11px] font-bold underline underline-offset-2 opacity-90 hover:opacity-100 cursor-pointer"
         >
           Ver {remainingCount} {remainingCount === 1 ? "aviso más" : "avisos más"} en Calendario Hacienda →
         </button>

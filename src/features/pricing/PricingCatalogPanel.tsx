@@ -345,16 +345,16 @@ export function PricingCatalogPanel({
   const dailyScheduleBreakdown = computeDailyWorkHoursBreakdown(workSchedule);
 
   return (
-    <div data-testid="pricing-catalog-panel" className="w-full max-w-full overflow-x-hidden space-y-4 text-xs">
+    <div data-testid="pricing-catalog-panel" className="w-full max-w-full overflow-x-hidden space-y-4 text-xs font-sans text-[#2C2621]">
       {errorMsg && (
-        <div role="alert" className="rounded-2xl border border-coral-alert/30 bg-error-container p-3 text-on-error-container">
+        <div role="alert" className="rounded-2xl border border-[#DC2626]/30 bg-[#FAD2D8] p-3 text-[#5A121C]">
           {errorMsg}
         </div>
       )}
       {statusMsg && (
         <div
           data-testid="pricing-status-banner"
-          className="rounded-2xl border border-outline-variant bg-success-container p-3 font-semibold text-on-success-container"
+          className="rounded-2xl border border-[#059669]/30 bg-[#D4EDDA] p-3 font-semibold text-[#1B3A24]"
         >
           {statusMsg}
         </div>
@@ -364,26 +364,26 @@ export function PricingCatalogPanel({
       <form
         data-testid="pricing-hourly-rate-card"
         onSubmit={(e) => void handleSaveHourlyRate(e)}
-        className="rounded-[20px] border border-outline-variant bg-terracotta-soft p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] space-y-3"
+        className="postit-note postit-yellow p-4 space-y-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-terracotta px-2.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EA580C] px-2.5 py-0.5 text-[10px] font-bold text-white">
               <Calculator className="h-3 w-3" />
               Tarifa Principal
             </span>
-            <h3 className="mt-1.5 text-[15px] font-semibold text-on-surface">
+            <h3 className="mt-1.5 text-[15px] font-semibold text-[#2C2621]">
               Precio Base por Hora (€/hora)
             </h3>
-            <p className="mt-0.5 text-[11px] text-on-surface-variant">
+            <p className="mt-0.5 text-[11px] text-[#3E3300]/80">
               Las partidas configuradas por tiempo se recalculan automáticamente: duración (h) × tarifa/hora + materiales.
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[10px] font-semibold text-on-surface-variant">Vigente</div>
+            <div className="text-[10px] font-semibold text-[#3E3300]">Vigente</div>
             <div
               data-testid="pricing-current-hourly-badge"
-              className="font-mono text-[17px] font-bold text-on-primary-container tabular-nums"
+              className="font-mono font-mono-nums text-[17px] font-bold text-[#2C2621] tabular-nums"
             >
               {formatCentsEs(hourlyRateCents)}/h
             </div>
@@ -391,7 +391,7 @@ export function PricingCatalogPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-1.5">
+          <div className="flex items-center rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-1.5">
             <input
               type="number"
               step="0.5"
@@ -400,15 +400,15 @@ export function PricingCatalogPanel({
               disabled={busy}
               value={hourlyRateInput}
               onChange={(e) => setHourlyRateInput(e.target.value)}
-              className="w-24 font-mono text-[15px] font-bold text-on-surface tabular-nums focus:outline-none"
+              className="w-24 bg-transparent font-mono font-mono-nums text-[15px] font-bold text-[#2C2621] tabular-nums focus:outline-none"
             />
-            <span className="text-xs font-semibold text-on-surface-variant">€/h</span>
+            <span className="text-xs font-semibold text-[#6B6860]">€/h</span>
           </div>
           <button
             type="submit"
             data-testid="pricing-save-hourly-btn"
             disabled={busy}
-            className="min-h-[46px] flex-1 rounded-xl bg-primary hover:bg-terracotta px-3 text-[13px] font-semibold text-white disabled:opacity-50 cursor-pointer"
+            className="min-h-[46px] flex-1 rounded-xl bg-[#4B7094] hover:bg-[#3d5d7c] px-3 text-[13px] font-semibold text-[#FFFDF9] disabled:opacity-50 cursor-pointer shadow-xs"
           >
             Guardar tarifa y recalcular
           </button>
@@ -418,18 +418,20 @@ export function PricingCatalogPanel({
       {/* 1b. Mi Horario Habitual de Trabajo (vinculado al Calendario) */}
       <section
         data-testid="pricing-work-schedule-section"
-        className="rounded-[20px] border border-outline-variant bg-surface-container-lowest p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] flex flex-col gap-3"
+        className="relative ruled-notebook rounded-[20px] border border-[#E5DFD2] p-4 pl-10 flex flex-col gap-3"
       >
+        <span className="absolute left-2.5 top-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
+        <span className="absolute left-2.5 bottom-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-on-primary-container" />
-            <h3 className="text-[15px] font-semibold text-on-surface">
+            <Clock className="w-4 h-4 text-[#D04B00]" />
+            <h3 className="text-[15px] font-semibold text-[#2C2621]">
               Mi Horario Habitual de Trabajo
             </h3>
           </div>
           <span
             data-testid="pricing-schedule-daily-hours"
-            className="font-mono text-[11px] font-semibold text-on-success-container bg-success-container px-2.5 py-0.5 rounded-full tabular-nums"
+            className="status-emerald font-mono font-mono-nums text-[11px] font-semibold px-2.5 py-0.5 rounded-full tabular-nums"
           >
             {formatThousandthsHours(dailyScheduleBreakdown.totalThousandths)}/día
           </span>
@@ -499,8 +501,8 @@ export function PricingCatalogPanel({
                 aria-pressed={active}
                 className={`min-h-[42px] rounded-xl font-semibold text-[12px] cursor-pointer transition-colors ${
                   active
-                    ? "bg-secondary text-on-secondary"
-                    : "bg-surface-container-low border border-outline-variant text-on-surface-variant"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "bg-[#FFFDF7] border border-[#E5DFD2] text-[#6B6860]"
                 }`}
               >
                 {day.label}
@@ -510,10 +512,10 @@ export function PricingCatalogPanel({
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between bg-surface-container-low rounded-2xl p-2.5">
+          <div className="flex items-center justify-between bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
             <div className="flex flex-col pl-1">
-              <span className="text-[12px] font-semibold text-on-surface">Mañana</span>
-              <span className="text-[11px] text-on-surface-variant">
+              <span className="text-[12px] font-semibold text-[#2C2621]">Mañana</span>
+              <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
                 {formatThousandthsHours(dailyScheduleBreakdown.morningThousandths)}
               </span>
             </div>
@@ -525,9 +527,9 @@ export function PricingCatalogPanel({
                 onChange={(e) =>
                   void handleUpdateWorkSchedule({ ...workSchedule, morning_start: e.target.value })
                 }
-                className="min-h-[40px] px-2 rounded-xl bg-surface-container-lowest border border-outline-variant font-mono text-[12px] tabular-nums"
+                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
               />
-              <span className="text-outline">–</span>
+              <span className="text-[#6B6860]">–</span>
               <input
                 type="time"
                 aria-label="Fin mañana"
@@ -535,15 +537,15 @@ export function PricingCatalogPanel({
                 onChange={(e) =>
                   void handleUpdateWorkSchedule({ ...workSchedule, morning_end: e.target.value })
                 }
-                className="min-h-[40px] px-2 rounded-xl bg-surface-container-lowest border border-outline-variant font-mono text-[12px] tabular-nums"
+                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-surface-container-low rounded-2xl p-2.5">
+          <div className="flex items-center justify-between bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
             <div className="flex flex-col pl-1">
-              <span className="text-[12px] font-semibold text-on-surface">Tarde</span>
-              <span className="text-[11px] text-on-surface-variant">
+              <span className="text-[12px] font-semibold text-[#2C2621]">Tarde</span>
+              <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
                 {formatThousandthsHours(dailyScheduleBreakdown.afternoonThousandths)}
               </span>
             </div>
@@ -555,9 +557,9 @@ export function PricingCatalogPanel({
                 onChange={(e) =>
                   void handleUpdateWorkSchedule({ ...workSchedule, afternoon_start: e.target.value })
                 }
-                className="min-h-[40px] px-2 rounded-xl bg-surface-container-lowest border border-outline-variant font-mono text-[12px] tabular-nums"
+                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
               />
-              <span className="text-outline">–</span>
+              <span className="text-[#6B6860]">–</span>
               <input
                 type="time"
                 aria-label="Fin tarde"
@@ -565,14 +567,14 @@ export function PricingCatalogPanel({
                 onChange={(e) =>
                   void handleUpdateWorkSchedule({ ...workSchedule, afternoon_end: e.target.value })
                 }
-                className="min-h-[40px] px-2 rounded-xl bg-surface-container-lowest border border-outline-variant font-mono text-[12px] tabular-nums"
+                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
               />
             </div>
           </div>
         </div>
 
-        <label className="flex items-center justify-between gap-3 min-h-[46px] px-3 py-2 rounded-xl bg-terracotta-soft border border-outline-variant cursor-pointer">
-          <span className="text-[12px] font-medium text-on-primary-container">
+        <label className="flex items-center justify-between gap-3 min-h-[46px] px-3 py-2 rounded-xl bg-[#FFD6B0]/70 border border-[#E5DFD2] cursor-pointer">
+          <span className="text-[12px] font-medium text-[#4A2500]">
             Aplicar automáticamente este horario al crear una obra con fechas
           </span>
           <input
@@ -585,7 +587,7 @@ export function PricingCatalogPanel({
                 auto_apply_to_jobs: e.target.checked,
               })
             }
-            className="w-5 h-5 rounded border-outline accent-terracotta shrink-0"
+            className="w-5 h-5 rounded border-[#6B6860] accent-[#EA580C] shrink-0"
           />
         </label>
       </section>
@@ -593,23 +595,23 @@ export function PricingCatalogPanel({
       {/* 2. Importador IA Local de Documentos Existentes */}
       <section
         data-testid="pricing-document-importer"
-        className="rounded-2xl border border-indigo-200 bg-white p-3.5 shadow-xs space-y-2.5"
+        className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5"
       >
         <div className="flex items-start gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-800">
+          <span className="status-violet flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
             <Sparkles className="h-4 w-4" />
           </span>
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900">
+            <h3 className="text-sm font-bold text-[#2C2621]">
               Importador IA de Tarifas y Presupuestos Previos
             </h3>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+            <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B6860]">
               Sube presupuestos antiguos, facturas, listados de precios o imágenes. El motor offline extraerá partidas, precios, tarifa/hora e IVA para revisarlos antes de guardar.
             </p>
           </div>
         </div>
 
-        <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/70 px-3 py-2 text-xs font-bold text-indigo-900 active:bg-indigo-100">
+        <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#4B7094]/45 bg-[#CBE4F9]/35 px-3 py-2 text-xs font-bold text-[#143552] hover:bg-[#CBE4F9]/55 transition-colors">
           <FileUp className="h-4 w-4 shrink-0" />
           <span>
             {importingDocs
@@ -633,20 +635,20 @@ export function PricingCatalogPanel({
       </section>
 
       {/* 3. Partidas predefinidas del sector */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-2.5">
+      <section className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900">
+            <h3 className="text-sm font-bold text-[#2C2621]">
               Catálogo Predefinido de Oficios
             </h3>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-[#6B6860]">
               Activa o ajusta partidas habituales con cálculo conectado a tu tarifa base.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowPredefined((v) => !v)}
-            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700"
+            className="rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-1 text-[11px] font-bold text-[#3D352E] cursor-pointer"
           >
             {showPredefined ? "Ocultar" : "Mostrar"}
           </button>
@@ -663,13 +665,13 @@ export function PricingCatalogPanel({
                 <div
                   key={tpl.template_id}
                   data-testid={`predefined-tpl-${tpl.template_id}`}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2"
+                  className="ruled-index flex items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] px-2.5 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="break-words [overflow-wrap:anywhere] font-bold text-slate-900">
+                    <div className="break-words [overflow-wrap:anywhere] font-bold text-[#2C2621]">
                       {tpl.description}
                     </div>
-                    <div className="break-words text-[10px] text-slate-500">
+                    <div className="break-words text-[10px] text-[#6B6860]">
                       {tpl.category} · {tpl.unit} · IVA {tpl.default_vat_rate} % ·{" "}
                       {formatPricingBreakdown({
                         pricing_mode: tpl.pricing_mode,
@@ -681,7 +683,7 @@ export function PricingCatalogPanel({
                     </div>
                   </div>
                   {isActive ? (
-                    <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-900">
+                    <span className="status-emerald shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold">
                       Activa
                     </span>
                   ) : (
@@ -690,7 +692,7 @@ export function PricingCatalogPanel({
                       data-testid={`activate-tpl-${tpl.template_id}`}
                       disabled={busy}
                       onClick={() => void handleActivateTemplate(tpl)}
-                      className="shrink-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-white"
+                      className="shrink-0 rounded-lg bg-[#4B7094] px-2.5 py-1.5 text-[11px] font-bold text-[#FFFDF9] cursor-pointer"
                     >
                       Activar
                     </button>
@@ -703,11 +705,11 @@ export function PricingCatalogPanel({
       </section>
 
       {/* 4. Tarifario activo + Partida personalizada */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-2.5">
+      <section className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Sliders className="h-4 w-4 text-slate-700" />
-            <h3 className="text-sm font-extrabold text-slate-900">
+            <Sliders className="h-4 w-4 text-[#6B6860]" />
+            <h3 className="text-sm font-bold text-[#2C2621]">
               Mi Tarifario ({catalogItems.length})
             </h3>
           </div>
@@ -722,7 +724,7 @@ export function PricingCatalogPanel({
                 setShowCustomForm(true);
               }
             }}
-            className="inline-flex items-center gap-1 rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-bold text-white"
+            className="inline-flex items-center gap-1 rounded-xl bg-[#D04B00] hover:bg-[#EA580C] px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Partida personalizada</span>
@@ -733,9 +735,9 @@ export function PricingCatalogPanel({
           <form
             data-testid="pricing-custom-form"
             onSubmit={(e) => void handleSaveCatalogItem(e)}
-            className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5"
+            className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-2.5"
           >
-            <div className="font-bold text-slate-900">
+            <div className="font-bold text-[#2C2621]">
               {editingItemId ? "Editar partida" : "Nueva partida personalizada"}
             </div>
             <InlineVoiceFormTrigger
@@ -810,13 +812,13 @@ export function PricingCatalogPanel({
               placeholder="Descripción técnica de la partida *"
               value={formDesc}
               onValueChange={setFormDesc}
-              className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs"
+              className="w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             />
             <div className="grid grid-cols-3 gap-2">
               <select
                 value={formCat}
                 onChange={(e) => setFormCat(e.target.value as CatalogCategory)}
-                className="rounded-xl border border-slate-300 bg-white px-2 py-2 text-xs"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -829,7 +831,7 @@ export function PricingCatalogPanel({
                 placeholder="Unidad (ud, m2...)"
                 value={formUnit}
                 onChange={(e) => setFormUnit(e.target.value)}
-                className="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
               <input
                 type="number"
@@ -839,7 +841,7 @@ export function PricingCatalogPanel({
                 placeholder="IVA %"
                 value={formVatInput}
                 onChange={(e) => setFormVatInput(e.target.value)}
-                className="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs"
+                className="rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 font-mono tabular-nums text-xs text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
               />
             </div>
 
@@ -848,10 +850,10 @@ export function PricingCatalogPanel({
                 type="button"
                 data-testid="pricing-mode-hourly-btn"
                 onClick={() => setFormMode("hourly_plus_materials")}
-                className={`flex-1 rounded-xl px-2.5 py-2 text-[11px] font-bold ${
+                className={`flex-1 rounded-xl px-2.5 py-2 text-[11px] font-bold cursor-pointer ${
                   formMode === "hourly_plus_materials"
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-700"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "border border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860]"
                 }`}
               >
                 Horas × Tarifa + Materiales
@@ -860,10 +862,10 @@ export function PricingCatalogPanel({
                 type="button"
                 data-testid="pricing-mode-fixed-btn"
                 onClick={() => setFormMode("fixed")}
-                className={`flex-1 rounded-xl px-2.5 py-2 text-[11px] font-bold ${
+                className={`flex-1 rounded-xl px-2.5 py-2 text-[11px] font-bold cursor-pointer ${
                   formMode === "fixed"
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-700"
+                    ? "bg-[#4B7094] text-[#FFFDF9]"
+                    : "border border-[#E5DFD2] bg-[#FFFDF7] text-[#6B6860]"
                 }`}
               >
                 Importe fijo
@@ -873,7 +875,7 @@ export function PricingCatalogPanel({
             {formMode === "hourly_plus_materials" ? (
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[10px] text-slate-600">Duración (horas)</label>
+                  <label className="block text-[10px] text-[#6B6860]">Duración (horas)</label>
                   <input
                     type="number"
                     step="0.25"
@@ -881,11 +883,11 @@ export function PricingCatalogPanel({
                     data-testid="pricing-custom-hours-input"
                     value={formHoursInput}
                     onChange={(e) => setFormHoursInput(e.target.value)}
-                    className="mt-0.5 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+                    className="mt-0.5 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono tabular-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-600">Materiales (€)</label>
+                  <label className="block text-[10px] text-[#6B6860]">Materiales (€)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -893,19 +895,19 @@ export function PricingCatalogPanel({
                     data-testid="pricing-custom-materials-input"
                     value={formMaterialsInput}
                     onChange={(e) => setFormMaterialsInput(e.target.value)}
-                    className="mt-0.5 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold"
+                    className="mt-0.5 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 font-mono tabular-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col justify-end text-right">
-                  <span className="text-[10px] text-slate-500">Precio resultante</span>
-                  <span data-testid="pricing-custom-preview-total" className="text-sm font-extrabold text-orange-700">
+                  <span className="text-[10px] text-[#6B6860]">Precio resultante</span>
+                  <span data-testid="pricing-custom-preview-total" className="highlighter-yellow font-mono font-mono-nums text-sm font-bold text-[#2C2621] tabular-nums">
                     {formatCentsEs(formLivePriceCents)}
                   </span>
                 </div>
               </div>
             ) : (
               <div>
-                <label className="block text-[10px] text-slate-600">Precio unitario fijo (€)</label>
+                <label className="block text-[10px] text-[#6B6860]">Precio unitario fijo (€)</label>
                 <input
                   type="number"
                   step="0.5"
@@ -913,7 +915,7 @@ export function PricingCatalogPanel({
                   data-testid="pricing-custom-fixed-input"
                   value={formFixedPriceInput}
                   onChange={(e) => setFormFixedPriceInput(e.target.value)}
-                  className="mt-0.5 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold"
+                  className="mt-0.5 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-2 font-mono tabular-nums text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
                 />
               </div>
             )}
@@ -922,7 +924,7 @@ export function PricingCatalogPanel({
               <button
                 type="button"
                 onClick={resetCustomForm}
-                className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-700"
+                className="min-h-10 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#6B6860] cursor-pointer"
               >
                 Cancelar
               </button>
@@ -930,7 +932,7 @@ export function PricingCatalogPanel({
                 type="submit"
                 data-testid="pricing-custom-save-btn"
                 disabled={busy}
-                className="min-h-10 flex-1 rounded-xl bg-slate-900 font-bold text-white"
+                className="min-h-10 flex-1 rounded-xl bg-[#4B7094] font-bold text-[#FFFDF9] cursor-pointer"
               >
                 {editingItemId ? "Guardar cambios" : "Guardar partida"}
               </button>
@@ -944,59 +946,79 @@ export function PricingCatalogPanel({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar en tu tarifario..."
-          className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs"
+          className="min-h-10 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
         />
 
-        <div className="space-y-2">
-          {catalogItems.map((item) => (
-            <div
-              key={item.id}
-              data-testid={`catalog-item-${item.id}`}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 space-y-1.5"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="break-words [overflow-wrap:anywhere] font-bold text-slate-900">
-                    {item.description}
+        <div className="space-y-2.5">
+          {catalogItems.map((item) => {
+            const tabBg =
+              item.category === "Albañilería"
+                ? "postit-green text-[#1B3A24]"
+                : item.category === "Fontanería"
+                  ? "postit-blue text-[#143552]"
+                  : item.category === "Electricidad"
+                    ? "postit-yellow text-[#3E3300]"
+                    : item.category === "Pintura"
+                      ? "postit-lavender text-[#4C1D95]"
+                      : "postit-peach text-[#4A2500]";
+            const tabCode = item.category.slice(0, 3).toUpperCase();
+            return (
+              <div
+                key={item.id}
+                data-testid={`catalog-item-${item.id}`}
+                className="ruled-index rounded-xl border border-[#E5DFD2] overflow-hidden flex"
+              >
+                <div className={`w-7 ${tabBg} border-r border-[#E5DFD2] flex items-center justify-center shrink-0`}>
+                  <span className="font-mono text-[10px] font-bold -rotate-90 whitespace-nowrap">
+                    {tabCode}
+                  </span>
+                </div>
+                <div className="flex-1 p-2.5 space-y-1.5 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="break-words [overflow-wrap:anywhere] font-bold text-[#2C2621]">
+                        {item.description}
+                      </div>
+                      <div className="break-words text-[11px] text-[#6B6860]">
+                        {item.category} · {item.unit} · IVA {item.default_vat_rate} %
+                      </div>
+                      <div className="break-words text-[10px] font-medium text-[#6B6860]">
+                        {formatPricingBreakdown({
+                          pricing_mode: item.pricing_mode,
+                          estimated_hours_thousandths: item.estimated_hours_thousandths,
+                          materials_cents: item.materials_cents,
+                          hourly_rate_cents: hourlyRateCents,
+                          unit_price_cents: item.unit_price_cents,
+                        })}
+                      </div>
+                    </div>
+                    <div className="highlighter-yellow shrink-0 font-mono font-mono-nums text-sm font-bold text-[#2C2621] tabular-nums">
+                      {formatCentsEs(item.unit_price_cents)}
+                    </div>
                   </div>
-                  <div className="break-words text-[11px] text-slate-500">
-                    {item.category} · {item.unit} · IVA {item.default_vat_rate} %
-                  </div>
-                  <div className="break-words text-[10px] font-medium text-slate-600">
-                    {formatPricingBreakdown({
-                      pricing_mode: item.pricing_mode,
-                      estimated_hours_thousandths: item.estimated_hours_thousandths,
-                      materials_cents: item.materials_cents,
-                      hourly_rate_cents: hourlyRateCents,
-                      unit_price_cents: item.unit_price_cents,
-                    })}
+                  <div className="flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleEditItem(item)}
+                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1 text-[11px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleDeactivateItem(item.id)}
+                      className="rounded-lg border border-[#DC2626]/30 bg-[#FFFDF7] px-2.5 py-1 text-[11px] font-semibold text-[#DC2626] hover:bg-[#FAD2D8] cursor-pointer"
+                    >
+                      Desactivar
+                    </button>
                   </div>
                 </div>
-                <div className="shrink-0 text-sm font-extrabold text-slate-900">
-                  {formatCentsEs(item.unit_price_cents)}
-                </div>
               </div>
-              <div className="flex justify-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleEditItem(item)}
-                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleDeactivateItem(item.id)}
-                  className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700"
-                >
-                  Desactivar
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {catalogItems.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500">
+            <div className="ruled-index rounded-xl border border-dashed border-[#E5DFD2] p-4 text-center text-xs text-[#6B6860]">
               Aún no hay partidas activas que coincidan con tu búsqueda.
             </div>
           )}

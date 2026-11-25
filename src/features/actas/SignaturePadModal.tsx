@@ -48,7 +48,7 @@ export function SignaturePadModal({
     ctx.fillRect(0, 0, width, height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
+    ctx.strokeStyle = "#2C2621";
     ctx.lineWidth = 2.6;
     setHasStroke(false);
   }, []);
@@ -95,7 +95,7 @@ export function SignaturePadModal({
     if (ctx) {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 1.3, 0, Math.PI * 2);
-      ctx.fillStyle = "#0f172a";
+      ctx.fillStyle = "#2C2621";
       ctx.fill();
       setHasStroke(true);
     }
@@ -146,26 +146,26 @@ export function SignaturePadModal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[#2C2621]/55 p-4 backdrop-blur-[1px] font-sans"
     >
-      <div className="w-full max-w-lg rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-2xl space-y-3">
+      <div className="clipboard-panel w-full max-w-lg rounded-2xl p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-[15px] font-bold text-on-surface">{title}</h3>
-            <p className="text-[11px] text-on-surface-variant">{subtitle}</p>
+            <h3 className="text-[15px] font-bold text-[#2C2621]">{title}</h3>
+            <p className="text-[11px] text-[#6B6860]">{subtitle}</p>
           </div>
           <button
             type="button"
             disabled={busy}
             onClick={onClose}
             aria-label="Cerrar firma"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container cursor-pointer"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#6B6860] hover:bg-[#EFECE4] cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border-2 border-dashed border-outline-variant bg-white">
+        <div className="overflow-hidden rounded-2xl border-2 border-dashed border-[#E5DFD2] bg-white">
           <canvas
             ref={canvasRef}
             data-testid="signature-pad-canvas"
@@ -179,13 +179,13 @@ export function SignaturePadModal({
         </div>
 
         {showSaveAsDefaultOption && (
-          <label className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-[11px] font-semibold text-on-surface cursor-pointer">
+          <label className="flex items-center gap-2 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 text-[11px] font-semibold text-[#2C2621] cursor-pointer">
             <input
               type="checkbox"
               data-testid="signature-save-default-checkbox"
               checked={saveAsDefault}
               onChange={(e) => setSaveAsDefault(e.target.checked)}
-              className="h-4 w-4 accent-terracotta"
+              className="h-4 w-4 accent-[#EA580C]"
             />
             <span>{saveAsDefaultLabel}</span>
           </label>
@@ -197,7 +197,7 @@ export function SignaturePadModal({
             data-testid="signature-pad-clear-btn"
             disabled={busy}
             onClick={resetCanvas}
-            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-low font-semibold text-on-surface cursor-pointer"
+            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] font-semibold text-[#2C2621] cursor-pointer"
           >
             <Eraser className="h-4 w-4" />
             <span>Borrar</span>
@@ -207,7 +207,7 @@ export function SignaturePadModal({
             data-testid="signature-pad-confirm-btn"
             disabled={busy || !hasStroke}
             onClick={() => void handleConfirmClick()}
-            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-terracotta font-semibold text-white disabled:opacity-45 cursor-pointer"
+            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#EA580C] hover:bg-[#D04B00] font-semibold text-white disabled:opacity-45 cursor-pointer transition-colors"
           >
             <Check className="h-4 w-4" />
             <span>{busy ? "Guardando..." : "Confirmar Firma"}</span>

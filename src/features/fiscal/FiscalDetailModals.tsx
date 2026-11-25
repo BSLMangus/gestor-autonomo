@@ -45,12 +45,12 @@ function TicketPhotoPreview({
 
   if (!url) return null;
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-      <div className="mb-1 text-[11px] font-semibold text-slate-600">Imagen del ticket</div>
+    <div className="paper-sheet rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5">
+      <div className="mb-1 text-[11px] font-semibold text-[#6B6860]">Imagen del ticket</div>
       <img
         src={url}
         alt="Imagen del ticket deducible"
-        className="max-h-48 w-full rounded-lg object-contain bg-white"
+        className="max-h-48 w-full rounded-lg object-contain bg-[#F5F1E6]"
       />
     </div>
   );
@@ -115,18 +115,18 @@ export function DeductibleTicketsModal({
   return (
     <div
       data-testid="tickets-detail-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-secondary/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex flex-col bg-[#2C2621]/40 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-label={`Tickets deducibles ${quarter}`}
     >
-      <div className="mx-auto mt-8 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-outline-variant bg-surface-container-lowest shadow-2xl">
-        <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3.5">
+      <div className="clipboard-panel mx-auto mt-8 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-[#E5DFD2] bg-[#FFFDF7]">
+        <div className="flex items-center justify-between border-b border-[#E5DFD2] px-4 py-3.5">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold text-on-warning-container">
+            <div className="font-mono text-[11px] font-semibold text-[#9A2D08]">
               Tickets deducibles · {quarter}
             </div>
-            <h3 className="truncate text-[16px] font-semibold text-on-surface">
+            <h3 className="truncate text-[16px] font-bold text-[#2C2621]">
               {selectedTicket ? selectedTicket.supplier_name : `Todos los gastos (${tickets.length})`}
             </h3>
           </div>
@@ -135,75 +135,79 @@ export function DeductibleTicketsModal({
             data-testid="close-tickets-detail-btn"
             onClick={onClose}
             aria-label="Cerrar detalle de tickets"
-            className="h-10 w-10 rounded-full hover:bg-surface-container text-sm font-bold text-on-surface-variant cursor-pointer"
+            className="h-10 w-10 rounded-full hover:bg-[#EFECE4] text-sm font-bold text-[#6B6860] cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs text-[#2C2621]">
           {selectedTicket ? (
             <div data-testid="ticket-detail-panel" className="space-y-3">
               <button
                 type="button"
                 onClick={() => setSelectedTicketId(null)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700"
+                className="inline-flex items-center gap-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-[11px] font-bold text-[#2C2621] cursor-pointer"
               >
                 ← Ver todos los tickets del trimestre
               </button>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-2.5">
+              <div className="receipt-slip my-2 border-x border-[#E5DFD2] p-3.5 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-base font-extrabold text-slate-900">
+                    <div className="text-base font-bold text-[#2C2621]">
                       {selectedTicket.supplier_name}
                     </div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="font-mono text-[11px] text-[#6B6860] tabular-nums">
                       {selectedTicket.supplier_nif
                         ? `NIF/CIF: ${selectedTicket.supplier_nif}`
                         : "NIF no indicado"}
                     </div>
                   </div>
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold capitalize text-amber-900">
+                  <span className="badge-expense rounded-full px-2.5 py-1 text-[11px] font-bold capitalize">
                     {selectedTicket.category}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 pt-1">
-                  <div className="rounded-xl bg-white p-2 border border-slate-200">
-                    <div className="text-[10px] text-slate-500">Base imponible</div>
-                    <div className="font-bold text-slate-900">
+                  <div className="rounded-xl bg-[#F5F1E6] p-2 border border-[#E5DFD2]">
+                    <div className="text-[10px] text-[#6B6860]">Base imponible</div>
+                    <div className="font-mono font-bold text-[#2C2621] tabular-nums">
                       {formatCentsEs(selectedTicket.base_cents)}
                     </div>
                   </div>
-                  <div className="rounded-xl bg-white p-2 border border-slate-200">
-                    <div className="text-[10px] text-slate-500">
+                  <div className="rounded-xl bg-[#D4EDDA] p-2 border border-[#1E8E5A]/30">
+                    <div className="text-[10px] text-[#1B3A24]">
                       IVA deducible ({selectedTicket.vat_rate_label === "mixed" ? "Mixto" : `${selectedTicket.vat_rate_label} %`})
                     </div>
-                    <div className="font-bold text-emerald-700">
+                    <div className="font-mono font-bold text-[#14532D] tabular-nums">
                       {formatCentsEs(selectedTicket.vat_cents)}
                     </div>
                   </div>
-                  <div className="rounded-xl bg-slate-900 p-2 text-white">
-                    <div className="text-[10px] text-slate-300">Total pagado</div>
-                    <div className="font-extrabold">
+                  <div className="rounded-xl bg-[#4B7094] p-2 text-[#FFFDF9]">
+                    <div className="text-[10px] opacity-85">Total pagado</div>
+                    <div className="font-mono font-bold tabular-nums">
                       {formatCentsEs(selectedTicket.total_cents)}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-1 border-t border-slate-200 pt-2 text-slate-700">
+                <div className="space-y-1 border-t border-dashed border-[#E5DFD2] pt-2 text-[#6B6860]">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Fecha del ticket</span>
-                    <span className="font-semibold">{selectedTicket.issue_date_iso}</span>
+                    <span>Fecha del ticket</span>
+                    <span className="font-mono font-semibold text-[#2C2621] tabular-nums">
+                      {selectedTicket.issue_date_iso}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Trimestre fiscal</span>
-                    <span className="font-semibold">{selectedTicket.quarter}</span>
+                    <span>Trimestre fiscal</span>
+                    <span className="font-mono font-semibold text-[#2C2621] tabular-nums">
+                      {selectedTicket.quarter}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Imputado a obra</span>
-                    <span className="font-semibold">
+                    <span>Imputado a obra</span>
+                    <span className="font-semibold text-[#2C2621]">
                       {selectedTicket.job_id
                         ? (() => {
                             const j = jobById.get(selectedTicket.job_id);
@@ -220,39 +224,43 @@ export function DeductibleTicketsModal({
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                  <div className="text-[10px] text-slate-500">Base deducible</div>
-                  <div className="mt-0.5 text-sm font-extrabold text-slate-900">
+                <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                  <div className="text-[10px] text-[#6B6860]">Base deducible</div>
+                  <div className="mt-0.5 font-mono text-sm font-bold text-[#2C2621] tabular-nums">
                     {formatCentsEs(totalBase)}
                   </div>
                 </div>
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5">
-                  <div className="text-[10px] text-emerald-900">IVA a deducir</div>
-                  <div className="mt-0.5 text-sm font-extrabold text-emerald-950">
+                <div className="rounded-xl border border-[#1E8E5A]/30 bg-[#D4EDDA] p-2.5">
+                  <div className="text-[10px] text-[#1B3A24]">IVA a deducir</div>
+                  <div className="mt-0.5 font-mono text-sm font-bold text-[#14532D] tabular-nums">
                     {formatCentsEs(totalVat)}
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-900 p-2.5 text-white">
-                  <div className="text-[10px] text-slate-300">Total tickets</div>
-                  <div className="mt-0.5 text-sm font-extrabold">{formatCentsEs(totalGross)}</div>
+                <div className="rounded-xl border border-[#4B7094] bg-[#4B7094] p-2.5 text-[#FFFDF9]">
+                  <div className="text-[10px] opacity-85">Total tickets</div>
+                  <div className="mt-0.5 font-mono text-sm font-bold tabular-nums">
+                    {formatCentsEs(totalGross)}
+                  </div>
                 </div>
               </div>
 
               {categoryTotals.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                  <div className="font-bold text-slate-800">Gasto por categoría</div>
+                <div className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-3 pl-8 space-y-2">
+                  <div className="font-bold text-[#2C2621]">Gasto por categoría</div>
                   <div className="space-y-1.5">
                     {categoryTotals.map((c) => {
                       const pct = Math.round((c.sum / maxCatSum) * 100);
                       return (
                         <div key={c.cat} className="space-y-0.5">
                           <div className="flex justify-between text-[11px]">
-                            <span className="capitalize font-medium text-slate-700">{c.cat}</span>
-                            <span className="font-bold text-slate-900">{formatCentsEs(c.sum)}</span>
+                            <span className="capitalize font-medium text-[#2C2621]">{c.cat}</span>
+                            <span className="font-mono font-bold text-[#2C2621] tabular-nums">
+                              {formatCentsEs(c.sum)}
+                            </span>
                           </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE4]">
                             <div
-                              className="h-full rounded-full bg-amber-500"
+                              className="h-full rounded-full chart-tangerine"
                               style={{ width: `${Math.max(4, pct)}%` }}
                             />
                           </div>
@@ -268,10 +276,10 @@ export function DeductibleTicketsModal({
                   <button
                     type="button"
                     onClick={() => setCategoryFilter("all")}
-                    className={`rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-bold cursor-pointer ${
                       categoryFilter === "all"
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-700"
+                        ? "bg-[#4B7094] text-[#FFFDF9]"
+                        : "bg-[#EFECE4] text-[#6B6860]"
                     }`}
                   >
                     Todos
@@ -281,10 +289,10 @@ export function DeductibleTicketsModal({
                       key={cat}
                       type="button"
                       onClick={() => setCategoryFilter(cat)}
-                      className={`rounded-lg px-2.5 py-1 text-[11px] font-bold capitalize ${
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-bold capitalize cursor-pointer ${
                         categoryFilter === cat
-                          ? "bg-orange-600 text-white"
-                          : "bg-slate-100 text-slate-700"
+                          ? "bg-[#EA580C] text-[#FFFDF9]"
+                          : "bg-[#EFECE4] text-[#6B6860]"
                       }`}
                     >
                       {cat}
@@ -297,15 +305,15 @@ export function DeductibleTicketsModal({
                     onClose();
                     void onQuickManualTicket();
                   }}
-                  className="shrink-0 rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-white"
+                  className="shrink-0 rounded-lg bg-[#4B7094] px-2.5 py-1 text-[11px] font-bold text-[#FFFDF9] cursor-pointer"
                 >
                   + Añadir
                 </button>
               </div>
 
-              <div className="space-y-2">
+              <div className="receipt-slip my-2 border-x border-[#E5DFD2] divide-y divide-dashed divide-[#E5DFD2]">
                 {filteredTickets.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-slate-500">
+                  <div className="p-4 text-center text-[#6B6860]">
                     No hay tickets en esta categoría para {quarter}.
                   </div>
                 ) : (
@@ -323,20 +331,20 @@ export function DeductibleTicketsModal({
                             setSelectedTicketId(t.id);
                           }
                         }}
-                        className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 text-left hover:bg-slate-50 cursor-pointer"
+                        className="flex w-full items-center justify-between p-3 text-left hover:bg-[#F5F1E6]/60 cursor-pointer"
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="truncate font-bold text-slate-900">{t.supplier_name}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {t.issue_date_iso} · <span className="capitalize">{t.category}</span>
+                          <div className="truncate font-bold text-[#2C2621]">{t.supplier_name}</div>
+                          <div className="font-mono text-[11px] text-[#6B6860] tabular-nums">
+                            {t.issue_date_iso} · <span className="capitalize font-sans">{t.category}</span>
                             {job ? ` · ${job.job_code}` : " · General"}
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <div className="font-extrabold text-slate-900">
+                          <div className="font-mono font-bold text-[#2C2621] tabular-nums">
                             {formatCentsEs(t.total_cents)}
                           </div>
-                          <div className="text-[10px] font-semibold text-orange-700">Ver →</div>
+                          <div className="text-[10px] font-semibold text-[#D04B00]">Ver →</div>
                         </div>
                       </button>
                     );
@@ -472,22 +480,22 @@ export function ProfitabilityAnalysisModal({
     {
       label: "Facturado",
       cents: metrics.invoicedBaseCents,
-      color: "#0f172a",
+      color: "#8B5CF6",
     },
     {
       label: "Cobrado",
       cents: metrics.collectedGrossCents,
-      color: "#0284c7",
+      color: "#D99B26",
     },
     {
       label: "Gastos",
       cents: metrics.ticketsBaseCents,
-      color: "#d97706",
+      color: "#E85D2A",
     },
     {
       label: "Beneficio",
       cents: Math.max(0, metrics.netProfitCents),
-      color: metrics.netProfitCents >= 0 ? "#059669" : "#e11d48",
+      color: metrics.netProfitCents >= 0 ? "#1E8E5A" : "#DC2626",
     },
   ];
   const maxBarCents = Math.max(100, ...chartSeries.map((s) => Math.abs(s.cents)));
@@ -501,18 +509,18 @@ export function ProfitabilityAnalysisModal({
   return (
     <div
       data-testid="profitability-analysis-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-secondary/45 backdrop-blur-[1px]"
+      className="fixed inset-0 z-50 flex flex-col bg-[#2C2621]/40 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-label="Análisis visual de rentabilidad por obra"
     >
-      <div className="mx-auto mt-6 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-outline-variant bg-surface-container-lowest shadow-2xl">
-        <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3.5">
+      <div className="clipboard-panel mx-auto mt-6 flex min-h-0 w-full max-w-md flex-1 flex-col rounded-t-[24px] border-t border-[#E5DFD2] bg-[#FFFDF7]">
+        <div className="flex items-center justify-between border-b border-[#E5DFD2] px-4 py-3.5">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold text-on-success-container">
+            <div className="text-[11px] font-semibold text-[#14532D]">
               Análisis de rentabilidad
             </div>
-            <h3 className="truncate text-[16px] font-semibold text-on-surface">
+            <h3 className="truncate text-[16px] font-bold text-[#2C2621]">
               {metrics.title}
             </h3>
           </div>
@@ -521,18 +529,18 @@ export function ProfitabilityAnalysisModal({
             data-testid="close-profitability-modal-btn"
             onClick={onClose}
             aria-label="Cerrar análisis de rentabilidad"
-            className="h-10 w-10 rounded-full hover:bg-surface-container text-sm font-bold text-on-surface-variant cursor-pointer"
+            className="h-10 w-10 rounded-full hover:bg-[#EFECE4] text-sm font-bold text-[#6B6860] cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs text-[#2C2621]">
           {/* Selector de obra o vista general */}
           <div>
             <label
               htmlFor="profit-scope-select"
-              className="block text-[11px] font-semibold text-slate-600 mb-1"
+              className="block text-[11px] font-semibold text-[#6B6860] mb-1"
             >
               Obra analizada
             </label>
@@ -541,7 +549,7 @@ export function ProfitabilityAnalysisModal({
               data-testid="profitability-scope-select"
               value={selectedScope}
               onChange={(e) => setSelectedScope(e.target.value)}
-              className="min-h-10 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs font-bold text-slate-900"
+              className="min-h-10 w-full rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 text-xs font-bold text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
             >
               <option value="all">Todas las obras activas ({activeJobs.length})</option>
               {jobBreakdowns.map((b) => (
@@ -555,35 +563,35 @@ export function ProfitabilityAnalysisModal({
           {/* 1. Análisis escrito en lenguaje claro */}
           <section
             data-testid="profitability-written-analysis"
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-2"
+            className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2"
           >
-            <div className="font-extrabold text-slate-900">Resumen escrito</div>
-            <p className="leading-relaxed text-slate-700">
+            <div className="font-bold text-[#2C2621]">Resumen escrito</div>
+            <p className="leading-relaxed text-[#6B6860]">
               {metrics.invoicedBaseCents === 0 && metrics.ticketsBaseCents === 0 ? (
                 <>
                   Todavía no hay facturas emitidas ni tickets de gasto imputados en{" "}
-                  <strong>{metrics.title}</strong>. En cuanto emitas una factura o imputes gastos,
+                  <strong className="text-[#2C2621]">{metrics.title}</strong>. En cuanto emitas una factura o imputes gastos,
                   verás aquí la evolución real de tu beneficio.
                 </>
               ) : (
                 <>
-                  Has facturado <strong>{formatCentsEs(metrics.invoicedBaseCents)}</strong> sin IVA
-                  ({formatCentsEs(metrics.invoicedGrossCents)} con IVA incluido), de los cuales ya has
-                  cobrado <strong>{formatCentsEs(metrics.collectedGrossCents)}</strong>
+                  Has facturado <strong className="font-mono text-[#2C2621] tabular-nums">{formatCentsEs(metrics.invoicedBaseCents)}</strong> sin IVA
+                  (<span className="font-mono tabular-nums">{formatCentsEs(metrics.invoicedGrossCents)}</span> con IVA incluido), de los cuales ya has
+                  cobrado <strong className="font-mono text-[#2C2621] tabular-nums">{formatCentsEs(metrics.collectedGrossCents)}</strong>
                   {metrics.pendingGrossCents > 0
                     ? ` y quedan ${formatCentsEs(metrics.pendingGrossCents)} pendientes de cobro.`
                     : " (todo cobrado al 100 %)."}
                   {" "}
                   Tus gastos deducibles en tickets suman{" "}
-                  <strong>{formatCentsEs(metrics.ticketsBaseCents)}</strong> sin IVA, lo que deja un{" "}
+                  <strong className="font-mono text-[#2C2621] tabular-nums">{formatCentsEs(metrics.ticketsBaseCents)}</strong> sin IVA, lo que deja un{" "}
                   <strong
-                    className={
-                      metrics.netProfitCents >= 0 ? "text-emerald-700" : "text-rose-700"
-                    }
+                    className={`font-mono tabular-nums ${
+                      metrics.netProfitCents >= 0 ? "text-[#14532D]" : "text-[#9A2D08]"
+                    }`}
                   >
                     beneficio neto de {formatCentsEs(metrics.netProfitCents)}
                   </strong>{" "}
-                  (margen limpio del <strong>{metrics.marginPct} %</strong> sobre lo facturado).
+                  (margen limpio del <strong className="font-mono text-[#2C2621] tabular-nums">{metrics.marginPct} %</strong> sobre lo facturado).
                 </>
               )}
             </p>
@@ -592,11 +600,18 @@ export function ProfitabilityAnalysisModal({
           {/* 2. Gráficas muy visuales */}
           <section
             data-testid="profitability-visual-charts"
-            className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-3"
+            className="ruled-notebook rounded-2xl border border-[#E5DFD2] p-3.5 pl-9 space-y-3"
           >
+            <div
+              className="absolute left-2.5 top-0 bottom-0 flex flex-col justify-around py-3 pointer-events-none"
+              aria-hidden="true"
+            >
+              <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+              <span className="w-2.5 h-2.5 rounded-full paper-hole border shadow-inner" />
+            </div>
             <div className="flex items-center justify-between">
-              <div className="font-extrabold text-slate-900">Gráfica comparativa</div>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-900">
+              <div className="font-bold text-[#2C2621]">Gráfica comparativa</div>
+              <span className="status-emerald rounded-full px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums">
                 Margen {metrics.marginPct} %
               </span>
             </div>
@@ -608,7 +623,7 @@ export function ProfitabilityAnalysisModal({
               aria-label="Gráfica comparativa de facturación, cobros, gastos y beneficio neto"
               className="w-full overflow-visible"
             >
-              <line x1="8" y1="108" x2="312" y2="108" stroke="#cbd5e1" strokeWidth="1" />
+              <line x1="8" y1="108" x2="312" y2="108" stroke="#E5DFD2" strokeWidth="1" />
               {chartSeries.map((bar, idx) => {
                 const barWidth = 46;
                 const gap = 28;
@@ -624,7 +639,7 @@ export function ProfitabilityAnalysisModal({
                       textAnchor="middle"
                       fontSize="9"
                       fontWeight="700"
-                      fill="#0f172a"
+                      fill="#2C2621"
                     >
                       {formatCentsEs(bar.cents)}
                     </text>
@@ -642,7 +657,7 @@ export function ProfitabilityAnalysisModal({
                       textAnchor="middle"
                       fontSize="10"
                       fontWeight="600"
-                      fill="#475569"
+                      fill="#6B6860"
                     >
                       {bar.label}
                     </text>
@@ -653,19 +668,19 @@ export function ProfitabilityAnalysisModal({
 
             {/* Barra de proporción Costes vs Beneficio */}
             <div className="space-y-1 pt-1">
-              <div className="flex justify-between text-[11px] font-semibold text-slate-700">
+              <div className="flex justify-between text-[11px] font-semibold text-[#6B6860]">
                 <span>Reparto sobre lo facturado</span>
-                <span>
+                <span className="font-mono text-[#2C2621] tabular-nums">
                   {profitRatioPct} % beneficio · {costRatioPct} % gastos
                 </span>
               </div>
-              <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className="flex h-3 w-full overflow-hidden rounded-full bg-[#EFECE4]">
                 <div
-                  className="bg-emerald-600 transition-all"
+                  className="chart-emerald transition-all"
                   style={{ width: `${profitRatioPct}%` }}
                 />
                 <div
-                  className="bg-amber-500 transition-all"
+                  className="chart-tangerine transition-all"
                   style={{ width: `${costRatioPct}%` }}
                 />
               </div>
@@ -673,8 +688,8 @@ export function ProfitabilityAnalysisModal({
 
             {/* Comparativa visual por obra cuando se ven todas */}
             {selectedScope === "all" && jobBreakdowns.length > 0 && (
-              <div className="space-y-1.5 border-t border-slate-100 pt-2.5">
-                <div className="font-bold text-slate-800">Beneficio neto por obra</div>
+              <div className="space-y-1.5 border-t border-[#E5DFD2] pt-2.5">
+                <div className="font-bold text-[#2C2621]">Beneficio neto por obra</div>
                 {(() => {
                   const maxAbsProfit = Math.max(
                     100,
@@ -690,24 +705,24 @@ export function ProfitabilityAnalysisModal({
                         key={b.job.id}
                         type="button"
                         onClick={() => setSelectedScope(b.job.id)}
-                        className="block w-full text-left space-y-0.5 rounded-lg p-1 hover:bg-slate-50"
+                        className="block w-full text-left space-y-0.5 rounded-lg p-1 hover:bg-[#F5F1E6] cursor-pointer"
                       >
                         <div className="flex justify-between text-[11px]">
-                          <span className="truncate font-semibold text-slate-800 pr-2">
+                          <span className="truncate font-mono font-semibold text-[#2C2621] pr-2">
                             {b.job.job_code} · {b.job.title}
                           </span>
                           <span
-                            className={`shrink-0 font-bold ${
-                              b.netProfitCents >= 0 ? "text-emerald-700" : "text-rose-700"
+                            className={`shrink-0 font-mono font-bold tabular-nums ${
+                              b.netProfitCents >= 0 ? "text-[#14532D]" : "text-[#9A2D08]"
                             }`}
                           >
                             {formatCentsEs(b.netProfitCents)}
                           </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE4]">
                           <div
                             className={`h-full rounded-full ${
-                              b.netProfitCents >= 0 ? "bg-emerald-500" : "bg-rose-500"
+                              b.netProfitCents >= 0 ? "chart-emerald" : "chart-tangerine"
                             }`}
                             style={{ width: `${widthPct}%` }}
                           />
@@ -722,7 +737,7 @@ export function ProfitabilityAnalysisModal({
 
           {/* 3. Tabla financiera detallada (modern-web-guidance: responsive-table) */}
           <section className="space-y-2">
-            <div className="font-extrabold text-slate-900">
+            <div className="font-bold text-[#2C2621]">
               {focused ? "Movimientos de la obra" : "Tabla de rentabilidad por obra"}
             </div>
             <div
@@ -730,14 +745,14 @@ export function ProfitabilityAnalysisModal({
               role="region"
               aria-labelledby="profit-table-caption"
               data-testid="profitability-data-table"
-              className="table-wrapper responsive-stack rounded-2xl border border-slate-200 bg-white"
+              className="table-wrapper responsive-stack rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7]"
             >
               {!focused ? (
                 <table className="text-left text-[11px]">
                   <caption id="profit-table-caption" className="sr-only">
                     Tabla comparativa de facturación, gastos y beneficio neto por obra
                   </caption>
-                  <thead className="bg-slate-100 text-slate-700">
+                  <thead className="bg-[#EFECE4] text-[#6B6860]">
                     <tr>
                       <th className="px-2.5 py-2 font-bold">Obra</th>
                       <th className="px-2.5 py-2 font-bold">Facturado</th>
@@ -745,28 +760,28 @@ export function ProfitabilityAnalysisModal({
                       <th className="px-2.5 py-2 font-bold">Beneficio</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[#E5DFD2]">
                     {jobBreakdowns.map((b) => (
                       <tr key={b.job.id}>
-                        <th scope="row" className="px-2.5 py-2 font-bold text-slate-900">
+                        <th scope="row" className="px-2.5 py-2 font-bold text-[#2C2621]">
                           <button
                             type="button"
                             onClick={() => setSelectedScope(b.job.id)}
-                            className="text-left text-orange-700 hover:underline"
+                            className="text-left font-mono text-[#D04B00] hover:underline cursor-pointer"
                           >
                             {b.job.job_code} · {b.job.title}
                           </button>
                         </th>
-                        <td data-label="Facturado" className="px-2.5 py-2 text-slate-700">
+                        <td data-label="Facturado" className="px-2.5 py-2 font-mono text-[#2C2621] tabular-nums">
                           {formatCentsEs(b.invoicedBaseCents)}
                         </td>
-                        <td data-label="Gastos" className="px-2.5 py-2 text-amber-800">
+                        <td data-label="Gastos" className="px-2.5 py-2 font-mono text-[#9A2D08] tabular-nums">
                           {formatCentsEs(b.ticketsBaseCents)}
                         </td>
                         <td
                           data-label="Beneficio"
-                          className={`px-2.5 py-2 font-extrabold ${
-                            b.netProfitCents >= 0 ? "text-emerald-700" : "text-rose-700"
+                          className={`px-2.5 py-2 font-mono font-bold tabular-nums ${
+                            b.netProfitCents >= 0 ? "text-[#14532D]" : "text-[#9A2D08]"
                           }`}
                         >
                           {formatCentsEs(b.netProfitCents)} ({b.marginPct}%)
@@ -780,7 +795,7 @@ export function ProfitabilityAnalysisModal({
                   <caption id="profit-table-caption" className="sr-only">
                     Tabla de facturas y tickets de gasto de la obra seleccionada
                   </caption>
-                  <thead className="bg-slate-100 text-slate-700">
+                  <thead className="bg-[#EFECE4] text-[#6B6860]">
                     <tr>
                       <th className="px-2.5 py-2 font-bold">Concepto</th>
                       <th className="px-2.5 py-2 font-bold">Fecha</th>
@@ -788,10 +803,10 @@ export function ProfitabilityAnalysisModal({
                       <th className="px-2.5 py-2 font-bold">Estado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[#E5DFD2]">
                     {focused.jobInvoices.map((inv) => (
                       <tr key={inv.id}>
-                        <th scope="row" className="px-2.5 py-2 font-bold text-slate-900">
+                        <th scope="row" className="px-2.5 py-2 font-bold text-[#2C2621]">
                           {onOpenInvoice ? (
                             <button
                               type="button"
@@ -799,7 +814,7 @@ export function ProfitabilityAnalysisModal({
                                 onClose();
                                 onOpenInvoice(inv.id);
                               }}
-                              className="text-left text-on-primary-container hover:underline cursor-pointer"
+                              className="text-left font-mono text-[#D04B00] hover:underline cursor-pointer"
                             >
                               Factura {inv.invoice_number}
                             </button>
@@ -807,20 +822,20 @@ export function ProfitabilityAnalysisModal({
                             <>Factura {inv.invoice_number}</>
                           )}
                         </th>
-                        <td data-label="Fecha" className="px-2.5 py-2 text-slate-600">
+                        <td data-label="Fecha" className="px-2.5 py-2 font-mono text-[#6B6860] tabular-nums">
                           {inv.issued_at_iso}
                         </td>
-                        <td data-label="Base" className="px-2.5 py-2 font-bold text-emerald-700">
+                        <td data-label="Base" className="px-2.5 py-2 font-mono font-bold text-[#14532D] tabular-nums">
                           +{formatCentsEs(inv.base_cents)}
                         </td>
-                        <td data-label="Estado" className="px-2.5 py-2 capitalize text-slate-700">
+                        <td data-label="Estado" className="px-2.5 py-2 capitalize text-[#2C2621]">
                           {inv.status.replace("_", " ")}
                         </td>
                       </tr>
                     ))}
                     {focused.jobTickets.map((t) => (
                       <tr key={t.id}>
-                        <th scope="row" className="px-2.5 py-2 font-bold text-slate-900">
+                        <th scope="row" className="px-2.5 py-2 font-bold text-[#2C2621]">
                           {onOpenTicket ? (
                             <button
                               type="button"
@@ -828,7 +843,7 @@ export function ProfitabilityAnalysisModal({
                                 onClose();
                                 onOpenTicket(t.id);
                               }}
-                              className="text-left text-on-primary-container hover:underline cursor-pointer"
+                              className="text-left text-[#D04B00] hover:underline cursor-pointer"
                             >
                               Ticket · {t.supplier_name}
                             </button>
@@ -836,20 +851,20 @@ export function ProfitabilityAnalysisModal({
                             <>Ticket · {t.supplier_name}</>
                           )}
                         </th>
-                        <td data-label="Fecha" className="px-2.5 py-2 text-slate-600">
+                        <td data-label="Fecha" className="px-2.5 py-2 font-mono text-[#6B6860] tabular-nums">
                           {t.issue_date_iso}
                         </td>
-                        <td data-label="Base" className="px-2.5 py-2 font-bold text-amber-800">
+                        <td data-label="Base" className="px-2.5 py-2 font-mono font-bold text-[#9A2D08] tabular-nums">
                           -{formatCentsEs(t.base_cents)}
                         </td>
-                        <td data-label="Estado" className="px-2.5 py-2 capitalize text-slate-700">
+                        <td data-label="Estado" className="px-2.5 py-2 capitalize text-[#2C2621]">
                           {t.category}
                         </td>
                       </tr>
                     ))}
                     {focused.jobInvoices.length === 0 && focused.jobTickets.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-3 py-3 text-center text-slate-500">
+                        <td colSpan={4} className="px-3 py-3 text-center text-[#6B6860]">
                           No hay facturas ni tickets imputados aún en esta obra.
                         </td>
                       </tr>

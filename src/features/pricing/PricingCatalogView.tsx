@@ -17,7 +17,7 @@ interface PricingCatalogViewProps {
 
 export function PricingCatalogView(props: PricingCatalogViewProps) {
   return (
-    <div data-testid="pricing-catalog-view" className="flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 bg-surface">
+    <div data-testid="pricing-catalog-view" className="cotton-paper flex flex-1 flex-col overflow-y-auto no-scrollbar p-4 bg-[#F9F7F2] text-[#2C2621] font-sans">
       <PricingCatalogPanel {...props} />
     </div>
   );

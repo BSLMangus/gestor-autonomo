@@ -58,7 +58,9 @@ const workerPdfMock: PdfPort = {
         ? input.quoteCode
         : input.kind === "invoice"
           ? input.invoiceNumber
-          : input.codigoActa;
+          : input.kind === "work_order"
+            ? input.documentCode
+            : input.codigoActa;
     return {
       pdfBytes: new TextEncoder().encode(`%PDF-1.4\n%EVAL ${label}\n%%EOF`),
       fileName: `${label}.pdf`,
