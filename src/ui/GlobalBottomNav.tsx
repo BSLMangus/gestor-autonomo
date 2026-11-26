@@ -61,9 +61,9 @@ export function GlobalBottomNav({
         data-testid="global-nav-camera-btn"
         disabled={isSubmitting}
         onClick={onTriggerCamera}
-        className="flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-3 text-[#6B6860] hover:text-[#2C2621] transition-colors disabled:opacity-45 cursor-pointer"
+        className="flex min-w-[64px] min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-3 bg-[#CBE4F9]/75 text-[#143552] border border-[#4B7094]/25 shadow-[0_1px_3px_rgba(44,38,33,0.06)] hover:bg-[#CBE4F9] transition-colors disabled:opacity-45 cursor-pointer"
       >
-        <Camera className="h-[22px] w-[22px]" strokeWidth={1.9} aria-hidden="true" />
+        <Camera className="h-[22px] w-[22px]" strokeWidth={2.1} aria-hidden="true" />
         <span className="text-[11px] leading-[14px] font-semibold tracking-[0.2px]">
           Cámara
         </span>

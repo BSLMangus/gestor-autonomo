@@ -263,4 +263,66 @@ describe("Tarifario Dinámico, Plantillas, Importador IA, Migración y Módulos 
     const qSearch = await quotesRepo.listPaginated({ search: "garcia" });
     expect(qSearch.totalCount).toBeGreaterThanOrEqual(1);
   });
+
+  it("activatePredefinedTemplate respeta precio por defecto, guarda precio personalizado como fixed, reactiva inactivas y rechaza <= 0", async () => {
+    await settingsRepo.getAppSettings();
+    // tpl_cambio_grifo: 1h * 38,00 € + 51,00 € materiales = 89,00 € (8900 céntimos), modo hourly_plus_materials
+    const tplGrifo = PREDEFINED_CATALOG_TEMPLATES.find((t) => t.template_id === "tpl_cambio_grifo")!;
+    // tpl_punto_luz: 1h * 38,00 € + 14,00 € materiales = 52,00 € (5200 céntimos), modo hourly_plus_materials
+    const tplPuntoLuz = PREDEFINED_CATALOG_TEMPLATES.find((t) => t.template_id === "tpl_punto_luz")!;
+
+    // 1. Activar con precio por defecto (sin options y con options coincidente) preserva hourly_plus_materials
+    const defaultRes = await catalogRepo.activatePredefinedTemplate(tplGrifo, 3800, {
+      customUnitPriceCents: 8900,
+    });
+    expect(defaultRes.createdOrReactivated).toBe(true);
+    expect(defaultRes.item.unit_price_cents).toBe(8900);
+    expect(defaultRes.item.pricing_mode).toBe("hourly_plus_materials");
+    expect(defaultRes.item.estimated_hours_thousandths).toBe(1000);
+    expect(defaultRes.item.materials_cents).toBe(5100);
+
+    // 2. Activar con precio personalizado cambia a fixed con 0 horas y 0 materiales
+    const customRes = await catalogRepo.activatePredefinedTemplate(tplPuntoLuz, 3800, {
+      customUnitPriceCents: 10550,
+    });
+    expect(customRes.createdOrReactivated).toBe(true);
+    expect(customRes.item.unit_price_cents).toBe(10550);
+    expect(customRes.item.pricing_mode).toBe("fixed");
+    expect(customRes.item.estimated_hours_thousandths).toBe(0);
+    expect(customRes.item.materials_cents).toBe(0);
+
+    // Subir tarifa base a 50 €/h -> la partida personalizada fixed NO se recalcula; la de por defecto SÍ
+    await settingsRepo.updateHourlyRate(5000);
+    const grifoAfterRate = await catalogRepo.getById(defaultRes.item.id);
+    const puntoLuzAfterRate = await catalogRepo.getById(customRes.item.id);
+    expect(grifoAfterRate?.unit_price_cents).toBe(10100);
+    expect(puntoLuzAfterRate?.unit_price_cents).toBe(10550);
+
+    // 3. Desactivar y reactivar partida existente inactiva con precio personalizado
+    await catalogRepo.deactivate(defaultRes.item.id);
+    const inactiveCheck = await catalogRepo.getById(defaultRes.item.id);
+    expect(inactiveCheck?.active).toBe(0);
+
+    const reactivatedCustom = await catalogRepo.activatePredefinedTemplate(tplGrifo, 5000, {
+      customUnitPriceCents: 12345,
+    });
+    expect(reactivatedCustom.createdOrReactivated).toBe(true);
+    expect(reactivatedCustom.item.id).toBe(defaultRes.item.id);
+    expect(reactivatedCustom.item.active).toBe(1);
+    expect(reactivatedCustom.item.unit_price_cents).toBe(12345);
+    expect(reactivatedCustom.item.pricing_mode).toBe("fixed");
+    expect(reactivatedCustom.item.estimated_hours_thousandths).toBe(0);
+    expect(reactivatedCustom.item.materials_cents).toBe(0);
+
+    // 4. Rechaza <= 0 céntimos o no entero
+    await expect(
+      catalogRepo.activatePredefinedTemplate(tplGrifo, 3800, { customUnitPriceCents: 0 })
+    ).rejects.toThrow(/SCHEMA_VALIDATION_ERROR/);
+    await expect(
+      catalogRepo.activatePredefinedTemplate(tplGrifo, 3800, { customUnitPriceCents: -250 })
+    ).rejects.toThrow(/SCHEMA_VALIDATION_ERROR/);
+    await expect(
+      catalogRepo.activatePredefinedTemplate(tplGrifo, 3800, { customUnitPriceCents: 12.5 })
+    ).rejects.toThrow(/SCHEMA_VALIDATION_ERROR/);
+  });
 });

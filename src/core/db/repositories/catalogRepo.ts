@@ -246,12 +246,31 @@ export class CatalogRepository {
 
   async activatePredefinedTemplate(
     template: PredefinedCatalogTemplate,
-    hourlyRateCents?: number
+    hourlyRateCents?: number,
+    options?: { customUnitPriceCents?: number }
   ): Promise<{ item: CatalogItemRow; createdOrReactivated: boolean }> {
     const rate = hourlyRateCents ?? (await this.getCurrentHourlyRateCents());
+    const defaultPriceCents = computeTemplatePreviewPriceCents(template, rate);
+
+    if (options?.customUnitPriceCents !== undefined) {
+      if (
+        !Number.isInteger(options.customUnitPriceCents) ||
+        options.customUnitPriceCents <= 0
+      ) {
+        throw new Error("SCHEMA_VALIDATION_ERROR: El precio unitario debe ser > 0 céntimos");
+      }
+    }
+
+    const hasCustomOverride =
+      options?.customUnitPriceCents !== undefined &&
+      options.customUnitPriceCents !== defaultPriceCents;
+    const unitPriceCents = hasCustomOverride ? options!.customUnitPriceCents! : defaultPriceCents;
+    const pricingMode: CatalogPricingMode = hasCustomOverride ? "fixed" : template.pricing_mode;
+    const estimatedHoursThousandths = hasCustomOverride ? 0 : template.estimated_hours_thousandths;
+    const materialsCents = hasCustomOverride ? 0 : template.materials_cents;
+
     const allRows = await this.executor.query<CatalogItemRow>(`SELECT * FROM catalog_items`);
     const existing = findMatchingCatalogItemForTemplate(template, allRows);
-    const unitPriceCents = computeTemplatePreviewPriceCents(template, rate);
 
     if (existing) {
       if (Number(existing.active) === 1) {
@@ -268,9 +287,9 @@ export class CatalogRepository {
           template.category,
           template.unit,
           unitPriceCents,
-          template.pricing_mode,
-          template.estimated_hours_thousandths,
-          template.materials_cents,
+          pricingMode,
+          estimatedHoursThousandths,
+          materialsCents,
           template.default_vat_rate,
           now,
           existing.id,
@@ -288,9 +307,9 @@ export class CatalogRepository {
         category: template.category,
         unit: template.unit,
         unit_price_cents: unitPriceCents,
-        pricing_mode: template.pricing_mode,
-        estimated_hours_thousandths: template.estimated_hours_thousandths,
-        materials_cents: template.materials_cents,
+        pricing_mode: pricingMode,
+        estimated_hours_thousandths: estimatedHoursThousandths,
+        materials_cents: materialsCents,
         default_vat_rate: template.default_vat_rate,
       },
       idTaken ? undefined : template.template_id

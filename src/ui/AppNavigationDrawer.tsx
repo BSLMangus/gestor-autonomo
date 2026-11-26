@@ -12,6 +12,7 @@ import {
   Plus,
   Settings,
   Sliders,
+  Trash2,
   Users,
   Wrench,
   X,
@@ -29,6 +30,7 @@ interface AppNavigationDrawerProps {
   onNavigate: (route: AppRoute) => void;
   onSelectThread: (threadId: string) => Promise<void>;
   onCreateThread: () => Promise<void>;
+  onRequestDeleteThread?: (thread: ChatThreadRecord) => void;
   onLogout?: () => Promise<void>;
 }
 
@@ -65,6 +67,7 @@ export function AppNavigationDrawer({
   onNavigate,
   onSelectThread,
   onCreateThread,
+  onRequestDeleteThread,
   onLogout,
 }: AppNavigationDrawerProps) {
   if (!open) return null;
@@ -188,12 +191,9 @@ export function AppNavigationDrawer({
                         ? "Con incidencia"
                         : "Hilo";
                 return (
-                  <button
+                  <div
                     key={thr.thread_id}
-                    type="button"
-                    data-testid={`thread-item-${thr.thread_id}`}
-                    onClick={() => void onSelectThread(thr.thread_id)}
-                    className={`w-full rounded-2xl border p-3 text-left transition-colors cursor-pointer ${
+                    className={`flex items-center gap-1.5 rounded-2xl border transition-colors ${
                       thr.status === "interrupted"
                         ? "postit-note postit-yellow tilt-subtle-left border-[#E6B84C]/50"
                         : isActive
@@ -201,23 +201,43 @@ export function AppNavigationDrawer({
                           : "border-transparent bg-[#FFFDF7]/90 hover:bg-[#F5F1E6]"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[14px] font-semibold text-[#2C2621]">
-                        {formatDisplayThreadTitle(thr.title)}
-                      </span>
-                      {thr.status === "interrupted" && (
-                        <span className="shrink-0 rounded-full status-tangerine px-2 py-0.5 text-[10px] font-semibold">
-                          Pendiente
+                    <button
+                      type="button"
+                      data-testid={`thread-item-${thr.thread_id}`}
+                      onClick={() => void onSelectThread(thr.thread_id)}
+                      className="min-w-0 flex-1 p-3 text-left cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-[14px] font-semibold text-[#2C2621]">
+                          {formatDisplayThreadTitle(thr.title)}
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-[#6B6860]">
-                      <span className={thr.status === "interrupted" ? "text-[#3E3300]" : ""}>
-                        {statusLabel}
-                      </span>
-                      <span>{thr.active_job_id ? "Con obra vinculada" : "General"}</span>
-                    </div>
-                  </button>
+                        {thr.status === "interrupted" && (
+                          <span className="shrink-0 rounded-full status-tangerine px-2 py-0.5 text-[10px] font-semibold">
+                            Pendiente
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-[#6B6860]">
+                        <span className={thr.status === "interrupted" ? "text-[#3E3300]" : ""}>
+                          {statusLabel}
+                        </span>
+                        <span>{thr.active_job_id ? "Con obra vinculada" : "General"}</span>
+                      </div>
+                    </button>
+                    {onRequestDeleteThread && (
+                      <button
+                        type="button"
+                        data-testid={`drawer-delete-thread-${thr.thread_id}`}
+                        aria-label={`Eliminar conversación ${formatDisplayThreadTitle(thr.title)}`}
+                        title="Eliminar conversación"
+                        disabled={thr.status === "running"}
+                        onClick={() => onRequestDeleteThread(thr)}
+                        className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#DC2626]/25 bg-[#FAD2D8]/55 text-[#DC2626] hover:bg-[#FAD2D8] transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
               {threads.length === 0 && (

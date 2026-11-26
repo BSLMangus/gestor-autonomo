@@ -1,4 +1,4 @@
-import { Calculator, Clock, FileUp, Plus, Sliders, Sparkles } from "lucide-react";
+import { Calculator, ChevronDown, Clock, FileUp, Plus, Sliders, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInferenceAdapter";
 import {
@@ -37,6 +37,7 @@ import {
   computeCatalogUnitPriceCents,
   formatPricingBreakdown,
 } from "../../core/pricing/pricingEngine";
+import { ActivateCatalogItemModal } from "./ActivateCatalogItemModal";
 import { analyzeDocumentsForCatalog } from "./documentImportPipeline";
 
 interface PricingCatalogPanelProps {
@@ -132,6 +133,8 @@ export function PricingCatalogPanel({
 
   const [busy, setBusy] = useState(false);
   const [importingDocs, setImportingDocs] = useState(false);
+  const [templatePendingActivate, setTemplatePendingActivate] =
+    useState<PredefinedCatalogTemplate | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [schedUndoStack, setSchedUndoStack] = useState<WorkScheduleDefaults[]>([]);
@@ -269,15 +272,18 @@ export function PricingCatalogPanel({
     }
   };
 
-  const handleActivateTemplate = async (tpl: PredefinedCatalogTemplate) => {
+  const handleConfirmActivateTemplate = async (customUnitPriceCents: number) => {
+    if (!templatePendingActivate) return;
     setErrorMsg(null);
     setStatusMsg(null);
     setBusy(true);
     try {
       const res = await new CatalogRepository(executor).activatePredefinedTemplate(
-        tpl,
-        hourlyRateCents
+        templatePendingActivate,
+        hourlyRateCents,
+        { customUnitPriceCents }
       );
+      setTemplatePendingActivate(null);
       await loadData();
       await onDataChanged();
       setStatusMsg(
@@ -418,7 +424,7 @@ export function PricingCatalogPanel({
       {/* 1b. Mi Horario Habitual de Trabajo (vinculado al Calendario) */}
       <section
         data-testid="pricing-work-schedule-section"
-        className="relative ruled-notebook rounded-[20px] border border-[#E5DFD2] p-4 pl-10 flex flex-col gap-3"
+        className="relative ruled-notebook overflow-hidden rounded-[20px] border border-[#E5DFD2] p-4 pl-10 flex flex-col gap-3"
       >
         <span className="absolute left-2.5 top-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
         <span className="absolute left-2.5 bottom-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
@@ -512,63 +518,87 @@ export function PricingCatalogPanel({
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
-            <div className="flex flex-col pl-1">
+          <div className="flex items-center justify-between gap-2 w-full min-w-0 overflow-hidden bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
+            <div className="flex flex-col pl-1 shrink-0 min-w-[52px]">
               <span className="text-[12px] font-semibold text-[#2C2621]">Mañana</span>
               <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
                 {formatThousandthsHours(dailyScheduleBreakdown.morningThousandths)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="time"
-                aria-label="Inicio mañana"
-                value={workSchedule.morning_start}
-                onChange={(e) =>
-                  void handleUpdateWorkSchedule({ ...workSchedule, morning_start: e.target.value })
-                }
-                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
-              />
-              <span className="text-[#6B6860]">–</span>
-              <input
-                type="time"
-                aria-label="Fin mañana"
-                value={workSchedule.morning_end}
-                onChange={(e) =>
-                  void handleUpdateWorkSchedule({ ...workSchedule, morning_end: e.target.value })
-                }
-                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
-              />
+            <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
+              <div className="relative flex-1 min-w-0 max-w-[115px]">
+                <input
+                  type="time"
+                  aria-label="Inicio mañana"
+                  value={workSchedule.morning_start}
+                  onChange={(e) =>
+                    void handleUpdateWorkSchedule({ ...workSchedule, morning_start: e.target.value })
+                  }
+                  className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                />
+                <ChevronDown
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                  aria-hidden="true"
+                />
+              </div>
+              <span className="shrink-0 text-[#6B6860]">–</span>
+              <div className="relative flex-1 min-w-0 max-w-[115px]">
+                <input
+                  type="time"
+                  aria-label="Fin mañana"
+                  value={workSchedule.morning_end}
+                  onChange={(e) =>
+                    void handleUpdateWorkSchedule({ ...workSchedule, morning_end: e.target.value })
+                  }
+                  className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                />
+                <ChevronDown
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
-            <div className="flex flex-col pl-1">
+          <div className="flex items-center justify-between gap-2 w-full min-w-0 overflow-hidden bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
+            <div className="flex flex-col pl-1 shrink-0 min-w-[52px]">
               <span className="text-[12px] font-semibold text-[#2C2621]">Tarde</span>
               <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
                 {formatThousandthsHours(dailyScheduleBreakdown.afternoonThousandths)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="time"
-                aria-label="Inicio tarde"
-                value={workSchedule.afternoon_start}
-                onChange={(e) =>
-                  void handleUpdateWorkSchedule({ ...workSchedule, afternoon_start: e.target.value })
-                }
-                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
-              />
-              <span className="text-[#6B6860]">–</span>
-              <input
-                type="time"
-                aria-label="Fin tarde"
-                value={workSchedule.afternoon_end}
-                onChange={(e) =>
-                  void handleUpdateWorkSchedule({ ...workSchedule, afternoon_end: e.target.value })
-                }
-                className="min-h-[40px] px-2 rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] font-mono text-[12px] text-[#2C2621] tabular-nums focus:border-[#EA580C] focus:outline-none"
-              />
+            <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
+              <div className="relative flex-1 min-w-0 max-w-[115px]">
+                <input
+                  type="time"
+                  aria-label="Inicio tarde"
+                  value={workSchedule.afternoon_start}
+                  onChange={(e) =>
+                    void handleUpdateWorkSchedule({ ...workSchedule, afternoon_start: e.target.value })
+                  }
+                  className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                />
+                <ChevronDown
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                  aria-hidden="true"
+                />
+              </div>
+              <span className="shrink-0 text-[#6B6860]">–</span>
+              <div className="relative flex-1 min-w-0 max-w-[115px]">
+                <input
+                  type="time"
+                  aria-label="Fin tarde"
+                  value={workSchedule.afternoon_end}
+                  onChange={(e) =>
+                    void handleUpdateWorkSchedule({ ...workSchedule, afternoon_end: e.target.value })
+                  }
+                  className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                />
+                <ChevronDown
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -674,24 +704,34 @@ export function PricingCatalogPanel({
                     <div className="break-words text-[10px] text-[#6B6860]">
                       {tpl.category} · {tpl.unit} · IVA {tpl.default_vat_rate} % ·{" "}
                       {formatPricingBreakdown({
-                        pricing_mode: tpl.pricing_mode,
-                        estimated_hours_thousandths: tpl.estimated_hours_thousandths,
-                        materials_cents: tpl.materials_cents,
+                        pricing_mode: isActive ? matched.pricing_mode : tpl.pricing_mode,
+                        estimated_hours_thousandths: isActive
+                          ? matched.estimated_hours_thousandths
+                          : tpl.estimated_hours_thousandths,
+                        materials_cents: isActive ? matched.materials_cents : tpl.materials_cents,
                         hourly_rate_cents: hourlyRateCents,
-                        unit_price_cents: previewPrice,
+                        unit_price_cents: isActive ? matched.unit_price_cents : previewPrice,
                       })}
                     </div>
                   </div>
                   {isActive ? (
-                    <span className="status-emerald shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      data-testid={`deactivate-tpl-${tpl.template_id}`}
+                      aria-label={`Desactivar ${tpl.description}`}
+                      title="Pulsa para desactivar"
+                      disabled={busy}
+                      onClick={() => void handleDeactivateItem(matched.id)}
+                      className="status-emerald shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold cursor-pointer hover:opacity-85 transition-opacity"
+                    >
                       Activa
-                    </span>
+                    </button>
                   ) : (
                     <button
                       type="button"
                       data-testid={`activate-tpl-${tpl.template_id}`}
                       disabled={busy}
-                      onClick={() => void handleActivateTemplate(tpl)}
+                      onClick={() => setTemplatePendingActivate(tpl)}
                       className="shrink-0 rounded-lg bg-[#4B7094] px-2.5 py-1.5 text-[11px] font-bold text-[#FFFDF9] cursor-pointer"
                     >
                       Activar
@@ -1024,6 +1064,24 @@ export function PricingCatalogPanel({
           )}
         </div>
       </section>
+
+      <ActivateCatalogItemModal
+        open={templatePendingActivate !== null}
+        template={templatePendingActivate}
+        defaultPriceCents={
+          templatePendingActivate
+            ? computeTemplatePreviewPriceCents(templatePendingActivate, hourlyRateCents)
+            : 0
+        }
+        busy={busy}
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!busy) {
+            setTemplatePendingActivate(null);
+          }
+        }}
+        onConfirm={handleConfirmActivateTemplate}
+      />
     </div>
   );
 }

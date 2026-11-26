@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import type {
   ActiveWidgetEnvelope,
   ChatMessageRecord,
@@ -13,6 +14,8 @@ interface ChatTimelineViewProps {
   checkpointStatus: "idle" | "interrupted";
   activeInterrupt: InterruptPayload | null;
   isSubmitting: boolean;
+  canDeleteThread?: boolean;
+  onRequestDeleteThread?: () => void;
   onQuickAction: (action: QuickAction) => Promise<void>;
   onOpenWidget: (params: {
     widget: ActiveWidgetEnvelope;
@@ -27,6 +30,8 @@ export function ChatTimelineView({
   checkpointStatus,
   activeInterrupt,
   isSubmitting,
+  canDeleteThread = false,
+  onRequestDeleteThread,
   onQuickAction,
   onOpenWidget,
 }: ChatTimelineViewProps) {
@@ -49,18 +54,33 @@ export function ChatTimelineView({
       data-testid="chat-timeline"
       className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-3 bg-[#F9F7F2] cotton-paper text-[#2C2621] font-sans"
     >
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-[12px] font-semibold uppercase tracking-wide text-[#6B6860]">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h2 className="min-w-0 truncate text-[12px] font-semibold uppercase tracking-wide text-[#6B6860]">
           {threadTitle}
         </h2>
-        {checkpointStatus === "interrupted" && activeInterrupt && (
-          <span
-            data-testid="active-hitl-pill"
-            className="rounded-full status-tangerine px-2.5 py-0.5 text-[11px] font-semibold"
-          >
-            Pendiente de tu confirmación
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {checkpointStatus === "interrupted" && activeInterrupt && (
+            <span
+              data-testid="active-hitl-pill"
+              className="rounded-full status-tangerine px-2.5 py-0.5 text-[11px] font-semibold"
+            >
+              Pendiente de tu confirmación
+            </span>
+          )}
+          {canDeleteThread && onRequestDeleteThread && (
+            <button
+              type="button"
+              data-testid="chat-header-delete-thread-btn"
+              aria-label="Eliminar conversación actual"
+              title="Eliminar conversación"
+              disabled={isSubmitting}
+              onClick={onRequestDeleteThread}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#DC2626]/25 bg-[#FAD2D8]/55 text-[#DC2626] hover:bg-[#FAD2D8] transition-colors cursor-pointer disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {messages.length === 0 ? (

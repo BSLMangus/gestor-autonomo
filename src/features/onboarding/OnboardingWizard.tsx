@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Calculator,
   Check,
+  ChevronDown,
   Clock,
   FileUp,
   ImagePlus,
@@ -637,7 +638,7 @@ export function OnboardingWizard({
             </section>
 
             {/* Horario habitual */}
-            <section className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
+            <section className="paper-sheet overflow-hidden rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-[#D04B00]" />
@@ -675,53 +676,87 @@ export function OnboardingWizard({
                 })}
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2">
-                  <span className="font-semibold text-[#2C2621]">Mañana</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="time"
-                      aria-label="Inicio mañana"
-                      value={workSchedule.morning_start}
-                      onChange={(e) =>
-                        setWorkSchedule((p) => ({ ...p, morning_start: e.target.value }))
-                      }
-                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
-                    />
-                    <span>–</span>
-                    <input
-                      type="time"
-                      aria-label="Fin mañana"
-                      value={workSchedule.morning_end}
-                      onChange={(e) =>
-                        setWorkSchedule((p) => ({ ...p, morning_end: e.target.value }))
-                      }
-                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
-                    />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2 w-full min-w-0 overflow-hidden bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
+                  <div className="flex flex-col pl-1 shrink-0 min-w-[52px]">
+                    <span className="text-[12px] font-semibold text-[#2C2621]">Mañana</span>
+                    <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
+                      {(dailyBreakdown.morningThousandths / 1000).toFixed(1).replace(/\.0$/, "")} h
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
+                    <div className="relative flex-1 min-w-0 max-w-[115px]">
+                      <input
+                        type="time"
+                        aria-label="Inicio mañana"
+                        value={workSchedule.morning_start}
+                        onChange={(e) =>
+                          setWorkSchedule((p) => ({ ...p, morning_start: e.target.value }))
+                        }
+                        className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                      />
+                      <ChevronDown
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <span className="shrink-0 text-[#6B6860]">–</span>
+                    <div className="relative flex-1 min-w-0 max-w-[115px]">
+                      <input
+                        type="time"
+                        aria-label="Fin mañana"
+                        value={workSchedule.morning_end}
+                        onChange={(e) =>
+                          setWorkSchedule((p) => ({ ...p, morning_end: e.target.value }))
+                        }
+                        className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                      />
+                      <ChevronDown
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                        aria-hidden="true"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2">
-                  <span className="font-semibold text-[#2C2621]">Tarde</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="time"
-                      aria-label="Inicio tarde"
-                      value={workSchedule.afternoon_start}
-                      onChange={(e) =>
-                        setWorkSchedule((p) => ({ ...p, afternoon_start: e.target.value }))
-                      }
-                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
-                    />
-                    <span>–</span>
-                    <input
-                      type="time"
-                      aria-label="Fin tarde"
-                      value={workSchedule.afternoon_end}
-                      onChange={(e) =>
-                        setWorkSchedule((p) => ({ ...p, afternoon_end: e.target.value }))
-                      }
-                      className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-1.5 py-1 font-mono text-[11px] text-[#2C2621]"
-                    />
+                <div className="flex items-center justify-between gap-2 w-full min-w-0 overflow-hidden bg-[#F5F1E6] border border-[#E5DFD2] rounded-2xl p-2.5">
+                  <div className="flex flex-col pl-1 shrink-0 min-w-[52px]">
+                    <span className="text-[12px] font-semibold text-[#2C2621]">Tarde</span>
+                    <span className="text-[11px] font-mono tabular-nums text-[#6B6860]">
+                      {(dailyBreakdown.afternoonThousandths / 1000).toFixed(1).replace(/\.0$/, "")} h
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
+                    <div className="relative flex-1 min-w-0 max-w-[115px]">
+                      <input
+                        type="time"
+                        aria-label="Inicio tarde"
+                        value={workSchedule.afternoon_start}
+                        onChange={(e) =>
+                          setWorkSchedule((p) => ({ ...p, afternoon_start: e.target.value }))
+                        }
+                        className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                      />
+                      <ChevronDown
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <span className="shrink-0 text-[#6B6860]">–</span>
+                    <div className="relative flex-1 min-w-0 max-w-[115px]">
+                      <input
+                        type="time"
+                        aria-label="Fin tarde"
+                        value={workSchedule.afternoon_end}
+                        onChange={(e) =>
+                          setWorkSchedule((p) => ({ ...p, afternoon_end: e.target.value }))
+                        }
+                        className="time-pill-input w-full min-w-0 min-h-[40px] appearance-none rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] pl-2.5 pr-6 py-2 font-mono text-[12px] font-medium text-[#2C2621] tabular-nums text-center focus:border-[#EA580C] focus:outline-none"
+                      />
+                      <ChevronDown
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B6860]"
+                        aria-hidden="true"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

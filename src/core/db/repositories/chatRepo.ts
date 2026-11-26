@@ -237,6 +237,27 @@ export class ChatRepository {
     };
   }
 
+  async deleteThread(threadId: string): Promise<void> {
+    const existing = await this.getThread(threadId);
+    if (!existing) return;
+    if (existing.status === "running") {
+      throw new Error(
+        "INVALID_STATE_TRANSITION: No se puede borrar una conversación en ejecución"
+      );
+    }
+    await this.executor.inTransaction(async (tx) => {
+      await tx.run(
+        `UPDATE app_settings SET last_active_thread_id = NULL, updated_at_ms = ?
+         WHERE id = 1 AND last_active_thread_id = ?`,
+        [Date.now(), threadId]
+      );
+      await tx.run(`DELETE FROM recovered_drafts WHERE thread_id = ?`, [threadId]);
+      await tx.run(`DELETE FROM chat_messages WHERE thread_id = ?`, [threadId]);
+      await tx.run(`DELETE FROM chat_threads WHERE thread_id = ?`, [threadId]);
+      await this.checkpointsRepo.deleteThreadCheckpoints(threadId, tx);
+    });
+  }
+
   async deleteClosedThread(threadId: string): Promise<void> {
     const existing = await this.getThread(threadId);
     if (!existing) return;

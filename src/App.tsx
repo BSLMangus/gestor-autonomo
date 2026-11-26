@@ -66,6 +66,7 @@ import type { SiteLogService } from "./features/sitelog/siteLogService";
 import { UpdateBanner } from "./features/updates/UpdateBanner";
 import { AppNavigationDrawer } from "./ui/AppNavigationDrawer";
 import { BottomQuickBar } from "./ui/BottomQuickBar";
+import { ConfirmDeleteDialog } from "./ui/ConfirmDeleteDialog";
 import { GlobalCameraChoiceSheet } from "./ui/GlobalCameraChoiceSheet";
 import { GlobalVoiceOverlay } from "./ui/GlobalVoiceOverlay";
 import { GuardBanners } from "./ui/GuardBanners";
@@ -224,6 +225,12 @@ export function App({ runtime }: { runtime: AppRuntime }) {
   const [refreshTick, setRefreshTick] = useState(0);
   const [todayIso, setTodayIso] = useState<string>(() => getLocalTodayIso());
   const [superAdminUnlocked, setSuperAdminUnlocked] = useState(false);
+  const [threadPendingDelete, setThreadPendingDelete] = useState<{
+    thread: ChatThreadRecord;
+    source: "drawer" | "header";
+  } | null>(null);
+  const [deletingThread, setDeletingThread] = useState(false);
+  const [deleteThreadError, setDeleteThreadError] = useState<string | null>(null);
 
   const showCleanToast = useCallback((nextToast: ToastNotification) => {
     setToast(nextToast);
@@ -1049,6 +1056,52 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     });
   };
 
+  const handleConfirmDeleteThread = useCallback(async () => {
+    if (!threadPendingDelete) return;
+    const { thread: target, source } = threadPendingDelete;
+    setDeletingThread(true);
+    setDeleteThreadError(null);
+    try {
+      await chatRepo.deleteThread(target.thread_id);
+      if (activeThreadIdRef.current === target.thread_id) {
+        if (
+          protagonistOverlay &&
+          protagonistOverlay.kind === "a2ui" &&
+          protagonistOverlay.source === "thread"
+        ) {
+          setProtagonistOverlay(null);
+          setOverlayError(null);
+        }
+        await loadThreadsAndActive(null);
+        if (source === "header") {
+          navigate({ name: "home" });
+        }
+      } else {
+        const [allThreads, drafts] = await Promise.all([
+          chatRepo.listThreads(),
+          settingsRepo.listActiveRecoveredDrafts(),
+        ]);
+        setThreads(allThreads);
+        setRecoveredDrafts(drafts);
+      }
+      setRefreshTick((t) => t + 1);
+      setThreadPendingDelete(null);
+      showCleanToast({ message: "Conversación eliminada." });
+    } catch (err) {
+      setDeleteThreadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingThread(false);
+    }
+  }, [
+    threadPendingDelete,
+    chatRepo,
+    settingsRepo,
+    protagonistOverlay,
+    loadThreadsAndActive,
+    navigate,
+    showCleanToast,
+  ]);
+
   const visibleUpdateBanner =
     availableUpdate && !updateDismissed ? (
       <UpdateBanner
@@ -1236,6 +1289,15 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             checkpointStatus={checkpointStatus}
             activeInterrupt={activeInterrupt}
             isSubmitting={isSubmitting}
+            canDeleteThread={Boolean(activeThread)}
+            onRequestDeleteThread={
+              activeThread
+                ? () => {
+                    setDeleteThreadError(null);
+                    setThreadPendingDelete({ thread: activeThread, source: "header" });
+                  }
+                : undefined
+            }
             onQuickAction={handleQuickAction}
             onOpenWidget={(params) => openWidgetInOverlay({ ...params, source: "thread" })}
           />
@@ -1607,6 +1669,10 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           navigate({ name: "chat" });
           setDrawerOpen(false);
         }}
+        onRequestDeleteThread={(thr) => {
+          setDeleteThreadError(null);
+          setThreadPendingDelete({ thread: thr, source: "drawer" });
+        }}
       />
 
       <GlobalVoiceOverlay
@@ -1651,6 +1717,35 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           });
         }}
         onCloseOrReject={() => void handleCloseOrRejectOverlay()}
+      />
+
+      <ConfirmDeleteDialog
+        open={threadPendingDelete !== null}
+        dialogTestId="confirm-delete-thread-dialog"
+        confirmTestId="confirm-delete-thread-btn"
+        cancelTestId="cancel-delete-thread-btn"
+        title="Eliminar conversación"
+        description={`¿Seguro que quieres eliminar «${
+          threadPendingDelete?.thread.title
+            .replace(/\s*\((?:Pausa HITL|Validar Gate \d+)\)/gi, "")
+            .trim() || "Conversación"
+        }»? Se borrarán sus mensajes y borradores pendientes, pero las obras, presupuestos y facturas ya guardados se conservarán.`}
+        warningNote={
+          threadPendingDelete?.thread.status === "interrupted"
+            ? "Esta conversación tiene una acción pendiente de confirmar; al eliminarla se descartará el borrador pendiente."
+            : null
+        }
+        errorMsg={deleteThreadError}
+        confirmLabel="Sí, eliminar"
+        busy={deletingThread}
+        registerBackHandler={registerBackHandler}
+        onCancel={() => {
+          if (!deletingThread) {
+            setThreadPendingDelete(null);
+            setDeleteThreadError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteThread}
       />
     </>
     );
