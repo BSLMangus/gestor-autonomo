@@ -12,6 +12,7 @@ import {
   type PredefinedCatalogTemplate,
 } from "../../pricing/predefinedCatalog";
 import { computeCatalogUnitPriceCents } from "../../pricing/pricingEngine";
+import { sanitizeQuoteItemDescription } from "../../text/quoteDescriptionSanitizer";
 import { sanitizeFts5Query } from "../sqliteExecutor";
 
 export interface CatalogItemInput {
@@ -127,10 +128,6 @@ export class CatalogRepository {
   }
 
   async create(input: CatalogItemInput, idOverride?: string): Promise<CatalogItemRow> {
-    const desc = input.description.trim();
-    if (!desc) {
-      throw new Error("SCHEMA_VALIDATION_ERROR: Descripción obligatoria");
-    }
     const pricingMode: CatalogPricingMode = input.pricing_mode ?? "fixed";
     const estimatedHoursThousandths = Math.max(
       0,
@@ -153,6 +150,12 @@ export class CatalogRepository {
 
     if (!Number.isInteger(unitPriceCents) || unitPriceCents <= 0) {
       throw new Error("SCHEMA_VALIDATION_ERROR: El precio unitario debe ser > 0 céntimos");
+    }
+    const desc = sanitizeQuoteItemDescription(input.description, {
+      knownPricesCents: [unitPriceCents, input.unit_price_cents],
+    }).trim();
+    if (!desc) {
+      throw new Error("SCHEMA_VALIDATION_ERROR: Descripción obligatoria");
     }
     const now = Date.now();
     const id = idOverride ?? `cat_${crypto.randomUUID().slice(0, 12)}`;
@@ -186,10 +189,6 @@ export class CatalogRepository {
     if (!existing) {
       throw new Error("INVALID_STATE_TRANSITION: Partida no encontrada");
     }
-    const desc = input.description !== undefined ? input.description.trim() : existing.description;
-    if (!desc) {
-      throw new Error("SCHEMA_VALIDATION_ERROR: Descripción obligatoria");
-    }
     const pricingMode: CatalogPricingMode =
       input.pricing_mode ?? existing.pricing_mode ?? "fixed";
     const estimatedHoursThousandths = Math.max(
@@ -218,6 +217,18 @@ export class CatalogRepository {
 
     if (!Number.isInteger(price) || price <= 0) {
       throw new Error("SCHEMA_VALIDATION_ERROR: El precio unitario debe ser > 0 céntimos");
+    }
+    const desc =
+      input.description !== undefined
+        ? sanitizeQuoteItemDescription(input.description, {
+            knownPricesCents: [
+              price,
+              ...(input.unit_price_cents !== undefined ? [input.unit_price_cents] : []),
+            ],
+          }).trim()
+        : existing.description;
+    if (!desc) {
+      throw new Error("SCHEMA_VALIDATION_ERROR: Descripción obligatoria");
     }
     const now = Date.now();
     await this.executor.run(

@@ -28,6 +28,7 @@ import {
   formatCentsEs,
   roundHalfUpDiv,
 } from "../core/fiscal/fiscalEngine";
+import { sanitizeQuoteItemDescription } from "../core/text/quoteDescriptionSanitizer";
 import { normalizeSpanishText } from "../core/text/spanishText";
 import {
   extractClientFieldsFromText,
@@ -506,11 +507,11 @@ export async function patchQuoteDraftByVoice(
 
   // F. Modificar precio o cantidad de partida existente
   const editPriceByLineNumRx =
-    /\b(?:cambia|cambiar|pon|poner|modifica|modificar|actualiza)\s+(?:el\s+precio\s+de\s+)?(?:la\s+)?(?:partida|l[ií]nea)\s+(\d+|primera|segunda|tercera|cuarta|quinta)\s+(?:a|por)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?\b/i;
+    /\b(?:cambia|cambiar|pon|poner|modifica|modificar|actualiza)\s+(?:el\s+precio\s+de\s+)?(?:la\s+)?(?:partida|l[ií]nea)\s+(\d+|primera|segunda|tercera|cuarta|quinta)\s+(?:a|por)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?(?=$|[\s,.;:)\]}!?/])/i;
   const editPriceByNameRx =
-    /\b(?:cambia|cambiar|pon|poner|modifica|modificar|sube|baja)\s+(?:el\s+)?precio\s+(?:de(?:l|\s+la)?\s+)?([^,;.\n]+?)\s+(?:a|por)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?\b/i;
+    /\b(?:cambia|cambiar|pon|poner|modifica|modificar|sube|baja)\s+(?:el\s+)?precio\s+(?:de(?:l|\s+la)?\s+)?([^,;.\n]+?)\s+(?:a|por)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?(?=$|[\s,.;:)\]}!?/])/i;
   const editLinePriceDirectRx =
-    /\b(?:pon|cambia)\s+(?:el|la)?\s*([^,;.\n]{3,45}?)\s+a\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)\b/i;
+    /\b(?:pon|cambia)\s+(?:el|la)?\s*([^,;.\n]{3,45}?)\s+a\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i;
 
   const priceEditMatch =
     editPriceByLineNumRx.exec(working) ??
@@ -588,9 +589,14 @@ export async function patchQuoteDraftByVoice(
       const additions: Gate1QuoteDraftPayload["lines"] = [];
 
       for (const parsedLine of parsedMeta.lines) {
-        const cleanDesc = parsedLine.description
-          .replace(/^(?:a[ñn]ade|a[ñn]adir|agrega|pon|incluye)\s+/i, "")
-          .trim();
+        const cleanDesc = sanitizeQuoteItemDescription(
+          parsedLine.description
+            .replace(/^(?:a[ñn]ade|a[ñn]adir|agrega|pon|incluye)\s+/i, "")
+            .trim(),
+          parsedLine.explicit_price_cents !== null
+            ? { knownPricesCents: [parsedLine.explicit_price_cents] }
+            : undefined
+        );
         if (cleanDesc.length < 2) continue;
 
         const catalogHit = await findCatalogBestMatch(catalogRepo, cleanDesc);
@@ -604,13 +610,16 @@ export async function patchQuoteDraftByVoice(
           continue;
         }
         if (catalogHit) {
+          const resolvedUnitPrice = parsedLine.explicit_price_cents ?? catalogHit.unit_price_cents;
           additions.push({
             catalog_item_id: catalogHit.id,
-            description: catalogHit.description,
+            description: sanitizeQuoteItemDescription(catalogHit.description, {
+              knownPricesCents: [resolvedUnitPrice, catalogHit.unit_price_cents],
+            }),
             category: catalogHit.category,
             unit: catalogHit.unit,
             quantity_thousandths: parsedLine.quantity_thousandths,
-            unit_price_cents: parsedLine.explicit_price_cents ?? catalogHit.unit_price_cents,
+            unit_price_cents: resolvedUnitPrice,
             original_unit_price_cents: catalogHit.unit_price_cents,
             save_to_catalog: false,
           });
@@ -1460,9 +1469,9 @@ export async function patchTicketDraftByVoice(
   const vatM = /\biva(?:\s+\d{1,2}\s*%)?(?:\s+de)?[:\s]+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?/i.exec(trimmed);
   const totalM =
     /\btotal(?:\s+ticket)?(?:\s+de)?[:\s]+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)?/i.exec(trimmed) ??
-    /\b(?:por|importe(?:\s+de)?)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(trimmed) ??
+    /\b(?:por|importe(?:\s+de)?)\s+(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i.exec(trimmed) ??
     (!baseM && !vatM
-      ? /\b(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(trimmed)
+      ? /\b(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i.exec(trimmed)
       : null);
 
   const parsedBase = baseM?.[1] ? extractEurosCentsFromPhrase(baseM[1]) : null;
@@ -1879,7 +1888,7 @@ export async function patchCatalogItemByVoice(
       trimmed
     );
   const fixedMatch =
-    /\b(?:precio(?:\s+fijo)?|importe(?:\s+fijo)?|a)\s*(?::|\s+de)?\s*(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(
+    /\b(?:precio(?:\s+fijo)?|importe(?:\s+fijo)?|a)\s*(?::|\s+de)?\s*(\d+(?:[.,]\d{1,2})?(?:\s+con\s+\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i.exec(
       trimmed
     );
 
@@ -1913,15 +1922,23 @@ export async function patchCatalogItemByVoice(
 
   // Descripción
   const descMatch =
-    /\b(?:descripci[oó]n|partida|nombre)\s*(?:es|:)?\s*([^,;\n]+?)(?=(?:\s*(?:,|;|\bcategor[ií]a\b|\bunidad\b|\biva\b|\bmaterial|\bprecio\b|\bimporte\b|\d+\s*(?:h|horas?|€|eur)|$)))/i.exec(
+    /\b(?:descripci[oó]n|partida|nombre)\s*(?:es|:)?\s*((?:[^,;\n]|(?<=\d),(?=\d))+?)(?=(?:\s*(?:(?<!\d),|;|\bcategor[ií]a\b|\bunidad\b|\biva\b|\bmaterial|\bprecio\b|\bimporte\b|(?:[([]\s*)?\d+(?:[.,]\d{1,2})?\s*(?:h|horas?|€|eur)|$)))/i.exec(
       working
     );
+  const parsedFixedCents = next.fixedPriceInput ? Math.round(Number(next.fixedPriceInput) * 100) : NaN;
+  const knownPricesCents = Number.isFinite(parsedFixedCents) && parsedFixedCents > 0 ? [parsedFixedCents] : undefined;
   if (descMatch?.[1]) {
-    next.desc = descMatch[1].trim();
+    next.desc = sanitizeQuoteItemDescription(
+      descMatch[1].trim(),
+      knownPricesCents ? { knownPricesCents } : undefined
+    );
     appliedChanges.push(`Descripción: ${next.desc}`);
   } else if (!next.desc.trim() && appliedChanges.length === 0) {
-    next.desc = trimmed;
-    appliedChanges.push(`Descripción: ${trimmed}`);
+    next.desc = sanitizeQuoteItemDescription(
+      trimmed,
+      knownPricesCents ? { knownPricesCents } : undefined
+    );
+    appliedChanges.push(`Descripción: ${next.desc}`);
   }
 
   void deps;

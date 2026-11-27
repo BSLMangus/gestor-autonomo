@@ -35,6 +35,8 @@ interface InvoiceDetailViewProps {
   onOpenClient: (clientId: string) => void;
   onOpenQuote: (quoteId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
   onShareInvoice: (invoice: InvoiceRow) => Promise<void>;
   onDataChanged: () => Promise<void>;
 }
@@ -71,6 +73,8 @@ export function InvoiceDetailView({
   onOpenClient,
   onOpenQuote,
   onOpenInvoice,
+  onPreviewQuote,
+  onPreviewInvoice,
   onShareInvoice,
   onDataChanged,
 }: InvoiceDetailViewProps) {
@@ -191,6 +195,17 @@ export function InvoiceDetailView({
     );
   }
 
+  const handleOpenPdf = () => {
+    if (!invoice) return;
+    if (onPreviewInvoice) {
+      onPreviewInvoice(invoice.id);
+      return;
+    }
+    void runAction(async () => {
+      await documentOpener.openPdf(invoice.pdf_uri, "invoice", invoice.id, pdfPort);
+    });
+  };
+
   const isPaid = invoice.status === "pagado";
   const isOverdue = invoice.status === "vencido";
   const deductedTotalCents =
@@ -224,11 +239,7 @@ export function InvoiceDetailView({
           type="button"
           data-testid="invoice-detail-pdf-btn"
           disabled={busy}
-          onClick={() =>
-            void runAction(async () => {
-              await documentOpener.openPdf(invoice.pdf_uri, "invoice", invoice.id, pdfPort);
-            })
-          }
+          onClick={handleOpenPdf}
           className="paper-cream inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-[12px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer shadow-xs"
         >
           <FileText className="h-4 w-4 shrink-0" />
@@ -370,7 +381,13 @@ export function InvoiceDetailView({
             {quote && (
               <button
                 type="button"
-                onClick={() => onOpenQuote(quote.id)}
+                onClick={() => {
+                  if (onPreviewQuote && (quote.status === "aceptado" || quote.status === "enviado")) {
+                    onPreviewQuote(quote.id);
+                  } else {
+                    onOpenQuote(quote.id);
+                  }
+                }}
                 className="text-[11px] font-semibold text-[#D04B00] hover:underline cursor-pointer"
               >
                 Ver presupuesto {quote.quote_code} →
@@ -392,15 +409,17 @@ export function InvoiceDetailView({
                 <div className="break-words [overflow-wrap:anywhere] font-semibold text-[#2C2621]">
                   {item.description}
                 </div>
-                <div className="flex justify-between text-[11px] text-[#6B6860] font-mono font-mono-nums tabular-nums">
-                  <span>
-                    {formatThousandthsEs(item.quantity_thousandths)} {item.unit} ×{" "}
-                    {formatCentsEs(item.unit_price_cents)}
-                  </span>
-                  <span className="font-bold text-[#2C2621]">
-                    {formatCentsEs(item.line_subtotal_cents)}
-                  </span>
-                </div>
+                {quote?.modalidad_cobro !== "solo_mano_obra" && (
+                  <div className="flex justify-between text-[11px] text-[#6B6860] font-mono font-mono-nums tabular-nums">
+                    <span>
+                      {formatThousandthsEs(item.quantity_thousandths)} {item.unit} ×{" "}
+                      {formatCentsEs(item.unit_price_cents)}
+                    </span>
+                    <span className="font-bold text-[#2C2621]">
+                      {formatCentsEs(item.line_subtotal_cents)}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -518,11 +537,7 @@ export function InvoiceDetailView({
             type="button"
             data-testid="invoice-detail-open-pdf-btn"
             disabled={busy}
-            onClick={() =>
-              void runAction(async () => {
-                await documentOpener.openPdf(invoice.pdf_uri, "invoice", invoice.id, pdfPort);
-              })
-            }
+            onClick={handleOpenPdf}
             className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer disabled:opacity-50"
           >
             <FileText className="h-4 w-4 shrink-0" />

@@ -10,6 +10,7 @@ import {
 import { truncateText } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
+  BillingMode,
   ClientRow,
   ErrorCode,
   Gate1QuoteDraftPayload,
@@ -20,6 +21,7 @@ import type {
   InvoiceKind,
   InvoiceRow,
   JobRow,
+  LaborOnlySubMode,
   QuoteRow,
 } from "../../core/contracts/types";
 import { InvoicesRepository } from "../../core/db/repositories/invoicesRepo";
@@ -38,13 +40,15 @@ import {
 import {
   computeAdvanceByPercent,
   computeFinalInvoiceFromQuoteAndAdvance,
-  computeQuoteTotals,
+  computeLineSubtotalCents,
+  computeQuoteTotalsByBillingMode,
   computeQuoteValidUntilIso,
   deriveRateOrMixed,
   formatCentsEs,
   parseQuotePaymentScheduleJson,
   resolveQuoteAdvancePolicy,
 } from "../../core/fiscal/fiscalEngine";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import {
   getSeedOverride,
   getThreadIdFromConfig,
@@ -95,7 +99,15 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
       throw new Error("SCHEMA_VALIDATION_ERROR: Widget inválido para quote_commit");
     }
     const proposed = stripQuoteDisplayFields(state.active_widget.widget_payload);
-    const totalsSummary = computeQuoteTotals(proposed.lines, proposed.vat_rate);
+    const totalsSummary = computeQuoteTotalsByBillingMode({
+      billingMode: proposed.modalidad_cobro ?? "solo_partidas",
+      laborSubMode: proposed.solo_mano_obra_submodo ?? "por_horas",
+      lines: proposed.lines,
+      vatRate: proposed.vat_rate,
+      horasEstimadasThousandths: proposed.horas_estimadas_thousandths ?? 0,
+      tarifaHoraCents: proposed.tarifa_hora_cents ?? 0,
+      manoObraFijaCents: proposed.mano_obra_fija_cents ?? 0,
+    });
     const summaryEs =
       getSeedOverride(config)?.quoteFixtureOverride?.summary_es ??
       `Presupuesto borrador (${proposed.lines.length} líneas, IVA ${proposed.vat_rate} %, total ${formatCentsEs(totalsSummary.totalCents)}).`;
@@ -172,10 +184,45 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
             })()
           : Gate1QuoteCommitPayloadSchema.parse(proposed);
 
+      const billingMode: BillingMode = committed.modalidad_cobro ?? "solo_partidas";
+      const laborSubMode: LaborOnlySubMode = committed.solo_mano_obra_submodo ?? "por_horas";
+      const horasEstimadasThousandths = Math.max(
+        0,
+        Math.round(committed.horas_estimadas_thousandths ?? 0)
+      );
+      const tarifaHoraCents =
+        committed.tarifa_hora_cents === undefined || committed.tarifa_hora_cents === null
+          ? null
+          : Math.max(0, Math.round(committed.tarifa_hora_cents));
+      const manoObraFijaCents = Math.max(0, Math.round(committed.mano_obra_fija_cents ?? 0));
+
+      const sanitizedLines = committed.lines.map((line) => {
+        const cleaned = sanitizeQuoteItemDescription(line.description, {
+          knownPricesCents: line.unit_price_cents > 0 ? [line.unit_price_cents] : [],
+        });
+        return {
+          ...line,
+          description: cleaned.trim() || line.description.trim(),
+        };
+      });
+
       const now = Date.now();
       const todayIso = getLocalTodayIso();
       const fiscalYear = getFiscalYearFromIso(todayIso);
-      const totals = computeQuoteTotals(committed.lines, committed.vat_rate);
+      const totals = computeQuoteTotalsByBillingMode({
+        billingMode,
+        laborSubMode,
+        lines: sanitizedLines,
+        vatRate: committed.vat_rate,
+        horasEstimadasThousandths,
+        tarifaHoraCents,
+        manoObraFijaCents,
+      });
+      const lineSubtotals = sanitizedLines.map((line) =>
+        billingMode === "solo_mano_obra"
+          ? 0
+          : computeLineSubtotalCents(line.quantity_thousandths, line.unit_price_cents)
+      );
 
       // Proyección previa (solo lectura) antes de generar PDF fuera de transacción
       let projectedQuoteCode: string;
@@ -251,7 +298,7 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
 
       const effectiveJobTitle =
         committed.job_title.trim() ||
-        truncateText(committed.lines[0]?.description.trim() || "Presupuesto sin título", 80);
+        truncateText(sanitizedLines[0]?.description || "Presupuesto sin título", 80);
       const issuedDateIso = existingQuote ? formatLocalDateIso(existingQuote.created_at_ms) : todayIso;
       const issuedMs = existingQuote ? existingQuote.created_at_ms : now;
       const validityDays = committed.validity_days === undefined ? 30 : committed.validity_days;
@@ -293,6 +340,12 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
         estimatedDurationValue,
         estimatedDurationUnit,
         vatRate: committed.vat_rate,
+        billingMode,
+        laborSubMode,
+        laborHoursThousandths: horasEstimadasThousandths,
+        hourlyRateCents: tarifaHoraCents,
+        laborCents: totals.laborCents,
+        itemsSubtotalCents: totals.itemsSubtotalCents,
         subtotalCents: totals.subtotalCents,
         vatCents: totals.vatCents,
         totalCents: totals.totalCents,
@@ -304,12 +357,12 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
         showIban,
         notes: committed.notes,
         attachments,
-        lines: committed.lines.map((line, i) => ({
+        lines: sanitizedLines.map((line, i) => ({
           description: line.description,
           unit: line.unit,
           quantityThousandths: line.quantity_thousandths,
           unitPriceCents: line.unit_price_cents,
-          lineSubtotalCents: totals.lineSubtotals[i] ?? 0,
+          lineSubtotalCents: lineSubtotals[i] ?? 0,
         })),
       };
 
@@ -389,20 +442,49 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 "INVALID_STATE_TRANSITION: La obra ya tiene otro presupuesto activo distinto"
               );
             }
+            const existingInvoices = await tx.query<{ cnt: number }>(
+              `SELECT COUNT(*) AS cnt FROM invoices WHERE job_id = ?`,
+              [finalJobId]
+            );
+            if ((existingInvoices[0]?.cnt ?? 0) === 0) {
+              await tx.run(
+                `UPDATE jobs
+                 SET modalidad_cobro = ?, solo_mano_obra_submodo = ?,
+                     horas_estimadas_thousandths = ?, tarifa_hora_cents = ?,
+                     mano_obra_fija_cents = ?, updated_at_ms = ?
+                 WHERE id = ?`,
+                [
+                  billingMode,
+                  laborSubMode,
+                  horasEstimadasThousandths,
+                  tarifaHoraCents,
+                  manoObraFijaCents,
+                  now,
+                  finalJobId,
+                ]
+              );
+            }
           } else {
             const { code: jobCode } = await allocateNextSequence(tx, "OBR", fiscalYear, now);
             finalJobId = `job_${crypto.randomUUID().slice(0, 12)}`;
             await tx.run(
               `INSERT INTO jobs (
                 id, job_code, client_id, title, address, status,
+                modalidad_cobro, solo_mano_obra_submodo, horas_estimadas_thousandths,
+                tarifa_hora_cents, mano_obra_fija_cents,
                 created_at_iso, created_at_ms, updated_at_ms
-              ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 finalJobId,
                 jobCode,
                 resolvedClientId,
                 effectiveJobTitle,
                 clientSnapshot.fiscalAddress,
+                billingMode,
+                laborSubMode,
+                horasEstimadasThousandths,
+                tarifaHoraCents,
+                manoObraFijaCents,
                 todayIso,
                 now,
                 now,
@@ -429,7 +511,10 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                    general_description = ?, estimated_duration_value = ?, estimated_duration_unit = ?,
                    validity_days = ?, payment_methods_json = ?, payment_schedule_json = ?,
                    payment_terms_text = ?, iban_override = ?, bank_name = ?, show_iban = ?,
-                   notes = ?, attachments_json = ?, pdf_uri = ?, updated_at_ms = ?
+                   notes = ?, attachments_json = ?, pdf_uri = ?,
+                   modalidad_cobro = ?, solo_mano_obra_submodo = ?,
+                   horas_estimadas_thousandths = ?, tarifa_hora_cents = ?,
+                   mano_obra_fija_cents = ?, updated_at_ms = ?
                WHERE id = ?`,
               [
                 resolvedClientId,
@@ -454,6 +539,11 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 committed.notes,
                 JSON.stringify(attachments),
                 pdfUri,
+                billingMode,
+                laborSubMode,
+                horasEstimadasThousandths,
+                tarifaHoraCents,
+                manoObraFijaCents,
                 now,
                 finalQuoteId,
               ]
@@ -473,8 +563,10 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 estimated_duration_unit, validity_days, payment_methods_json,
                 payment_schedule_json, payment_terms_text, iban_override, bank_name,
                 show_iban, notes, attachments_json, pdf_uri, sent_at_iso,
+                modalidad_cobro, solo_mano_obra_submodo, horas_estimadas_thousandths,
+                tarifa_hora_cents, mano_obra_fija_cents,
                 created_at_ms, updated_at_ms
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 finalQuoteId,
                 quoteCode,
@@ -501,15 +593,20 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 committed.notes,
                 JSON.stringify(attachments),
                 pdfUri,
+                billingMode,
+                laborSubMode,
+                horasEstimadasThousandths,
+                tarifaHoraCents,
+                manoObraFijaCents,
                 now,
                 now,
               ]
             );
           }
 
-          for (const [idx, line] of committed.lines.entries()) {
+          for (const [idx, line] of sanitizedLines.entries()) {
             let lineCatalogId = line.catalog_item_id;
-            if (line.save_to_catalog) {
+            if (line.save_to_catalog && line.unit_price_cents > 0) {
               if (lineCatalogId === null) {
                 lineCatalogId = `cat_${crypto.randomUUID().slice(0, 12)}`;
                 await tx.run(
@@ -520,7 +617,7 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                   ) VALUES (?, ?, ?, ?, ?, 'fixed', 0, 0, ?, 1, ?, ?)`,
                   [
                     lineCatalogId,
-                    line.description.trim(),
+                    line.description,
                     line.category,
                     line.unit,
                     line.unit_price_cents,
@@ -575,12 +672,12 @@ export function createQuoteCommitNode(deps: GraphDependencies) {
                 finalQuoteId,
                 idx,
                 lineCatalogId,
-                line.description.trim(),
+                line.description,
                 line.category,
                 line.unit,
                 line.quantity_thousandths,
                 line.unit_price_cents,
-                totals.lineSubtotals[idx] ?? 0,
+                lineSubtotals[idx] ?? 0,
               ]
             );
           }

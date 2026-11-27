@@ -4,6 +4,13 @@ import { validateSpanishTaxId } from "../fiscal/taxIdValidator";
 import { TEXT_LIMITS } from "./textLimits";
 
 export const JobStatusSchema = z.enum(["pendiente", "en_curso", "finalizado", "cancelado"]);
+export const BillingModeSchema = z.enum([
+  "solo_partidas",
+  "partidas_mas_horas",
+  "partidas_mas_fijo_mano_obra",
+  "solo_mano_obra",
+]);
+export const LaborOnlySubModeSchema = z.enum(["por_horas", "precio_cerrado"]);
 export const QuoteStatusSchema = z.enum(["borrador", "enviado", "aceptado", "rechazado"]);
 export const InvoiceStatusSchema = z.enum(["pendiente_cobro", "pagado", "vencido"]);
 export const InvoiceKindSchema = z.enum(["advance_40", "final", "full"]);
@@ -384,6 +391,11 @@ export const Gate1QuoteDraftPayloadSchema = z.object({
   show_iban: z.boolean().optional(),
   notes: z.string().max(TEXT_LIMITS.NOTES).default(""),
   attachments: z.array(QuoteAttachmentSchema).max(10).optional(),
+  modalidad_cobro: BillingModeSchema.optional(),
+  solo_mano_obra_submodo: LaborOnlySubModeSchema.optional(),
+  horas_estimadas_thousandths: z.number().int().nonnegative().max(10_000_000).optional(),
+  tarifa_hora_cents: z.number().int().nonnegative().max(100_000_000).nullable().optional(),
+  mano_obra_fija_cents: z.number().int().nonnegative().max(100_000_000).optional(),
   lines: z.array(Gate1QuoteLineDraftSchema).min(0),
 });
 
@@ -429,7 +441,7 @@ export const Gate4ShareDraftPayloadSchema = z.object({
 export const Gate1QuoteLineCommitSchema = Gate1QuoteLineDraftSchema.extend({
   description: z.string().trim().min(1).max(TEXT_LIMITS.DESCRIPTION),
   quantity_thousandths: z.number().int().positive().max(10_000_000),
-  unit_price_cents: z.number().int().positive().max(100_000_000),
+  unit_price_cents: z.number().int().nonnegative().max(100_000_000),
 });
 
 export const Gate1QuoteCommitPayloadSchema = Gate1QuoteDraftPayloadSchema.extend({
@@ -446,9 +458,91 @@ export const Gate1QuoteCommitPayloadSchema = Gate1QuoteDraftPayloadSchema.extend
       email: z.string().trim().max(TEXT_LIMITS.EMAIL).optional(),
     })
     .optional(),
-  lines: z.array(Gate1QuoteLineCommitSchema).min(1),
-}).refine((p) => !(p.client_id !== null && p.new_client !== undefined), {
-  message: "No puedes indicar client_id existente y new_client a la vez",
+  lines: z.array(Gate1QuoteLineCommitSchema).min(0),
+}).superRefine((p, ctx) => {
+  if (p.client_id !== null && p.new_client !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "No puedes indicar client_id existente y new_client a la vez",
+    });
+  }
+
+  const mode = p.modalidad_cobro ?? "solo_partidas";
+  const subMode = p.solo_mano_obra_submodo ?? "por_horas";
+  const hours = p.horas_estimadas_thousandths ?? 0;
+  const rate = p.tarifa_hora_cents ?? 0;
+  const fixedLabor = p.mano_obra_fija_cents ?? 0;
+
+  if (mode === "solo_partidas") {
+    if (p.lines.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["lines"],
+        message: "El presupuesto requiere al menos una partida con precio",
+      });
+    }
+    p.lines.forEach((line, idx) => {
+      if (line.unit_price_cents <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lines", idx, "unit_price_cents"],
+          message: "El precio unitario de cada partida debe ser mayor que 0",
+        });
+      }
+    });
+    return;
+  }
+
+  if (mode === "solo_mano_obra") {
+    const hasTitleOrDesc =
+      p.job_title.trim().length > 0 || (p.general_description?.trim().length ?? 0) > 0;
+    if (p.lines.length === 0 && !hasTitleOrDesc) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["lines"],
+        message: "Indica al menos una tarea, título de obra o descripción general",
+      });
+    }
+    if (subMode === "por_horas") {
+      const laborCents = Math.floor((hours * rate * 2 + 1000) / 2000);
+      if (hours <= 0 || rate <= 0 || laborCents <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["horas_estimadas_thousandths"],
+          message: "En solo mano de obra por horas, las horas y la tarifa deben ser > 0",
+        });
+      }
+    } else if (fixedLabor <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mano_obra_fija_cents"],
+        message: "En solo mano de obra a precio cerrado, el importe fijo debe ser > 0",
+      });
+    }
+    return;
+  }
+
+  // partidas_mas_horas | partidas_mas_fijo_mano_obra
+  let itemsSubtotalCents = 0;
+  p.lines.forEach((line, idx) => {
+    if (line.unit_price_cents <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["lines", idx, "unit_price_cents"],
+        message: "El precio unitario de cada partida debe ser mayor que 0",
+      });
+    }
+    itemsSubtotalCents += Math.floor((line.quantity_thousandths * line.unit_price_cents * 2 + 1000) / 2000);
+  });
+  const laborCents =
+    mode === "partidas_mas_horas" ? Math.floor((hours * rate * 2 + 1000) / 2000) : fixedLabor;
+  if (itemsSubtotalCents + laborCents <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["lines"],
+      message: "La base imponible total del presupuesto debe ser mayor que 0",
+    });
+  }
 });
 
 export const Gate2TicketCommitPayloadSchema = Gate2TicketDraftPayloadSchema.extend({
@@ -874,6 +968,11 @@ export const JobRowSchema = z.object({
   status: JobStatusSchema,
   start_date_iso: IsoDateSchema.nullable().optional().default(null),
   end_date_iso: IsoDateSchema.nullable().optional().default(null),
+  modalidad_cobro: BillingModeSchema.optional().default("solo_partidas"),
+  solo_mano_obra_submodo: LaborOnlySubModeSchema.optional().default("por_horas"),
+  horas_estimadas_thousandths: z.number().int().nonnegative().optional().default(0),
+  tarifa_hora_cents: z.number().int().nonnegative().nullable().optional().default(null),
+  mano_obra_fija_cents: z.number().int().nonnegative().optional().default(0),
   created_at_iso: IsoDateSchema,
   created_at_ms: z.number().int().nonnegative(),
   updated_at_ms: z.number().int().nonnegative(),
@@ -907,6 +1006,11 @@ export const QuoteRowSchema = z.object({
   attachments_json: z.string().optional().default("[]"),
   pdf_uri: z.string().nullable(),
   sent_at_iso: IsoDateSchema.nullable(),
+  modalidad_cobro: BillingModeSchema.optional().default("solo_partidas"),
+  solo_mano_obra_submodo: LaborOnlySubModeSchema.optional().default("por_horas"),
+  horas_estimadas_thousandths: z.number().int().nonnegative().optional().default(0),
+  tarifa_hora_cents: z.number().int().nonnegative().nullable().optional().default(null),
+  mano_obra_fija_cents: z.number().int().nonnegative().optional().default(0),
   created_at_ms: z.number().int().nonnegative(),
   updated_at_ms: z.number().int().nonnegative(),
 });
@@ -920,7 +1024,7 @@ export const QuoteItemRowSchema = z.object({
   category: CatalogCategorySchema,
   unit: z.string().trim().min(1),
   quantity_thousandths: z.number().int().positive(),
-  unit_price_cents: z.number().int().positive(),
+  unit_price_cents: z.number().int().nonnegative(),
   line_subtotal_cents: z.number().int().nonnegative(),
 });
 

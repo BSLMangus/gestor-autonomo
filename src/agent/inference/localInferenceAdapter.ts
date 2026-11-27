@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SpecialistRouteSchema } from "../../core/contracts/schemas";
 import { truncateText } from "../../core/contracts/textLimits";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import type {
   InferenceEngine,
   PendingDisambiguation,
@@ -63,6 +64,7 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       "Eres un clasificador estricto de intenciones para Gestor Autónomo.",
       "Responde únicamente JSON válido con { intent, confidence, entities }.",
       "Intents válidos: quote_specialist, ocr_ticket_specialist, fiscal_piggybank_specialist, lifecycle_billing_specialist, site_log_specialist, schedule_specialist, assistant_qa_node, clarification_node.",
+      "En quote_lines[].description incluye ÚNICAMENTE el concepto limpio de la tarea o partida; NUNCA incluyas precios, importes ni símbolos € o EUR.",
       `active_job_id=${params.activeJobId ?? "null"} active_quote_id=${params.activeQuoteId ?? "null"}`,
       `Texto usuario: ${JSON.stringify(truncateText(params.text, 2500))}`,
     ].join("\n");
@@ -79,11 +81,42 @@ export class LocalInferenceAdapterImpl implements LocalInferenceAdapter {
       const parsed = LlmClassificationOutputSchema.parse(
         JSON.parse(jsonMatch ? jsonMatch[0] : rawResponse)
       );
+      const mergedEntities: Record<string, unknown> = {
+        ...det.entities,
+        ...parsed.entities,
+      };
+      if (Array.isArray(mergedEntities.quote_lines)) {
+        mergedEntities.quote_lines = mergedEntities.quote_lines.map((line) => {
+          if (!line || typeof line !== "object") return line;
+          const record = line as Record<string, unknown>;
+          if (typeof record.description !== "string") return line;
+          const knownPricesCents: number[] = [];
+          if (
+            typeof record.explicit_price_cents === "number" &&
+            Number.isFinite(record.explicit_price_cents)
+          ) {
+            knownPricesCents.push(record.explicit_price_cents);
+          }
+          if (
+            typeof record.unit_price_cents === "number" &&
+            Number.isFinite(record.unit_price_cents)
+          ) {
+            knownPricesCents.push(record.unit_price_cents);
+          }
+          return {
+            ...record,
+            description: sanitizeQuoteItemDescription(
+              record.description,
+              knownPricesCents.length > 0 ? { knownPricesCents } : undefined
+            ),
+          };
+        });
+      }
       return {
         intent: parsed.intent,
         confidence: parsed.confidence,
         engine_used: "mediapipe_local_llm",
-        entities: { ...det.entities, ...parsed.entities },
+        entities: mergedEntities,
       };
     } catch {
       return {

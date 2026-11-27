@@ -435,35 +435,49 @@ describe("Diseño PDF de Presupuesto (buildQuoteDocDefinition)", () => {
     expect(durationColors.every((c) => c === "#000000")).toBe(true);
     expect(collectStrings(durationCell).join("")).toContain("5 Días laborables");
 
-    // 4: Tabla de tareas (#FCE7F3 cabecera, #E5E7EB bordes, #EDE9FE Sub-Total, todos los textos/números #000000)
+    // 4: Tabla de tareas de 4 columnas (#FCE7F3 cabecera, #E5E7EB bordes, #EDE9FE Sub-Total, todos los textos/números #000000)
     const tasksBlock = content[4] as {
-      table: { body: Array<Array<Record<string, unknown>>> };
+      table: {
+        widths: Array<string | number>;
+        body: Array<Array<Record<string, unknown>>>;
+      };
       layout: { hLineColor: () => string; vLineColor: () => string };
     };
+    expect(tasksBlock.table.widths).toEqual(["*", "auto", "auto", "auto"]);
     const headerRow = tasksBlock.table.body[0]!;
+    expect(headerRow).toHaveLength(4);
     expect(headerRow[0]?.text).toBe("Descripción de las tareas");
-    expect(headerRow[0]?.fillColor).toBe("#FCE7F3");
-    expect(headerRow[0]?.color).toBe("#000000");
-    expect(headerRow[1]?.text).toBe("Costes");
-    expect(headerRow[1]?.fillColor).toBe("#FCE7F3");
-    expect(headerRow[1]?.color).toBe("#000000");
+    expect(headerRow[1]?.text).toBe("Cant.");
+    expect(headerRow[2]?.text).toBe("Precio unit.");
+    expect(headerRow[3]?.text).toBe("Total");
+    for (const hCell of headerRow) {
+      expect(hCell.fillColor).toBe("#FCE7F3");
+      expect(hCell.color).toBe("#000000");
+    }
     expect(tasksBlock.layout.hLineColor()).toBe("#E5E7EB");
     expect(tasksBlock.layout.vLineColor()).toBe("#E5E7EB");
 
     const itemRows = tasksBlock.table.body.slice(1, -1);
     expect(itemRows.length).toBe(2);
     for (const row of itemRows) {
+      expect(row).toHaveLength(4);
+      // La celda izquierda tiene solo descripción limpia (sin sub-línea qty × price)
+      expect(typeof row[0]?.text).toBe("string");
+      expect(row[0]?.stack).toBeUndefined();
+      expect(String(row[0]?.text)).not.toContain("×");
       const rowColors = collectColors(row);
-      expect(rowColors.length).toBeGreaterThanOrEqual(3);
+      expect(rowColors.length).toBe(4);
       expect(rowColors.every((c) => c === "#000000")).toBe(true);
     }
 
     const subtotalRow = tasksBlock.table.body[tasksBlock.table.body.length - 1]!;
+    expect(subtotalRow).toHaveLength(4);
     expect(subtotalRow[0]?.text).toBe("Sub-Total");
-    expect(subtotalRow[0]?.fillColor).toBe("#EDE9FE");
-    expect(subtotalRow[0]?.color).toBe("#000000");
-    expect(subtotalRow[1]?.fillColor).toBe("#EDE9FE");
-    expect(subtotalRow[1]?.color).toBe("#000000");
+    expect(subtotalRow[3]?.text).toBe("1.000,00 €");
+    for (const sCell of subtotalRow) {
+      expect(sCell.fillColor).toBe("#EDE9FE");
+      expect(sCell.color).toBe("#000000");
+    }
 
     // 5: Bloque de cierre indivisible (unbreakable: true) con orden estricto de los 5 sub-bloques
     expect(content).toHaveLength(6);

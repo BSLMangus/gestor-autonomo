@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ActaRow,
+  BillingModeConfig,
   ClientRow,
   InvoiceRow,
   JobRow,
@@ -12,7 +13,13 @@ import type {
 import { ActasRepository } from "../../core/db/repositories/actasRepo";
 import { ClientsRepository } from "../../core/db/repositories/clientsRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
+import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import {
+  BillingModeSelector,
+  createDefaultBillingModeConfig,
+  getBillingModeBadgeLabel,
+} from "../jobs/BillingModeSelector";
 
 interface ClientProfileViewProps {
   clientId: string;
@@ -23,6 +30,9 @@ interface ClientProfileViewProps {
   onOpenQuote: (quoteId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
   onOpenActa?: (actaId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
+  onPreviewActa?: (actaId: string) => void;
   onCreateClientActa?: (clientId: string) => Promise<void>;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onOpenEditWidget: (client: ClientRow) => void;
@@ -38,6 +48,9 @@ export function ClientProfileView({
   onOpenQuote,
   onOpenInvoice,
   onOpenActa,
+  onPreviewQuote,
+  onPreviewInvoice,
+  onPreviewActa,
   onCreateClientActa,
   onStartJobQuote,
   onOpenEditWidget,
@@ -52,6 +65,10 @@ export function ClientProfileView({
 
   const [newJobTitle, setNewJobTitle] = useState("");
   const [showNewJobForm, setShowNewJobForm] = useState(false);
+  const [defaultHourlyRateCents, setDefaultHourlyRateCents] = useState<number>(3800);
+  const [newBillingConfig, setNewBillingConfig] = useState<BillingModeConfig>(() =>
+    createDefaultBillingModeConfig(3800)
+  );
   const [busy, setBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -59,10 +76,16 @@ export function ClientProfileView({
   const loadPortfolio = async () => {
     setLoading(true);
     try {
-      const [portfolio, clientActas] = await Promise.all([
+      const [portfolio, clientActas, appSettings] = await Promise.all([
         new ClientsRepository(executor).getClientPortfolio(clientId),
         new ActasRepository(executor).listByClientId(clientId),
+        new SettingsRepository(executor).getAppSettings(),
       ]);
+      const hourlyRate = appSettings.hourly_rate_cents ?? 3800;
+      setDefaultHourlyRateCents(hourlyRate);
+      if (!showNewJobForm) {
+        setNewBillingConfig(createDefaultBillingModeConfig(hourlyRate));
+      }
       if (!portfolio) {
         setClient(null);
         setJobs([]);
@@ -102,8 +125,14 @@ export function ClientProfileView({
         title: newJobTitle.trim(),
         address: client?.fiscal_address ?? "",
         client_id: clientId,
+        modalidad_cobro: newBillingConfig.modalidad_cobro,
+        solo_mano_obra_submodo: newBillingConfig.solo_mano_obra_submodo,
+        horas_estimadas_thousandths: newBillingConfig.horas_estimadas_thousandths,
+        tarifa_hora_cents: newBillingConfig.tarifa_hora_cents,
+        mano_obra_fija_cents: newBillingConfig.mano_obra_fija_cents,
       });
       setNewJobTitle("");
+      setNewBillingConfig(createDefaultBillingModeConfig(defaultHourlyRateCents));
       setShowNewJobForm(false);
       await loadPortfolio();
       await onDataChanged();
@@ -299,23 +328,32 @@ export function ClientProfileView({
         {showNewJobForm && (
           <form
             onSubmit={(e) => void handleCreateJobForClient(e)}
-            className="flex w-full min-w-0 gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFD6B0]/50 p-2"
+            className="w-full min-w-0 space-y-2 rounded-xl border border-[#E5DFD2] bg-[#FFD6B0]/35 p-2.5"
           >
-            <input
-              type="text"
-              maxLength={TEXT_LIMITS.TITLE}
-              value={newJobTitle}
-              onChange={(e) => setNewJobTitle(e.target.value)}
-              placeholder="Título de la obra (ej. Reforma baño)"
-              className="min-w-0 flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
-            />
-            <button
-              type="submit"
+            <div className="flex w-full min-w-0 gap-1.5">
+              <input
+                type="text"
+                maxLength={TEXT_LIMITS.TITLE}
+                value={newJobTitle}
+                onChange={(e) => setNewJobTitle(e.target.value)}
+                placeholder="Título de la obra (ej. Reforma baño)"
+                className="min-w-0 flex-1 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs text-[#2C2621] placeholder:text-[#6B6860] focus:border-[#EA580C] focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="shrink-0 rounded-lg bg-[#4B7094] px-3 py-1.5 text-xs font-bold text-[#FFFDF9] cursor-pointer"
+              >
+                Crear
+              </button>
+            </div>
+            <BillingModeSelector
+              value={newBillingConfig}
+              onChange={setNewBillingConfig}
+              defaultHourlyRateCents={defaultHourlyRateCents}
+              compact
               disabled={busy}
-              className="shrink-0 rounded-lg bg-[#4B7094] px-3 py-1.5 text-xs font-bold text-[#FFFDF9] cursor-pointer"
-            >
-              Crear
-            </button>
+            />
           </form>
         )}
 
@@ -351,6 +389,9 @@ export function ClientProfileView({
                     >
                       {job.status}
                     </span>
+                    <span className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
+                      {getBillingModeBadgeLabel(job.modalidad_cobro, job.solo_mano_obra_submodo)}
+                    </span>
                   </div>
                   <div className="mt-0.5 truncate font-bold text-[#2C2621]">{job.title}</div>
                   {job.address && (
@@ -385,12 +426,21 @@ export function ClientProfileView({
           Presupuestos y Facturas ({quotes.length + invoices.length})
         </h3>
         <div className="space-y-1.5">
-          {quotes.map((q) => (
+          {quotes.map((q) => {
+            const shouldPreview =
+              (q.status === "aceptado" || q.status === "enviado") && Boolean(onPreviewQuote);
+            return (
             <button
               key={q.id}
               type="button"
               data-testid={`client-open-quote-${q.id}`}
-              onClick={() => onOpenQuote(q.id)}
+              onClick={() => {
+                if (shouldPreview) {
+                  onPreviewQuote?.(q.id);
+                } else {
+                  onOpenQuote(q.id);
+                }
+              }}
               className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
@@ -406,16 +456,23 @@ export function ClientProfileView({
                 </div>
               </div>
               <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
-                Abrir →
+                {shouldPreview ? "Vista previa →" : "Abrir →"}
               </span>
             </button>
-          ))}
+            );
+          })}
           {invoices.map((inv) => (
             <button
               key={inv.id}
               type="button"
               data-testid={`client-open-invoice-${inv.id}`}
-              onClick={() => onOpenInvoice(inv.id)}
+              onClick={() => {
+                if (onPreviewInvoice) {
+                  onPreviewInvoice(inv.id);
+                } else {
+                  onOpenInvoice(inv.id);
+                }
+              }}
               className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
@@ -431,7 +488,7 @@ export function ClientProfileView({
                 </div>
               </div>
               <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
-                Abrir →
+                {onPreviewInvoice ? "Vista previa →" : "Abrir →"}
               </span>
             </button>
           ))}
@@ -467,12 +524,21 @@ export function ClientProfileView({
           )}
         </div>
         <div className="space-y-1.5">
-          {actas.map((acta) => (
+          {actas.map((acta) => {
+            const shouldPreview =
+              (acta.estado === "firmada" || acta.estado === "completada") && Boolean(onPreviewActa);
+            return (
             <button
               key={acta.id}
               type="button"
               data-testid={`client-open-acta-${acta.id}`}
-              onClick={() => onOpenActa?.(acta.id)}
+              onClick={() => {
+                if (shouldPreview) {
+                  onPreviewActa?.(acta.id);
+                } else {
+                  onOpenActa?.(acta.id);
+                }
+              }}
               className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 py-2.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
             >
               <div className="min-w-0 flex-1">
@@ -484,10 +550,11 @@ export function ClientProfileView({
                 </div>
               </div>
               <span className="shrink-0 text-[11px] font-semibold text-[#D04B00]">
-                Abrir →
+                {shouldPreview ? "Vista previa →" : "Abrir →"}
               </span>
             </button>
-          ))}
+            );
+          })}
           {actas.length === 0 && (
             <div className="text-[#6B6860]">Sin actas técnicas para este cliente.</div>
           )}

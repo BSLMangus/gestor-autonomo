@@ -116,11 +116,22 @@ test.describe("ObraLocal AI — Auth Local, Onboarding 2 Paneles, Presupuestos S
     await expect(page.getByTestId("quote-builder-widget")).toBeVisible();
 
     await page.getByTestId("quote-job-title-input").fill(LONG_JOB_TITLE);
+    await page.getByTestId("quote-client-mode-existing").click();
     await page.getByTestId("quote-client-select").selectOption({ index: 1 });
     await page.getByTestId("quote-add-line").click();
     await page.getByLabel("Descripción partida 1").fill(LONG_LINE_DESC);
     await page.getByTestId("quote-line-price-0").fill("250.00");
+    await page.getByTestId("quote-toggle-document-conditions-btn").click();
     await page.locator("#qb-notes").fill("Incluye materiales, desplazamiento y garantía de 2 años.");
+
+    // Vista previa de borrador sin guardar ni consumir numeración
+    await page.getByTestId("quote-builder-preview-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-draft-badge")).toContainText("BORRADOR");
+    await expect(page.getByTestId("doc-preview-page-1")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("doc-preview-close-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
+
     await page.getByTestId("quote-approve-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeHidden();
 
@@ -165,29 +176,54 @@ test.describe("ObraLocal AI — Auth Local, Onboarding 2 Paneles, Presupuestos S
     await expect(page.getByTestId("generative-widget-overlay")).toBeHidden();
     await expect(page.getByTestId("quote-detail-view")).toContainText("330,00 €");
 
-    // Aceptar, pedir Anticipo 40 %, Compartir y descargar PDF desde dentro
+    // Aceptar, verificar que al pulsar presupuesto aceptado abre In-App Preview primero y permite ir a "Ver ficha", pedir Anticipo 40 %, Compartir y descargar PDF desde preview
+    await page.getByTestId("quote-detail-preview-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-draft-badge")).toContainText("BORRADOR");
+    await page.getByTestId("doc-preview-close-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
+
     await page.getByTestId("quote-detail-accept-btn").click();
     await expect(page.getByTestId("quote-detail-view")).toContainText("Aceptado");
+
+    await page.getByTestId("back-to-quotes-btn").click();
+    await expect(page.getByTestId("quotes-view")).toBeVisible();
+    await page.locator('[data-testid^="quote-card-"]', { hasText: "PRE-2026-001" }).click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-detail-btn")).toContainText("Ver ficha");
+    await page.getByTestId("doc-preview-detail-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
+    await expect(page.getByTestId("quote-detail-view")).toBeVisible();
 
     await page.getByTestId("quote-detail-advance-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeVisible();
     await page.getByTestId("gate3-approve-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeHidden();
 
-    const quoteDownloadPromise = page.waitForEvent("download");
     await page.getByTestId("quote-detail-open-pdf-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-page-1")).toBeVisible({ timeout: 15_000 });
+    const quoteDownloadPromise = page.waitForEvent("download");
+    await page.getByTestId("doc-preview-share-btn").click();
     const quotePdf = await quoteDownloadPromise;
     expect(quotePdf.suggestedFilename()).toMatch(/^PRE-2026-001\.pdf$/);
+    await page.getByTestId("doc-preview-close-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
 
     await page.getByTestId("quote-detail-share-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeVisible();
     await page.getByTestId("gate4-approve-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeHidden();
 
-    // 8. Abrir factura ANT-2026-001 vinculada -> InvoiceDetailView con todos los datos (incluido IBAN)
+    // 8. Abrir factura ANT-2026-001 vinculada -> abre In-App Preview -> "Gestionar / Cobro" -> InvoiceDetailView con todos los datos (incluido IBAN)
     const linkedInvoiceCard = page.locator('[data-testid^="quote-detail-invoice-"]').first();
     await expect(linkedInvoiceCard).toBeVisible();
     await linkedInvoiceCard.click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("document-preview-modal")).toContainText("ANT-2026-001");
+    await expect(page.getByTestId("doc-preview-detail-btn")).toContainText("Gestionar / Cobro");
+    await page.getByTestId("doc-preview-detail-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
     await expect(page.getByTestId("invoice-detail-view")).toBeVisible();
     await expect(page.getByTestId("invoice-detail-view")).toContainText("ANT-2026-001");
     await expect(page.getByTestId("invoice-detail-view")).toContainText("ES9121000418450200051332");

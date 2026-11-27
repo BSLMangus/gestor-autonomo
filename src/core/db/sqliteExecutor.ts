@@ -266,6 +266,69 @@ async function rebuildLegacyQuotesTable(
   }
 }
 
+async function rebuildLegacyQuoteItemsTable(executor: SqliteExecutor): Promise<void> {
+  await executor.run("PRAGMA foreign_keys = OFF;");
+  const fkState = await executor.query<{ foreign_keys: number }>("PRAGMA foreign_keys;");
+  if (fkState[0] && Number(fkState[0].foreign_keys) !== 0) {
+    await executor.run("PRAGMA foreign_keys = ON;");
+    throw new Error("SQLITE_QUERY_ERROR: No se pudo desactivar foreign_keys para migrar quote_items");
+  }
+
+  try {
+    await executor.inTransaction(async (tx) => {
+      await tx.run("DROP TABLE IF EXISTS quote_items_migrated;");
+      await tx.run(
+        "CREATE TABLE quote_items_migrated (id TEXT PRIMARY KEY, quote_id TEXT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE, line_order INTEGER NOT NULL CHECK (line_order >= 0), catalog_item_id TEXT REFERENCES catalog_items(id) ON DELETE SET NULL, description TEXT NOT NULL CHECK (length(trim(description)) > 0), category TEXT NOT NULL DEFAULT 'General' CHECK (category IN ('Fontanería', 'Electricidad', 'Albañilería', 'Pintura', 'General')), unit TEXT NOT NULL DEFAULT 'ud' CHECK (length(trim(unit)) > 0), quantity_thousandths INTEGER NOT NULL CHECK (quantity_thousandths > 0), unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0), line_subtotal_cents INTEGER NOT NULL CHECK (line_subtotal_cents >= 0), UNIQUE (quote_id, line_order));"
+      );
+      await tx.run(
+        "INSERT INTO quote_items_migrated (id, quote_id, line_order, catalog_item_id, description, category, unit, quantity_thousandths, unit_price_cents, line_subtotal_cents) SELECT id, quote_id, line_order, catalog_item_id, description, category, unit, quantity_thousandths, unit_price_cents, line_subtotal_cents FROM quote_items;"
+      );
+      await tx.run("DROP TABLE quote_items;");
+      await tx.run("ALTER TABLE quote_items_migrated RENAME TO quote_items;");
+      const fkViolations = await tx.query<Record<string, unknown>>("PRAGMA foreign_key_check;");
+      if (fkViolations.length > 0) {
+        throw new Error(
+          `SQLITE_QUERY_ERROR: Violación FK tras migrar quote_items (${JSON.stringify(fkViolations[0])})`
+        );
+      }
+    });
+  } finally {
+    await executor.run("PRAGMA foreign_keys = ON;");
+  }
+}
+
+async function ensureBillingColumns(
+  executor: SqliteExecutor,
+  tableName: "jobs" | "quotes",
+  existingCols: ReadonlyArray<{ name: string }>
+): Promise<void> {
+  if (!existingCols.some((c) => c.name === "modalidad_cobro")) {
+    await executor.run(
+      `ALTER TABLE ${tableName} ADD COLUMN modalidad_cobro TEXT NOT NULL DEFAULT 'solo_partidas' CHECK (modalidad_cobro IN ('solo_partidas', 'partidas_mas_horas', 'partidas_mas_fijo_mano_obra', 'solo_mano_obra'));`
+    );
+  }
+  if (!existingCols.some((c) => c.name === "solo_mano_obra_submodo")) {
+    await executor.run(
+      `ALTER TABLE ${tableName} ADD COLUMN solo_mano_obra_submodo TEXT NOT NULL DEFAULT 'por_horas' CHECK (solo_mano_obra_submodo IN ('por_horas', 'precio_cerrado'));`
+    );
+  }
+  if (!existingCols.some((c) => c.name === "horas_estimadas_thousandths")) {
+    await executor.run(
+      `ALTER TABLE ${tableName} ADD COLUMN horas_estimadas_thousandths INTEGER NOT NULL DEFAULT 0 CHECK (horas_estimadas_thousandths >= 0);`
+    );
+  }
+  if (!existingCols.some((c) => c.name === "tarifa_hora_cents")) {
+    await executor.run(
+      `ALTER TABLE ${tableName} ADD COLUMN tarifa_hora_cents INTEGER CHECK (tarifa_hora_cents IS NULL OR tarifa_hora_cents >= 0);`
+    );
+  }
+  if (!existingCols.some((c) => c.name === "mano_obra_fija_cents")) {
+    await executor.run(
+      `ALTER TABLE ${tableName} ADD COLUMN mano_obra_fija_cents INTEGER NOT NULL DEFAULT 0 CHECK (mano_obra_fija_cents >= 0);`
+    );
+  }
+}
+
 export async function initializeSchema(executor: SqliteExecutor): Promise<void> {
   await executor.run("PRAGMA foreign_keys = ON;");
   const statements = splitSqlStatements(schemaSql);
@@ -406,6 +469,7 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
     if (!jobCols.some((c) => c.name === "end_date_iso")) {
       await executor.run(`ALTER TABLE jobs ADD COLUMN end_date_iso TEXT;`);
     }
+    await ensureBillingColumns(executor, "jobs", jobCols);
   }
 
   const quoteCols = await executor.query<{ name: string; notnull: number }>(
@@ -474,6 +538,15 @@ export async function initializeSchema(executor: SqliteExecutor): Promise<void> 
         `ALTER TABLE quotes ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]';`
       );
     }
+    await ensureBillingColumns(executor, "quotes", currentQuoteCols);
+  }
+
+  const qiTableRows = await executor.query<{ sql: string | null }>(
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name='quote_items'`
+  );
+  const qiTableSql = qiTableRows[0]?.sql;
+  if (typeof qiTableSql === "string" && /unit_price_cents\s*>\s*0/.test(qiTableSql)) {
+    await rebuildLegacyQuoteItemsTable(executor);
   }
 }
 

@@ -1,22 +1,28 @@
 import { parseQuoteAttachmentsJson } from "../../contracts/schemas";
 import { formatLocalDateIso, getLocalTodayIso, isValidIsoDate } from "../../fiscal/dateQuarter";
 import {
+  computeQuoteTotalsByBillingMode,
   computeQuoteValidUntilIso,
   parseQuotePaymentMethodsJson,
   parseQuotePaymentScheduleJson,
 } from "../../fiscal/fiscalEngine";
 import type { PdfPort, PdfQuoteDocumentInput } from "../../ports/mediaPorts";
 import type {
+  BillingMode,
   ClientRow,
+  Gate1QuoteDraftPayload,
   JobRow,
   JobStatus,
+  LaborOnlySubMode,
   LocalFileBridge,
   MemoryCoordinator,
   QuoteItemRow,
   QuoteRow,
   QuoteStatus,
+  QuoteVatRate,
   SqliteExecutor,
 } from "../../contracts/types";
+import { sanitizeQuoteItemDescription } from "../../text/quoteDescriptionSanitizer";
 import { normalizeSpanishText } from "../../text/spanishText";
 import { rewindSequenceIfLatest } from "./settingsRepo";
 
@@ -93,10 +99,90 @@ export class QuotesRepository {
   }
 
   async getItems(quoteId: string): Promise<QuoteItemRow[]> {
-    return this.executor.query<QuoteItemRow>(
+    const rows = await this.executor.query<QuoteItemRow>(
       `SELECT * FROM quote_items WHERE quote_id = ? ORDER BY line_order ASC`,
       [quoteId]
     );
+    return rows.map((item) => ({
+      ...item,
+      description: sanitizeQuoteItemDescription(item.description, {
+        knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+      }),
+    }));
+  }
+
+  async getDuplicateDraftData(quoteId: string): Promise<Gate1QuoteDraftPayload> {
+    const quote = await this.getById(quoteId);
+    if (!quote) {
+      throw new Error("INVALID_STATE_TRANSITION: Presupuesto no encontrado");
+    }
+    const [items, jobRows] = await Promise.all([
+      this.getItems(quoteId),
+      this.executor.query<JobRow>(`SELECT * FROM jobs WHERE id = ? LIMIT 1`, [quote.job_id]),
+    ]);
+    const job = jobRows[0] ?? null;
+
+    const billingMode: BillingMode =
+      quote.modalidad_cobro ?? job?.modalidad_cobro ?? "solo_partidas";
+    const laborSubMode: LaborOnlySubMode =
+      quote.solo_mano_obra_submodo ?? job?.solo_mano_obra_submodo ?? "por_horas";
+    const horasEstimadasThousandths =
+      quote.horas_estimadas_thousandths ?? job?.horas_estimadas_thousandths ?? 0;
+    const tarifaHoraCents =
+      quote.tarifa_hora_cents !== undefined
+        ? quote.tarifa_hora_cents
+        : (job?.tarifa_hora_cents ?? null);
+    const manoObraFijaCents =
+      quote.mano_obra_fija_cents ?? job?.mano_obra_fija_cents ?? 0;
+
+    return {
+      quote_id: null,
+      client_id: quote.client_id,
+      ...(!quote.client_id && quote.client_name_snapshot.trim()
+        ? {
+            new_client: {
+              name: quote.client_name_snapshot.trim(),
+              ...(quote.client_nif_snapshot ? { nif: quote.client_nif_snapshot } : {}),
+              ...(quote.client_address_snapshot
+                ? { fiscal_address: quote.client_address_snapshot }
+                : {}),
+              ...(quote.client_phone_snapshot ? { phone: quote.client_phone_snapshot } : {}),
+            },
+          }
+        : {}),
+      job_id: null,
+      job_title: job?.title ?? "",
+      general_description: quote.general_description ?? "",
+      estimated_duration_value: quote.estimated_duration_value ?? null,
+      estimated_duration_unit: quote.estimated_duration_unit ?? "dias_laborables",
+      vat_rate: quote.vat_rate,
+      validity_days: quote.validity_days ?? null,
+      payment_methods: parseQuotePaymentMethodsJson(quote.payment_methods_json),
+      payment_schedule: parseQuotePaymentScheduleJson(quote.payment_schedule_json),
+      payment_terms_text: quote.payment_terms_text ?? "",
+      iban_override: quote.iban_override ?? "",
+      bank_name: quote.bank_name ?? "",
+      show_iban: quote.show_iban !== undefined ? quote.show_iban !== 0 : true,
+      notes: quote.notes ?? "",
+      attachments: parseQuoteAttachmentsJson(quote.attachments_json),
+      modalidad_cobro: billingMode,
+      solo_mano_obra_submodo: laborSubMode,
+      horas_estimadas_thousandths: horasEstimadasThousandths,
+      tarifa_hora_cents: tarifaHoraCents,
+      mano_obra_fija_cents: manoObraFijaCents,
+      lines: items.map((item) => ({
+        catalog_item_id: item.catalog_item_id,
+        description: sanitizeQuoteItemDescription(item.description, {
+          knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+        }),
+        category: item.category,
+        unit: item.unit,
+        quantity_thousandths: item.quantity_thousandths,
+        unit_price_cents: item.unit_price_cents,
+        original_unit_price_cents: item.unit_price_cents,
+        save_to_catalog: false,
+      })),
+    };
   }
 
   async markSentManually(quoteId: string, sentAtIso = getLocalTodayIso()): Promise<QuoteRow> {
@@ -212,6 +298,26 @@ export class QuotesRepository {
     const showIban =
       quote.show_iban !== undefined ? quote.show_iban !== 0 : effectiveIban.length > 0;
     const attachments = parseQuoteAttachmentsJson(quote.attachments_json);
+    const billingMode: BillingMode = quote.modalidad_cobro ?? job.modalidad_cobro ?? "solo_partidas";
+    const laborSubMode: LaborOnlySubMode =
+      quote.solo_mano_obra_submodo ?? job.solo_mano_obra_submodo ?? "por_horas";
+    const laborHoursThousandths =
+      quote.horas_estimadas_thousandths ?? job.horas_estimadas_thousandths ?? 0;
+    const hourlyRateCents =
+      quote.tarifa_hora_cents !== undefined
+        ? quote.tarifa_hora_cents
+        : (job.tarifa_hora_cents ?? null);
+    const manoObraFijaCents = quote.mano_obra_fija_cents ?? job.mano_obra_fija_cents ?? 0;
+
+    const computedTotals = computeQuoteTotalsByBillingMode({
+      billingMode,
+      laborSubMode,
+      lines: items,
+      vatRate: quote.vat_rate as QuoteVatRate,
+      horasEstimadasThousandths: laborHoursThousandths,
+      tarifaHoraCents: hourlyRateCents,
+      manoObraFijaCents,
+    });
 
     const pdfInput: PdfQuoteDocumentInput = {
       kind: "quote",
@@ -241,6 +347,12 @@ export class QuotesRepository {
       estimatedDurationValue: quote.estimated_duration_value ?? null,
       estimatedDurationUnit: quote.estimated_duration_unit ?? "dias_laborables",
       vatRate: quote.vat_rate,
+      billingMode,
+      laborSubMode,
+      laborHoursThousandths,
+      hourlyRateCents,
+      laborCents: computedTotals.laborCents,
+      itemsSubtotalCents: computedTotals.itemsSubtotalCents,
       subtotalCents: quote.subtotal_cents,
       vatCents: quote.vat_cents,
       totalCents: quote.total_cents,
@@ -253,7 +365,9 @@ export class QuotesRepository {
       notes: quote.notes,
       attachments,
       lines: items.map((item) => ({
-        description: item.description,
+        description: sanitizeQuoteItemDescription(item.description, {
+          knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+        }),
         unit: item.unit,
         quantityThousandths: item.quantity_thousandths,
         unitPriceCents: item.unit_price_cents,

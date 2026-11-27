@@ -7,10 +7,12 @@ import type {
   JobRow,
   LocalFileBridge,
   QuoteRow,
+  ScheduleEntryRow,
   SqliteExecutor,
 } from "../../core/contracts/types";
 import { InvoicesRepository } from "../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../core/db/repositories/jobsRepo";
+import { ScheduleRepository } from "../../core/db/repositories/scheduleRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
 import { compareQuarter, deriveFiscalQuarter, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
@@ -28,6 +30,7 @@ interface FiscalDashboardViewProps {
   onOpenTaxCalendar?: (focusDateIso?: string) => void;
   onQuickManualTicket: () => Promise<void>;
   onOpenInvoice?: (invoiceId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
   onOpenTicket?: (ticketId: string) => void;
   onDataChanged?: () => Promise<void>;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
@@ -41,6 +44,7 @@ export function FiscalDashboardView({
   onOpenTaxCalendar,
   onQuickManualTicket,
   onOpenInvoice,
+  onPreviewInvoice,
   onOpenTicket,
   onDataChanged,
   registerBackHandler,
@@ -54,6 +58,7 @@ export function FiscalDashboardView({
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
   const [allJobs, setAllJobs] = useState<JobRow[]>([]);
   const [allQuotes, setAllQuotes] = useState<QuoteRow[]>([]);
+  const [allScheduleEntries, setAllScheduleEntries] = useState<ScheduleEntryRow[]>([]);
   const [irpfRate, setIrpfRate] = useState(20);
 
   const [ticketsModalOpen, setTicketsModalOpen] = useState(false);
@@ -72,13 +77,15 @@ export function FiscalDashboardView({
       const invoicesRepo = new InvoicesRepository(executor);
       const ticketsRepo = new TicketsRepository(executor);
       const jobsRepo = new JobsRepository(executor);
+      const scheduleRepo = new ScheduleRepository(executor);
       const settingsRepo = new SettingsRepository(executor);
 
-      const [invoices, tickets, jobs, quotes, settings] = await Promise.all([
+      const [invoices, tickets, jobs, quotes, scheduleEntries, settings] = await Promise.all([
         invoicesRepo.listAll(),
         ticketsRepo.listAll(),
         jobsRepo.listAll(),
         executor.query<QuoteRow>(`SELECT * FROM quotes ORDER BY created_at_ms DESC`),
+        scheduleRepo.listAllEntries(),
         settingsRepo.getAppSettings(),
       ]);
 
@@ -104,6 +111,7 @@ export function FiscalDashboardView({
         setAllTickets(tickets);
         setAllJobs(jobs);
         setAllQuotes(quotes);
+        setAllScheduleEntries(scheduleEntries);
         setQuarterTickets(tickets.filter((t) => t.quarter === quarter));
       }
     };
@@ -586,7 +594,13 @@ export function FiscalDashboardView({
                       <button
                         type="button"
                         data-testid={`fiscal-invoice-${inv.id}`}
-                        onClick={() => onOpenInvoice?.(inv.id)}
+                        onClick={() => {
+                          if (onPreviewInvoice) {
+                            onPreviewInvoice(inv.id);
+                          } else {
+                            onOpenInvoice?.(inv.id);
+                          }
+                        }}
                         className="flex min-w-0 flex-1 items-center justify-between gap-3 p-4 text-left cursor-pointer"
                       >
                         <div className="min-w-0 flex-1 space-y-1">
@@ -616,7 +630,7 @@ export function FiscalDashboardView({
                             {formatCentsEs(inv.total_cents)}
                           </div>
                           <div className="text-[11px] font-semibold text-[#D04B00]">
-                            Ver detalle →
+                            {onPreviewInvoice ? "Vista previa →" : "Ver detalle →"}
                           </div>
                         </div>
                       </button>
@@ -755,8 +769,10 @@ export function FiscalDashboardView({
         quotes={allQuotes}
         invoices={allInvoices}
         tickets={allTickets}
+        scheduleEntries={allScheduleEntries}
         onClose={() => setProfitModalOpen(false)}
         onOpenInvoice={onOpenInvoice}
+        onPreviewInvoice={onPreviewInvoice}
         onOpenTicket={onOpenTicket}
       />
 

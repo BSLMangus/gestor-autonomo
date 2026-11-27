@@ -5,8 +5,13 @@ import type {
   JobRow,
   LocalFileBridge,
   QuoteRow,
+  ScheduleEntryRow,
 } from "../../core/contracts/types";
-import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import {
+  computeJobBillingProfitability,
+  formatCentsEs,
+} from "../../core/fiscal/fiscalEngine";
+import { getBillingModeBadgeLabel } from "../jobs/BillingModeSelector";
 
 function TicketPhotoPreview({
   fileBridge,
@@ -367,9 +372,15 @@ interface ProfitabilityAnalysisModalProps {
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   tickets: ExpenseTicketRow[];
+  scheduleEntries?: ScheduleEntryRow[];
   onClose: () => void;
   onOpenInvoice?: (invoiceId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
   onOpenTicket?: (ticketId: string) => void;
+}
+
+function formatProfitHours(thousandths: number): string {
+  return `${(thousandths / 1000).toFixed(1).replace(/\.0$/, "").replace(".", ",")} h`;
 }
 
 export function ProfitabilityAnalysisModal({
@@ -380,8 +391,10 @@ export function ProfitabilityAnalysisModal({
   quotes,
   invoices,
   tickets,
+  scheduleEntries = [],
   onClose,
   onOpenInvoice,
+  onPreviewInvoice,
   onOpenTicket,
 }: ProfitabilityAnalysisModalProps) {
   const [selectedScope, setSelectedScope] = useState<string>(initialJobId ?? "all");
@@ -394,6 +407,17 @@ export function ProfitabilityAnalysisModal({
     () => jobs.filter((j) => j.status !== "cancelado"),
     [jobs]
   );
+
+  const billingProfitsByJobId = useMemo(() => {
+    const computed = computeJobBillingProfitability({
+      jobs: activeJobs,
+      quotes,
+      invoices,
+      tickets,
+      scheduleEntries,
+    });
+    return new Map(computed.map((item) => [item.jobId, item]));
+  }, [activeJobs, quotes, invoices, tickets, scheduleEntries]);
 
   const jobBreakdowns = useMemo(() => {
     return activeJobs.map((job) => {
@@ -415,6 +439,7 @@ export function ProfitabilityAnalysisModal({
       const netProfitCents = invoicedBaseCents - ticketsBaseCents;
       const marginPct =
         invoicedBaseCents > 0 ? Math.round((netProfitCents / invoicedBaseCents) * 100) : 0;
+      const billingProf = billingProfitsByJobId.get(job.id);
 
       return {
         job,
@@ -430,9 +455,10 @@ export function ProfitabilityAnalysisModal({
         ticketsGrossCents,
         netProfitCents,
         marginPct,
+        billingProf,
       };
     });
-  }, [activeJobs, quotes, invoices, tickets]);
+  }, [activeJobs, quotes, invoices, tickets, billingProfitsByJobId]);
 
   if (!open) return null;
 
@@ -440,6 +466,24 @@ export function ProfitabilityAnalysisModal({
     selectedScope === "all"
       ? null
       : jobBreakdowns.find((b) => b.job.id === selectedScope) ?? null;
+
+  const totalQuotedLaborCents = focused
+    ? (focused.billingProf?.quotedLaborCents ?? 0)
+    : jobBreakdowns.reduce((s, b) => s + (b.billingProf?.quotedLaborCents ?? 0), 0);
+  const totalQuotedItemsCents = focused
+    ? (focused.billingProf?.quotedItemsCents ?? 0)
+    : jobBreakdowns.reduce((s, b) => s + (b.billingProf?.quotedItemsCents ?? 0), 0);
+  const totalBudgetedHoursThousandths = focused
+    ? (focused.billingProf?.budgetedHoursThousandths ?? 0)
+    : jobBreakdowns.reduce((s, b) => s + (b.billingProf?.budgetedHoursThousandths ?? 0), 0);
+  const totalLoggedHoursThousandths = focused
+    ? (focused.billingProf?.loggedHoursThousandths ?? 0)
+    : jobBreakdowns.reduce((s, b) => s + (b.billingProf?.loggedHoursThousandths ?? 0), 0);
+  const unexpectedMaterialJobs = focused
+    ? focused.billingProf?.hasUnexpectedMaterialTickets
+      ? [focused.job]
+      : []
+    : jobBreakdowns.filter((b) => b.billingProf?.hasUnexpectedMaterialTickets).map((b) => b.job);
 
   const metrics = focused
     ? {
@@ -595,6 +639,65 @@ export function ProfitabilityAnalysisModal({
                 </>
               )}
             </p>
+          </section>
+
+          {/* 1b. Desglose Mano de obra vs Partidas/Materiales */}
+          <section
+            data-testid="profitability-labor-vs-materials"
+            className="paper-sheet rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 space-y-2.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-bold text-[#2C2621]">Mano de obra vs Partidas/Materiales</div>
+              {focused && focused.billingProf && (
+                <span
+                  data-testid={`profitability-billing-badge-${focused.job.id}`}
+                  className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-0.5 text-[10px] font-semibold text-[#3D352E]"
+                >
+                  {getBillingModeBadgeLabel(
+                    focused.billingProf.billingMode,
+                    focused.billingProf.laborSubMode
+                  )}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                <div className="text-[#6B6860]">Mano de obra (presup.)</div>
+                <div className="font-mono font-bold text-[#2C2621] tabular-nums">
+                  {formatCentsEs(totalQuotedLaborCents)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                <div className="text-[#6B6860]">Partidas / Materiales (presup.)</div>
+                <div className="font-mono font-bold text-[#2C2621] tabular-nums">
+                  {formatCentsEs(totalQuotedItemsCents)}
+                </div>
+              </div>
+            </div>
+
+            {(totalBudgetedHoursThousandths > 0 || totalLoggedHoursThousandths > 0) && (
+              <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-1.5 text-[11px]">
+                <span className="text-[#6B6860]">Horas mano de obra (presup. vs registradas)</span>
+                <span className="font-mono font-semibold text-[#2C2621] tabular-nums">
+                  {formatProfitHours(totalBudgetedHoursThousandths)} est. ·{" "}
+                  {formatProfitHours(totalLoggedHoursThousandths)} reg.
+                </span>
+              </div>
+            )}
+
+            {unexpectedMaterialJobs.length > 0 && (
+              <div
+                data-testid="profitability-unexpected-material-alert"
+                className="rounded-xl border border-[#D97706]/40 bg-[#FFF3A1]/70 px-3 py-2 text-[11px] font-semibold text-[#3E3300]"
+              >
+                {focused
+                  ? "Atención: esta obra está configurada como «Solo mano de obra», pero tiene tickets de materiales imputados."
+                  : `Atención: ${unexpectedMaterialJobs
+                      .map((j) => j.job_code)
+                      .join(", ")} en «Solo mano de obra» tienen tickets de materiales imputados.`}
+              </div>
+            )}
           </section>
 
           {/* 2. Gráficas muy visuales */}
@@ -771,6 +874,25 @@ export function ProfitabilityAnalysisModal({
                           >
                             {b.job.job_code} · {b.job.title}
                           </button>
+                          {b.billingProf && (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1 font-sans text-[10px] font-normal text-[#6B6860]">
+                              <span className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-1.5 py-0.5 font-semibold text-[#3D352E]">
+                                {getBillingModeBadgeLabel(
+                                  b.billingProf.billingMode,
+                                  b.billingProf.laborSubMode
+                                )}
+                              </span>
+                              <span>
+                                MO {formatCentsEs(b.billingProf.quotedLaborCents)} · Mat{" "}
+                                {formatCentsEs(b.billingProf.quotedItemsCents)}
+                              </span>
+                              {b.billingProf.hasUnexpectedMaterialTickets && (
+                                <span className="rounded-full bg-[#FFF3A1] px-1.5 py-0.5 font-semibold text-[#3E3300]">
+                                  Tickets material
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </th>
                         <td data-label="Facturado" className="px-2.5 py-2 font-mono text-[#2C2621] tabular-nums">
                           {formatCentsEs(b.invoicedBaseCents)}
@@ -807,12 +929,17 @@ export function ProfitabilityAnalysisModal({
                     {focused.jobInvoices.map((inv) => (
                       <tr key={inv.id}>
                         <th scope="row" className="px-2.5 py-2 font-bold text-[#2C2621]">
-                          {onOpenInvoice ? (
+                          {onPreviewInvoice || onOpenInvoice ? (
                             <button
                               type="button"
+                              data-testid={`profitability-invoice-${inv.id}`}
                               onClick={() => {
-                                onClose();
-                                onOpenInvoice(inv.id);
+                                if (onPreviewInvoice) {
+                                  onPreviewInvoice(inv.id);
+                                } else {
+                                  onClose();
+                                  onOpenInvoice?.(inv.id);
+                                }
                               }}
                               className="text-left font-mono text-[#D04B00] hover:underline cursor-pointer"
                             >

@@ -4,6 +4,7 @@ import type { LocalInferenceAdapterImpl } from "../../agent/inference/localInfer
 import { extractFlexibleDateRange, extractFlexibleSpanishDateIso } from "../../agent/inference/spanishFormParsers";
 import type {
   ActaRow,
+  BillingModeConfig,
   ClientRow,
   ExpenseTicketRow,
   InvoiceRow,
@@ -11,6 +12,7 @@ import type {
   JobScheduleDeviationSummary,
   JobStatus,
   QuoteRow,
+  ScheduleEntryRow,
   SiteLogRecord,
   WorkScheduleDefaults,
 } from "../../core/contracts/types";
@@ -23,15 +25,21 @@ import {
   computeDailyWorkHoursThousandths,
   ScheduleRepository,
 } from "../../core/db/repositories/scheduleRepo";
+import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import { SiteLogsRepository } from "../../core/db/repositories/siteLogsRepo";
 import { TicketsRepository } from "../../core/db/repositories/ticketsRepo";
-import { formatCentsEs } from "../../core/fiscal/fiscalEngine";
+import { computeJobBillingProfitability, formatCentsEs } from "../../core/fiscal/fiscalEngine";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { BACK_PRIORITY } from "../../core/navigation/routes";
 import type { LocalFileBridge, SqliteExecutor } from "../../core/contracts/types";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 import { SubDayDurationPicker } from "../calendar/SubDayDurationPicker";
+import {
+  BillingModeSelector,
+  createDefaultBillingModeConfig,
+  getBillingModeBadgeLabel,
+} from "../jobs/BillingModeSelector";
 
 const FALLBACK_SCHEDULE_DEFAULTS: WorkScheduleDefaults = {
   work_days: [1, 2, 3, 4, 5],
@@ -54,6 +62,9 @@ interface JobDetailDrawerProps {
   onOpenInvoice: (invoiceId: string) => void;
   onOpenTicket: (ticketId: string) => void;
   onOpenActa?: (actaId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
+  onPreviewActa?: (actaId: string) => void;
   onCreateJobActa?: (jobId: string, clientId: string | null) => Promise<void>;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onDataChanged: () => Promise<void>;
@@ -119,6 +130,9 @@ export function JobDetailDrawer({
   onOpenInvoice,
   onOpenTicket,
   onOpenActa,
+  onPreviewQuote,
+  onPreviewInvoice,
+  onPreviewActa,
   onCreateJobActa,
   onStartJobQuote,
   onDataChanged,
@@ -131,7 +145,14 @@ export function JobDetailDrawer({
   const [tickets, setTickets] = useState<ExpenseTicketRow[]>([]);
   const [siteLogs, setSiteLogs] = useState<SiteLogRecord[]>([]);
   const [actas, setActas] = useState<ActaRow[]>([]);
+  const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntryRow[]>([]);
   const [scheduleSummary, setScheduleSummary] = useState<JobScheduleDeviationSummary | null>(null);
+  const [defaultHourlyRateCents, setDefaultHourlyRateCents] = useState<number>(3800);
+  const [billingConfigDraft, setBillingConfigDraft] = useState<BillingModeConfig>(() =>
+    createDefaultBillingModeConfig(3800)
+  );
+  const [editingBillingConfig, setEditingBillingConfig] = useState(false);
+  const [billingSavedMsg, setBillingSavedMsg] = useState<string | null>(null);
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [scheduleDefaults, setScheduleDefaults] =
@@ -156,6 +177,7 @@ export function JobDetailDrawer({
     const siteLogsRepo = new SiteLogsRepository(executor);
     const clientsRepo = new ClientsRepository(executor);
     const scheduleRepo = new ScheduleRepository(executor);
+    const settingsRepo = new SettingsRepository(executor);
     const actasRepo = new ActasRepository(executor);
 
     const j = await jobsRepo.getById(targetId);
@@ -165,7 +187,7 @@ export function JobDetailDrawer({
     setEditStartDate(j.start_date_iso ?? "");
     setEditEndDate(j.end_date_iso ?? "");
 
-    const [cl, qList, iList, tRes, slList, schedSum, defaults, jobEntries, jobActas] = await Promise.all([
+    const [cl, qList, iList, tRes, slList, schedSum, defaults, jobEntries, jobActas, appSettings] = await Promise.all([
       j.client_id ? clientsRepo.getById(j.client_id) : Promise.resolve(null),
       quotesRepo.listByJobId(j.id),
       invoicesRepo.listByJobId(j.id),
@@ -175,13 +197,24 @@ export function JobDetailDrawer({
       scheduleRepo.getWorkScheduleDefaults(),
       scheduleRepo.listEntriesByJob(j.id),
       actasRepo.listByJobId(j.id),
+      settingsRepo.getAppSettings(),
     ]);
+    const hourlyRate = appSettings.hourly_rate_cents ?? 3800;
+    setDefaultHourlyRateCents(hourlyRate);
+    setBillingConfigDraft({
+      modalidad_cobro: j.modalidad_cobro ?? "solo_partidas",
+      solo_mano_obra_submodo: j.solo_mano_obra_submodo ?? "por_horas",
+      horas_estimadas_thousandths: j.horas_estimadas_thousandths ?? 0,
+      tarifa_hora_cents: j.tarifa_hora_cents ?? hourlyRate,
+      mano_obra_fija_cents: j.mano_obra_fija_cents ?? 0,
+    });
     setClient(cl);
     setQuotes(qList);
     setInvoices(iList);
     setTickets(tRes.items);
     setSiteLogs(slList);
     setActas(jobActas);
+    setScheduleEntries(jobEntries);
     setScheduleSummary(schedSum);
     setScheduleDefaults(defaults);
     if (jobEntries.length === 1 && j.start_date_iso && j.start_date_iso === (j.end_date_iso ?? j.start_date_iso)) {
@@ -198,6 +231,8 @@ export function JobDetailDrawer({
   useEffect(() => {
     if (!jobId) return;
     setErrorMsg(null);
+    setBillingSavedMsg(null);
+    setEditingBillingConfig(false);
     setDeleteSiteLogTarget(null);
     setDeleteError(null);
     void reload(jobId);
@@ -291,24 +326,47 @@ export function JobDetailDrawer({
             </div>
           )}
 
-          {job && (
+          {job && (() => {
+            const hasIssuedInvoices = invoices.length > 0;
+            const profitability = computeJobBillingProfitability({
+              jobs: [job],
+              quotes,
+              invoices,
+              tickets,
+              scheduleEntries,
+            })[0];
+            const showProfitability =
+              Boolean(profitability) &&
+              (quotes.length > 0 || invoices.length > 0 || tickets.length > 0);
+            const formatHoursLabel = (thousandths: number) =>
+              `${(thousandths / 1000).toFixed(1).replace(/\.0$/, "").replace(".", ",")} h`;
+
+            return (
             <>
               <div className="postit-note postit-blue p-4 space-y-2.5 text-[#143552]">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold text-[#143552]">Estado de obra:</span>
-                  <span
-                    className={`paper-stamp rounded px-2.5 py-0.5 font-semibold uppercase text-[10px] ${
-                      job.status === "en_curso"
-                        ? "status-emerald"
-                        : job.status === "finalizado"
-                          ? "status-cobalt"
-                          : job.status === "cancelado"
-                            ? "status-tangerine"
-                            : "status-gold"
-                    }`}
-                  >
-                    {job.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      data-testid={`job-detail-billing-badge-${job.id}`}
+                      className="rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-0.5 text-[10px] font-semibold text-[#3D352E]"
+                    >
+                      {getBillingModeBadgeLabel(job.modalidad_cobro, job.solo_mano_obra_submodo)}
+                    </span>
+                    <span
+                      className={`paper-stamp rounded px-2.5 py-0.5 font-semibold uppercase text-[10px] ${
+                        job.status === "en_curso"
+                          ? "status-emerald"
+                          : job.status === "finalizado"
+                            ? "status-cobalt"
+                            : job.status === "cancelado"
+                              ? "status-tangerine"
+                              : "status-gold"
+                      }`}
+                    >
+                      {job.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-[#2C2621]">
                   Cliente:{" "}
@@ -359,6 +417,172 @@ export function JobDetailDrawer({
                   </div>
                 )}
               </div>
+
+              {/* Modalidad de cobro */}
+              <div className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-[13px] font-semibold text-[#2C2621]">
+                    Modalidad de cobro
+                  </h4>
+                  {!hasIssuedInvoices && (
+                    <button
+                      type="button"
+                      data-testid="job-detail-edit-billing-btn"
+                      disabled={busy}
+                      onClick={() => {
+                        setBillingSavedMsg(null);
+                        setEditingBillingConfig((v) => !v);
+                      }}
+                      className="rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-1 text-[11px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer"
+                    >
+                      {editingBillingConfig ? "Cerrar" : "Editar modalidad"}
+                    </button>
+                  )}
+                </div>
+
+                {billingSavedMsg && (
+                  <div className="rounded-xl border border-[#059669]/30 bg-[#D4EDDA] px-3 py-2 text-[11px] font-semibold text-[#1B3A24]">
+                    {billingSavedMsg}
+                  </div>
+                )}
+
+                {hasIssuedInvoices ? (
+                  <div
+                    data-testid="job-detail-billing-locked"
+                    className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 text-[11px] text-[#6B6860]"
+                  >
+                    <span className="font-semibold text-[#2C2621]">
+                      {getBillingModeBadgeLabel(job.modalidad_cobro, job.solo_mano_obra_submodo)}
+                    </span>{" "}
+                    · Modalidad bloqueada porque la obra ya tiene facturas emitidas.
+                  </div>
+                ) : editingBillingConfig ? (
+                  <div className="space-y-2.5">
+                    <BillingModeSelector
+                      value={billingConfigDraft}
+                      onChange={setBillingConfigDraft}
+                      defaultHourlyRateCents={defaultHourlyRateCents}
+                      compact
+                      disabled={busy}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setEditingBillingConfig(false)}
+                        className="min-h-[40px] rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#6B6860] cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="job-detail-save-billing-btn"
+                        disabled={busy}
+                        onClick={() =>
+                          void runAction(async () => {
+                            await new JobsRepository(executor).updateBillingConfig(
+                              job.id,
+                              billingConfigDraft
+                            );
+                            setEditingBillingConfig(false);
+                            setBillingSavedMsg("Modalidad de cobro actualizada.");
+                          })
+                        }
+                        className="min-h-[40px] flex-1 rounded-xl bg-[#4B7094] font-semibold text-[#FFFDF9] cursor-pointer disabled:opacity-50"
+                      >
+                        Guardar modalidad
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-2 text-[11px] text-[#6B6860]">
+                    Configuración actual:{" "}
+                    <strong className="text-[#2C2621]">
+                      {getBillingModeBadgeLabel(job.modalidad_cobro, job.solo_mano_obra_submodo)}
+                    </strong>
+                    {job.horas_estimadas_thousandths > 0 &&
+                      (job.modalidad_cobro === "partidas_mas_horas" ||
+                        (job.modalidad_cobro === "solo_mano_obra" &&
+                          job.solo_mano_obra_submodo === "por_horas")) &&
+                      ` · ${formatHoursLabel(job.horas_estimadas_thousandths)} × ${formatCentsEs(
+                        job.tarifa_hora_cents ?? defaultHourlyRateCents
+                      )}/h`}
+                    {job.mano_obra_fija_cents > 0 &&
+                      (job.modalidad_cobro === "partidas_mas_fijo_mano_obra" ||
+                        (job.modalidad_cobro === "solo_mano_obra" &&
+                          job.solo_mano_obra_submodo === "precio_cerrado")) &&
+                      ` · Fijo MO ${formatCentsEs(job.mano_obra_fija_cents)}`}
+                  </div>
+                )}
+              </div>
+
+              {/* Resumen de rentabilidad: Mano de obra vs Partidas/Gastos */}
+              {showProfitability && profitability && (
+                <div
+                  data-testid="job-detail-profitability-summary"
+                  className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[13px] font-semibold text-[#2C2621]">
+                      Rentabilidad (Mano de obra vs Partidas/Gastos)
+                    </h4>
+                    <span
+                      className={`font-mono font-mono-nums text-[12px] font-bold tabular-nums ${
+                        profitability.netProfitCents >= 0 ? "text-[#14532D]" : "text-[#9A2D08]"
+                      }`}
+                    >
+                      Neto {formatCentsEs(profitability.netProfitCents)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                      <div className="text-[#6B6860]">Mano de obra (presup.)</div>
+                      <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">
+                        {formatCentsEs(profitability.quotedLaborCents)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                      <div className="text-[#6B6860]">Partidas / Mat. (presup.)</div>
+                      <div className="font-mono font-mono-nums font-bold text-[#2C2621] tabular-nums">
+                        {formatCentsEs(profitability.quotedItemsCents)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                      <div className="text-[#6B6860]">Facturado (base)</div>
+                      <div className="font-mono font-mono-nums font-bold text-[#14532D] tabular-nums">
+                        {formatCentsEs(profitability.invoicedBaseCents)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5">
+                      <div className="text-[#6B6860]">Gastos tickets (base)</div>
+                      <div className="font-mono font-mono-nums font-bold text-[#9A2D08] tabular-nums">
+                        {formatCentsEs(profitability.ticketsBaseCents)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {(profitability.budgetedHoursThousandths > 0 ||
+                    profitability.loggedHoursThousandths > 0) && (
+                    <div className="flex items-center justify-between rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3 py-1.5 text-[11px]">
+                      <span className="text-[#6B6860]">Horas mano de obra</span>
+                      <span className="font-mono font-mono-nums font-semibold text-[#2C2621] tabular-nums">
+                        {formatHoursLabel(profitability.budgetedHoursThousandths)} est. ·{" "}
+                        {formatHoursLabel(profitability.loggedHoursThousandths)} reg.
+                      </span>
+                    </div>
+                  )}
+
+                  {profitability.hasUnexpectedMaterialTickets && (
+                    <div
+                      data-testid="job-detail-unexpected-material-alert"
+                      className="rounded-xl border border-[#D97706]/40 bg-[#FFF3A1]/70 px-3 py-2 text-[11px] font-semibold text-[#3E3300]"
+                    >
+                      Aviso: hay tickets de materiales imputados en una obra configurada como «Solo mano de obra».
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Planificación en Agenda y Calendario */}
               <div className="paper-sheet rounded-[20px] border border-[#E5DFD2] bg-[#FFFDF7] p-4 space-y-2.5">
@@ -528,12 +752,21 @@ export function JobDetailDrawer({
               <div>
                 <h4 className="font-semibold text-[#2C2621] mb-1.5">Presupuestos ({quotes.length})</h4>
                 <div className="space-y-2">
-                  {quotes.map((q) => (
+                  {quotes.map((q) => {
+                    const shouldPreview =
+                      (q.status === "aceptado" || q.status === "enviado") && Boolean(onPreviewQuote);
+                    return (
                     <button
                       key={q.id}
                       type="button"
                       data-testid={`job-quote-card-${q.id}`}
-                      onClick={() => onOpenQuote(q.id)}
+                      onClick={() => {
+                        if (shouldPreview) {
+                          onPreviewQuote?.(q.id);
+                        } else {
+                          onOpenQuote(q.id);
+                        }
+                      }}
                       className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
@@ -548,11 +781,12 @@ export function JobDetailDrawer({
                           {formatCentsEs(q.total_cents)}
                         </div>
                         <div className="text-[10px] font-semibold text-[#D04B00]">
-                          Abrir →
+                          {shouldPreview ? "Vista previa →" : "Abrir →"}
                         </div>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                   {quotes.length === 0 && (
                     <div className="text-[#6B6860]">Sin presupuestos emitidos aún.</div>
                   )}
@@ -577,12 +811,21 @@ export function JobDetailDrawer({
                   )}
                 </div>
                 <div className="space-y-2">
-                  {actas.map((a) => (
+                  {actas.map((a) => {
+                    const shouldPreview =
+                      (a.estado === "firmada" || a.estado === "completada") && Boolean(onPreviewActa);
+                    return (
                     <button
                       key={a.id}
                       type="button"
                       data-testid={`job-acta-${a.id}`}
-                      onClick={() => onOpenActa?.(a.id)}
+                      onClick={() => {
+                        if (shouldPreview) {
+                          onPreviewActa?.(a.id);
+                        } else {
+                          onOpenActa?.(a.id);
+                        }
+                      }}
                       className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
@@ -592,10 +835,11 @@ export function JobDetailDrawer({
                         </div>
                       </div>
                       <div className="shrink-0 text-[10px] font-semibold text-[#D04B00]">
-                        Abrir →
+                        {shouldPreview ? "Vista previa →" : "Abrir →"}
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                   {actas.length === 0 && (
                     <div className="text-[#6B6860]">Sin actas técnicas emitidas para esta obra.</div>
                   )}
@@ -610,7 +854,13 @@ export function JobDetailDrawer({
                       key={inv.id}
                       type="button"
                       data-testid={`job-invoice-${inv.id}`}
-                      onClick={() => onOpenInvoice(inv.id)}
+                      onClick={() => {
+                        if (onPreviewInvoice) {
+                          onPreviewInvoice(inv.id);
+                        } else {
+                          onOpenInvoice(inv.id);
+                        }
+                      }}
                       className="paper-sheet flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-3 text-left hover:border-[#EA580C] transition-colors cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
@@ -625,7 +875,7 @@ export function JobDetailDrawer({
                           {formatCentsEs(inv.total_cents)}
                         </div>
                         <div className="text-[10px] font-semibold text-[#D04B00]">
-                          Abrir →
+                          {onPreviewInvoice ? "Vista previa →" : "Abrir →"}
                         </div>
                       </div>
                     </button>
@@ -710,7 +960,8 @@ export function JobDetailDrawer({
                 </div>
               </div>
             </>
-          )}
+            );
+          })()}
         </div>
       </div>
 

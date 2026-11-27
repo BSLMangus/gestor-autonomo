@@ -160,9 +160,23 @@ test.describe("Usabilidad móvil 360px — Clientes, Precio en partidas y Obras 
     await page.getByPlaceholder("Título de la obra *").fill("Obra de prueba para cancelación");
     const clientSelect = page.locator('[data-testid="jobs-view"] form select');
     await clientSelect.selectOption({ index: 1 });
+
+    // Verificar selector "Modalidad de presupuesto / cobro" en creación de obra
+    const billingSelector = page.getByTestId("billing-mode-selector");
+    await expect(billingSelector).toBeVisible();
+    await expect(billingSelector).toContainText("Modalidad de presupuesto / cobro");
+    await page.getByTestId("billing-mode-option-solo_mano_obra").click();
+    await expect(page.getByTestId("billing-submode-por_horas")).toBeVisible();
+    await expect(page.getByTestId("billing-submode-precio_cerrado")).toBeVisible();
+    await page.getByTestId("billing-mode-option-partidas_mas_horas").click();
+    await page.getByTestId("billing-hours-input").fill("4");
+
     await page.getByRole("button", { name: "Crear obra" }).click();
 
     await expect(page.getByTestId("job-detail-drawer")).toBeVisible();
+    await expect(page.locator('[data-testid^="job-detail-billing-badge-"]')).toContainText(
+      "Partidas + Horas"
+    );
     await expect(page.getByTestId("job-detail-start-quote-btn")).toBeVisible();
 
     await page.getByRole("button", { name: "Pasar a cancelado" }).click();

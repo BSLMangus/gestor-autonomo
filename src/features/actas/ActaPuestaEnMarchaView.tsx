@@ -17,10 +17,12 @@ import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import type { DocumentOpenerService } from "../../core/files/documentOpener";
 import type { CameraAdapter } from "../../core/hardware/cameraAdapter";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
-import type { PdfPort } from "../../core/ports/mediaPorts";
+import type { PdfActaDocumentInput, PdfPort } from "../../core/ports/mediaPorts";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
+import type { DocumentPreviewRequest } from "../pdf/DocumentPreviewModal";
 import { ActaFreeFormBlocks } from "./ActaFreeFormBlocks";
 import { ActaGuidedChatPanel } from "./ActaGuidedChatPanel";
+import { readActaPhotoAsPdfDataUrl } from "./actaImageHelper";
 import { computeActaCompletion } from "./actaTemplates";
 import { SignaturePadModal } from "./SignaturePadModal";
 
@@ -38,6 +40,7 @@ interface ActaPuestaEnMarchaViewProps {
   refreshTick: number;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
   onBack: () => void;
+  onOpenDocumentPreview?: (req: DocumentPreviewRequest) => void;
   onDataChanged: () => Promise<void>;
 }
 
@@ -70,6 +73,7 @@ export function ActaPuestaEnMarchaView({
   refreshTick,
   registerBackHandler,
   onBack,
+  onOpenDocumentPreview,
   onDataChanged,
 }: ActaPuestaEnMarchaViewProps) {
   const [loading, setLoading] = useState(true);
@@ -234,6 +238,61 @@ export function ActaPuestaEnMarchaView({
   const handlePreviewPdf = async () => {
     setErrorMsg(null);
     setStatusMsg(null);
+    const snapshot = latestDraftRef.current;
+    if (onOpenDocumentPreview && actaRow && snapshot.data) {
+      const liveData = snapshot.data;
+      const liveEstado = snapshot.estado;
+      const liveClientSig = snapshot.firmaClienteBase64;
+      const liveInstallerSig = snapshot.firmaInstaladorBase64;
+      const codigoActa = actaRow.codigo_acta;
+
+      onOpenDocumentPreview({
+        docKind: "acta",
+        title: codigoActa,
+        subtitle:
+          liveData.cliente.nombre_razon_social ||
+          liveData.alcance_ubicacion ||
+          "Acta de puesta en marcha",
+        isDraft: liveEstado === "borrador",
+        loadBytes: async () => {
+          const settings = appSettings ?? (await new SettingsRepository(executor).getAppSettings());
+          const resolvedFotos: Array<{ dataUrl: string; pieFoto: string }> = [];
+          for (const foto of liveData.fotos) {
+            const dataUrl = await readActaPhotoAsPdfDataUrl(fileBridge, foto.uri);
+            if (dataUrl) {
+              resolvedFotos.push({ dataUrl, pieFoto: foto.pie_foto });
+            }
+          }
+          const pdfInput: PdfActaDocumentInput = {
+            kind: "acta",
+            codigoActa,
+            estado: liveEstado,
+            data: {
+              ...liveData,
+              codigo_acta: codigoActa,
+            },
+            emitterLogoDataUrl: settings.emitter_logo_data_url ?? null,
+            firmaInstaladorDataUrl:
+              liveInstallerSig ?? settings.emitter_signature_data_url ?? null,
+            firmaClienteDataUrl: liveClientSig ?? null,
+            resolvedFotos,
+          };
+          const release = memoryCoordinator
+            ? await memoryCoordinator.acquireHeavyTask("pdf")
+            : async () => undefined;
+          try {
+            return await pdfPort.buildDocumentPdf(pdfInput);
+          } finally {
+            await release();
+          }
+        },
+        onDownloadOrShare: async (bytes, fileName) => {
+          await documentOpener.shareRawPdfBytes(bytes, fileName, codigoActa);
+        },
+      });
+      return;
+    }
+
     setPdfBusy(true);
     try {
       await flushSave(false);
@@ -591,6 +650,7 @@ export function ActaPuestaEnMarchaView({
               setFirmaClienteBase64(null);
               setDirty(true);
             }}
+            onPreviewPdf={handlePreviewPdf}
             onGenerateAndSharePdf={handleGenerateAndSharePdf}
           />
         </div>

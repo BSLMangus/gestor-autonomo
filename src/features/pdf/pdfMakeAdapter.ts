@@ -7,6 +7,7 @@ import {
   formatCentsEs,
   formatPercentEs,
 } from "../../core/fiscal/fiscalEngine";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import type {
   PdfActaDocumentInput,
   PdfBuildInput,
@@ -84,32 +85,193 @@ export function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<st
     input.estimatedDurationValue,
     input.estimatedDurationUnit
   );
+  const billingMode = input.billingMode ?? "solo_partidas";
 
-  const lineRows: Array<Array<Record<string, unknown>>> = [
-    [
-      buildPastelHeaderCell("Descripción de las tareas"),
-      buildPastelHeaderCell("Costes", "right"),
-    ],
-    ...input.lines.map((line) => [
-      buildPastelDataCell([
-        { text: line.description, fontSize: 9.5, color: PDF_COLORS.ink },
-        {
-          text: `${formatThousandthsEs(line.quantityThousandths)} ${line.unit} × ${formatCentsEs(line.unitPriceCents)}`,
-          fontSize: 8,
-          color: PDF_COLORS.ink,
-          margin: [0, 2, 0, 0],
-        },
-      ]),
-      buildPastelDataCell(formatCentsEs(line.lineSubtotalCents), {
-        bold: true,
-        alignment: "right",
+  const sanitizedLines = input.lines.map((line) => ({
+    ...line,
+    cleanDescription: sanitizeQuoteItemDescription(line.description, {
+      knownPricesCents: [line.unitPriceCents, line.lineSubtotalCents],
+    }),
+  }));
+
+  const quoteTables: Array<Record<string, unknown>> = [];
+
+  if (billingMode === "solo_mano_obra") {
+    const taskRows: Array<Array<Record<string, unknown>>> = [
+      [buildPastelHeaderCell("Descripción de las tareas / trabajos incluidos")],
+    ];
+
+    if (sanitizedLines.length > 0) {
+      for (const line of sanitizedLines) {
+        const trimmedUnit = line.unit?.trim() ?? "";
+        const includeQty =
+          line.quantityThousandths > 0 &&
+          (line.quantityThousandths !== 1000 ||
+            (trimmedUnit.length > 0 && trimmedUnit.toLowerCase() !== "ud"));
+        const taskText = includeQty
+          ? `${line.cleanDescription} (${formatThousandthsEs(line.quantityThousandths)}${trimmedUnit ? ` ${trimmedUnit}` : ""})`
+          : line.cleanDescription;
+        taskRows.push([
+          buildPastelDataCell(taskText, {
+            fontSize: 9.5,
+            color: PDF_COLORS.ink,
+          }),
+        ]);
+      }
+    } else {
+      taskRows.push([
+        buildPastelDataCell(
+          generalDescription || "Trabajos de mano de obra incluidos según presupuesto",
+          {
+            fontSize: 9.5,
+            color: PDF_COLORS.ink,
+          }
+        ),
+      ]);
+    }
+
+    quoteTables.push(
+      buildPastelTable({
+        widths: ["*"],
+        body: taskRows,
+        marginBottom: 8,
+      })
+    );
+
+    const effectiveLaborCents = input.laborCents ?? input.subtotalCents;
+    const laborLabel =
+      input.laborSubMode === "precio_cerrado"
+        ? "Mano de obra (Precio cerrado)"
+        : `Mano de obra (${formatThousandthsEs(input.laborHoursThousandths ?? 0)} h × ${formatCentsEs(input.hourlyRateCents ?? 0)}/h)`;
+
+    quoteTables.push(
+      buildPastelTable({
+        widths: ["*", "auto"],
+        headerRows: 0,
+        body: [
+          [
+            buildPastelDataCell(laborLabel, {
+              fontSize: 9.5,
+              color: PDF_COLORS.ink,
+            }),
+            buildPastelDataCell(formatCentsEs(effectiveLaborCents), {
+              fontSize: 9.5,
+              bold: true,
+              alignment: "right",
+              color: PDF_COLORS.ink,
+            }),
+          ],
+          [
+            buildPastelSubtotalCell("Sub-Total"),
+            buildPastelSubtotalCell(formatCentsEs(input.subtotalCents), "right"),
+          ],
+        ],
+        marginBottom: 12,
+      })
+    );
+  } else {
+    const lineRows: Array<Array<Record<string, unknown>>> = [
+      [
+        buildPastelHeaderCell("Descripción de las tareas"),
+        buildPastelHeaderCell("Cant.", "right"),
+        buildPastelHeaderCell("Precio unit.", "right"),
+        buildPastelHeaderCell("Total", "right"),
+      ],
+      ...sanitizedLines.map((line) => {
+        const trimmedUnit = line.unit?.trim() ?? "";
+        const qtyLabel = trimmedUnit
+          ? `${formatThousandthsEs(line.quantityThousandths)} ${trimmedUnit}`
+          : formatThousandthsEs(line.quantityThousandths);
+
+        return [
+          buildPastelDataCell(line.cleanDescription, {
+            fontSize: 9.5,
+            color: PDF_COLORS.ink,
+          }),
+          buildPastelDataCell(qtyLabel, {
+            fontSize: 9,
+            alignment: "right",
+            color: PDF_COLORS.ink,
+          }),
+          buildPastelDataCell(formatCentsEs(line.unitPriceCents), {
+            fontSize: 9,
+            alignment: "right",
+            color: PDF_COLORS.ink,
+          }),
+          buildPastelDataCell(formatCentsEs(line.lineSubtotalCents), {
+            fontSize: 9.5,
+            bold: true,
+            alignment: "right",
+            color: PDF_COLORS.ink,
+          }),
+        ];
       }),
-    ]),
-    [
+    ];
+
+    if (billingMode === "partidas_mas_horas" && (input.laborCents ?? 0) > 0) {
+      lineRows.push([
+        buildPastelDataCell("Mano de obra", {
+          fontSize: 9.5,
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell(`${formatThousandthsEs(input.laborHoursThousandths ?? 0)} h`, {
+          fontSize: 9,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell(`${formatCentsEs(input.hourlyRateCents ?? 0)}/h`, {
+          fontSize: 9,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell(formatCentsEs(input.laborCents ?? 0), {
+          fontSize: 9.5,
+          bold: true,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+      ]);
+    } else if (billingMode === "partidas_mas_fijo_mano_obra" && (input.laborCents ?? 0) > 0) {
+      const fixedLabor = input.laborCents ?? 0;
+      lineRows.push([
+        buildPastelDataCell("Mano de obra (importe fijo)", {
+          fontSize: 9.5,
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell("1 ud", {
+          fontSize: 9,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell(formatCentsEs(fixedLabor), {
+          fontSize: 9,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+        buildPastelDataCell(formatCentsEs(fixedLabor), {
+          fontSize: 9.5,
+          bold: true,
+          alignment: "right",
+          color: PDF_COLORS.ink,
+        }),
+      ]);
+    }
+
+    lineRows.push([
       buildPastelSubtotalCell("Sub-Total"),
+      buildPastelSubtotalCell("", "right"),
+      buildPastelSubtotalCell("", "right"),
       buildPastelSubtotalCell(formatCentsEs(input.subtotalCents), "right"),
-    ],
-  ];
+    ]);
+
+    quoteTables.push(
+      buildPastelTable({
+        widths: ["*", "auto", "auto", "auto"],
+        body: lineRows,
+        marginBottom: 12,
+      })
+    );
+  }
 
   const content: Array<Record<string, unknown>> = [
     buildUnifiedHeader({
@@ -159,13 +321,7 @@ export function buildQuoteDocDefinition(input: PdfQuoteDocumentInput): Record<st
     );
   }
 
-  content.push(
-    buildPastelTable({
-      widths: ["*", 96],
-      body: lineRows,
-      marginBottom: 12,
-    })
-  );
+  content.push(...quoteTables);
 
   const closingStack: Array<Record<string, unknown>> = [];
 

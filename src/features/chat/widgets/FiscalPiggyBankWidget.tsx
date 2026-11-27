@@ -1,11 +1,59 @@
-import type { ActiveWidgetEnvelope } from "../../../core/contracts/types";
-import { formatCentsEs } from "../../../core/fiscal/fiscalEngine";
+import { useEffect, useState } from "react";
+import type { ActiveWidgetEnvelope, QuoteRow } from "../../../core/contracts/types";
+import { InvoicesRepository } from "../../../core/db/repositories/invoicesRepo";
+import { JobsRepository } from "../../../core/db/repositories/jobsRepo";
+import { ScheduleRepository } from "../../../core/db/repositories/scheduleRepo";
+import { TicketsRepository } from "../../../core/db/repositories/ticketsRepo";
+import {
+  computeJobBillingProfitability,
+  formatCentsEs,
+  type JobBillingProfitability,
+} from "../../../core/fiscal/fiscalEngine";
+import { getBillingModeBadgeLabel } from "../../jobs/BillingModeSelector";
 import type { WidgetCommonProps } from "./widgetTypes";
 
 type FiscalWidget = Extract<ActiveWidgetEnvelope, { ui_widget_type: "FiscalPiggyBankWidget" }>;
 
 export function FiscalPiggyBankWidget({ widget, runtime }: WidgetCommonProps) {
   const fp = (widget as FiscalWidget).widget_payload;
+  const [profitabilityByJobId, setProfitabilityByJobId] = useState<
+    Map<string, JobBillingProfitability>
+  >(() => new Map());
+
+  useEffect(() => {
+    const executor = runtime?.executor;
+    if (!executor || fp.job_profits.length === 0) {
+      setProfitabilityByJobId(new Map());
+      return;
+    }
+    let active = true;
+    const jobIds = new Set(fp.job_profits.map((jp) => jp.job_id));
+    Promise.all([
+      new JobsRepository(executor).listAll(),
+      executor.query<QuoteRow>(`SELECT * FROM quotes ORDER BY created_at_ms DESC`),
+      new InvoicesRepository(executor).listAll(),
+      new TicketsRepository(executor).listAll(),
+      new ScheduleRepository(executor).listAllEntries(),
+    ])
+      .then(([jobs, quotes, invoices, tickets, scheduleEntries]) => {
+        if (!active) return;
+        const targetJobs = jobs.filter((j) => jobIds.has(j.id));
+        const rows = computeJobBillingProfitability({
+          jobs: targetJobs,
+          quotes,
+          invoices,
+          tickets,
+          scheduleEntries,
+        });
+        setProfitabilityByJobId(new Map(rows.map((r) => [r.jobId, r])));
+      })
+      .catch(() => {
+        if (active) setProfitabilityByJobId(new Map());
+      });
+    return () => {
+      active = false;
+    };
+  }, [runtime?.executor, fp.job_profits]);
 
   return (
     <section
@@ -105,24 +153,50 @@ export function FiscalPiggyBankWidget({ widget, runtime }: WidgetCommonProps) {
           <div className="text-xs font-semibold text-[#2C2621] mb-1.5">
             Beneficio neto acumulado por obra
           </div>
-          <div className="space-y-1">
-            {fp.job_profits.map((jp) => (
-              <div
-                key={jp.job_id}
-                className="flex items-center justify-between rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-1.5 text-xs"
-              >
-                <span className="truncate font-medium text-[#2C2621]">
-                  <span className="font-mono-nums">{jp.job_code}</span> · {jp.job_title}
-                </span>
-                <span
-                  className={`ml-2 font-bold font-mono-nums tabular-nums ${
-                    jp.net_profit_cents >= 0 ? "text-[#1E8E5A]" : "text-[#E85D2A]"
-                  }`}
+          <div className="space-y-1.5">
+            {fp.job_profits.map((jp) => {
+              const prof = profitabilityByJobId.get(jp.job_id);
+              return (
+                <div
+                  key={jp.job_id}
+                  data-testid={`piggy-job-profit-${jp.job_id}`}
+                  className="rounded-lg border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-2 text-xs space-y-1"
                 >
-                  {formatCentsEs(jp.net_profit_cents)}
-                </span>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-medium text-[#2C2621]">
+                      <span className="font-mono-nums">{jp.job_code}</span> · {jp.job_title}
+                    </span>
+                    <span
+                      className={`shrink-0 font-bold font-mono-nums tabular-nums ${
+                        jp.net_profit_cents >= 0 ? "text-[#1E8E5A]" : "text-[#E85D2A]"
+                      }`}
+                    >
+                      {formatCentsEs(jp.net_profit_cents)}
+                    </span>
+                  </div>
+                  {prof && (
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] text-[#6B6860]">
+                      <span
+                        data-testid={`piggy-job-billing-badge-${jp.job_id}`}
+                        className="rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-0.5 font-semibold text-[#3D352E]"
+                      >
+                        {getBillingModeBadgeLabel(prof.billingMode, prof.laborSubMode)}
+                      </span>
+                      <span className="font-mono-nums tabular-nums">
+                        MO {formatCentsEs(prof.quotedLaborCents)} · Mat{" "}
+                        {formatCentsEs(prof.quotedItemsCents)} · Gastos{" "}
+                        {formatCentsEs(prof.ticketsBaseCents)}
+                      </span>
+                      {prof.hasUnexpectedMaterialTickets && (
+                        <span className="rounded-full bg-[#FFF3A1] px-2 py-0.5 font-semibold text-[#3E3300]">
+                          Tickets material
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

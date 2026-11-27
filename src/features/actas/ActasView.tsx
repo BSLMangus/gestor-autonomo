@@ -20,6 +20,7 @@ interface ActasViewProps {
   executor: SqliteExecutor;
   refreshTick: number;
   onOpenActa: (actaId: string) => void;
+  onPreviewActa?: (actaId: string) => void;
   onCreateActa: (params?: {
     jobId?: string | null;
     quoteId?: string | null;
@@ -60,6 +61,7 @@ export function ActasView({
   executor,
   refreshTick,
   onOpenActa,
+  onPreviewActa,
   onCreateActa,
 }: ActasViewProps) {
   const [search, setSearch] = useState("");
@@ -321,7 +323,13 @@ export function ActasView({
                 key={acta.id}
                 type="button"
                 data-testid={`acta-list-item-${acta.id}`}
-                onClick={() => onOpenActa(acta.id)}
+                onClick={() => {
+                  if ((acta.estado === "firmada" || acta.estado === "completada") && onPreviewActa) {
+                    onPreviewActa(acta.id);
+                  } else {
+                    onOpenActa(acta.id);
+                  }
+                }}
                 className="paper-sheet w-full rounded-2xl border border-[#E5DFD2] bg-[#FFFDF7] p-3.5 text-left hover:border-[#EA580C] transition-colors cursor-pointer space-y-1.5"
               >
                 <div className="flex items-center justify-between gap-2">

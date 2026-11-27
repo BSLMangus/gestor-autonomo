@@ -22,6 +22,7 @@ import {
 import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
+  BillingModeConfig,
   JobRow,
   JobScheduleDeviationSummary,
   ScheduleEntryRow,
@@ -56,6 +57,10 @@ import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import { TaxAlertsBanner } from "../fiscal/TaxAlertsBanner";
+import {
+  BillingModeSelector,
+  createDefaultBillingModeConfig,
+} from "../jobs/BillingModeSelector";
 import { SubDayDurationPicker } from "./SubDayDurationPicker";
 
 const FALLBACK_DEFAULTS: WorkScheduleDefaults = {
@@ -222,6 +227,9 @@ export function CalendarScheduleView({
   const [newJobId, setNewJobId] = useState("");
   const [quickCreateJob, setQuickCreateJob] = useState(false);
   const [quickJobTitle, setQuickJobTitle] = useState("");
+  const [quickBillingConfig, setQuickBillingConfig] = useState<BillingModeConfig>(() =>
+    createDefaultBillingModeConfig(3800)
+  );
   const [newDate, setNewDate] = useState(initialDate);
   const [newEndDate, setNewEndDate] = useState(initialDate);
   const [newStart, setNewStart] = useState("08:00");
@@ -446,6 +454,11 @@ export function CalendarScheduleView({
           title: quickJobTitle.trim(),
           start_date_iso: newDate,
           end_date_iso: newModalMode === "multi_day" ? newEndDate : newDate,
+          modalidad_cobro: quickBillingConfig.modalidad_cobro,
+          solo_mano_obra_submodo: quickBillingConfig.solo_mano_obra_submodo,
+          horas_estimadas_thousandths: quickBillingConfig.horas_estimadas_thousandths,
+          tarifa_hora_cents: quickBillingConfig.tarifa_hora_cents,
+          mano_obra_fija_cents: quickBillingConfig.mano_obra_fija_cents,
         });
         targetJobId = createdJob.id;
       }
@@ -467,6 +480,7 @@ export function CalendarScheduleView({
       setNewNotes("");
       setQuickCreateJob(false);
       setQuickJobTitle("");
+      setQuickBillingConfig(createDefaultBillingModeConfig(hourlyRateCents));
       setShowAddModal(false);
       await loadCalendar();
       await onDataChanged();
@@ -491,6 +505,7 @@ export function CalendarScheduleView({
     setNewDurationThousandths(2000);
     setQuickCreateJob(false);
     setQuickJobTitle("");
+    setQuickBillingConfig(createDefaultBillingModeConfig(hourlyRateCents));
     setShowAddModal(true);
   };
 
@@ -1510,15 +1525,24 @@ export function CalendarScheduleView({
                 </button>
               </div>
               {quickCreateJob ? (
-                <input
-                  type="text"
-                  data-testid="calendar-quick-job-title"
-                  maxLength={TEXT_LIMITS.TITLE}
-                  value={quickJobTitle}
-                  onChange={(e) => setQuickJobTitle(e.target.value)}
-                  placeholder="Título del trabajo rápido (ej. Cambio de grifo)"
-                  className="min-h-[44px] rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
-                />
+                <div className="space-y-2.5">
+                  <input
+                    type="text"
+                    data-testid="calendar-quick-job-title"
+                    maxLength={TEXT_LIMITS.TITLE}
+                    value={quickJobTitle}
+                    onChange={(e) => setQuickJobTitle(e.target.value)}
+                    placeholder="Título del trabajo rápido (ej. Cambio de grifo)"
+                    className="min-h-[44px] w-full rounded-xl bg-[#FFFDF7] border border-[#E5DFD2] px-3 text-[13px] text-[#2C2621] focus:border-[#EA580C] focus:outline-none"
+                  />
+                  <BillingModeSelector
+                    compact
+                    value={quickBillingConfig}
+                    onChange={setQuickBillingConfig}
+                    defaultHourlyRateCents={hourlyRateCents}
+                    disabled={busy}
+                  />
+                </div>
               ) : (
                 <select
                   value={newJobId}

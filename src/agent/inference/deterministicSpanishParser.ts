@@ -6,6 +6,7 @@ import type {
   TicketVatRate,
 } from "../../core/contracts/types";
 import { deriveFiscalQuarter, getLocalTodayIso, isValidIsoDate } from "../../core/fiscal/dateQuarter";
+import { extractPriceAndCleanDescription } from "../../core/text/quoteDescriptionSanitizer";
 import { normalizeSpanishText, parseEurosToCents } from "../../core/text/spanishText";
 import {
   extractAddress,
@@ -289,7 +290,7 @@ export function extractTicketFieldsFromText(text: string): ParsedTicketFields {
         )
         .trim();
       const leadBeforeAmount =
-        /^([A-Za-zÁÉÍÓÚÑáéíóúñ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9.\s]{1,40}?)(?=\s*(?:,|;|\bpor\b|\bimporte\b|\btotal\b|\bbase\b|\biva\b|\d+(?:[.,]\d{1,2})?\s*(?:€|eur|euros)\b))/i.exec(
+        /^([A-Za-zÁÉÍÓÚÑáéíóúñ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9.\s]{1,40}?)(?=\s*(?:,|;|\bpor\b|\bimporte\b|\btotal\b|\bbase\b|\biva\b|\d+(?:[.,]\d{1,2})?\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])))/i.exec(
           cleanedLead
         );
       if (leadBeforeAmount?.[1] && !isGenericTicketSupplier(leadBeforeAmount[1])) {
@@ -306,8 +307,8 @@ export function extractTicketFieldsFromText(text: string): ParsedTicketFields {
     /iva(?:\s+(\d{1,2})\s*%)?[:\s]+(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)?/i.exec(text);
   const totalMatch =
     /total(?:\s+ticket)?[:\s]+(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)?/i.exec(text) ??
-    /(?:por|importe|de)\s+(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(text) ??
-    /\b(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(text);
+    /(?:por|importe|de)\s+(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i.exec(text) ??
+    /\b(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)(?=$|[\s,.;:)\]}!?/])/i.exec(text);
 
   const baseCents = baseMatch?.[1] ? parseEurosToCents(baseMatch[1]) : null;
   const vatCents = vatMatch?.[2] ? parseEurosToCents(vatMatch[2]) : null;
@@ -416,19 +417,22 @@ export function parseQuoteLinesAndMeta(text: string): {
     .trim();
 
   const segments = cleanBody
-    .split(/[,;\n]+|\s+\by\b\s+|\s*\+\s*/i)
+    .split(/(?:(?<!\d),(?!\d)|[;\n])+|\s+\by\b\s+|\s*\+\s*/i)
     .map((s) => stripQuotePreamble(s))
     .filter((s) => s.length > 0 && !/^(vivienda|general)$/i.test(s) && !isGarbageQuoteSegment(s));
 
   const lines: ParsedQuoteLine[] = [];
   for (const seg of segments) {
-    let working = seg;
-    let explicitPriceCents: number | null = null;
-    const priceMatch = /\s+(?:por|a)\s+(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros)\b/i.exec(working);
-    if (priceMatch?.[1]) {
-      explicitPriceCents = parseEurosToCents(priceMatch[1]);
-      working = working.slice(0, priceMatch.index).trim();
+    const { description: cleanedSeg, extractedPriceCents } = extractPriceAndCleanDescription(seg);
+    if (
+      extractedPriceCents !== null &&
+      cleanedSeg === seg.trim() &&
+      /^(?:€\s*|eur(?:os?)?\s*)?\d+(?:[.,]\d{1,2})?(?:\s*(?:€|eur(?:os?)?))?$/i.test(cleanedSeg)
+    ) {
+      continue;
     }
+    const working = cleanedSeg;
+    const explicitPriceCents = extractedPriceCents;
 
     let qty = 1;
     let unit = "ud";
@@ -497,7 +501,7 @@ export function parseQuoteSlotReply(
   const wordCount = normCleaned.split(/\s+/).filter(Boolean).length;
   const looksLikeWorkLine =
     /\d/.test(normCleaned) ||
-    /\b(termo|grifo|alicatado|pintura|ducha|plato|luz|puntos?|cuadro|llave|cable|tuberia|m2|ml|kg|horas?|euros?|€|desmontaje|instalacion|reparacion|reforma|bano|cocina|suelo|pared|techo|griferia|inodoro|lavabo)\b/.test(
+    /(?:\b(termo|grifo|alicatado|pintura|ducha|plato|luz|puntos?|cuadro|llave|cable|tuberia|m2|ml|kg|horas?|euros?|desmontaje|instalacion|reparacion|reforma|bano|cocina|suelo|pared|techo|griferia|inodoro|lavabo)\b|€(?=$|[\s,.;:)\]}!?/]))/.test(
       normCleaned
     );
 

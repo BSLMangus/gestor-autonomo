@@ -17,11 +17,12 @@ import { JobsRepository } from "../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../core/db/repositories/quotesRepo";
 import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import {
-  computeQuoteTotals,
+  computeQuoteTotalsByBillingMode,
   formatCentsEs,
   parseQuotePaymentMethodsJson,
   parseQuotePaymentScheduleJson,
 } from "../../core/fiscal/fiscalEngine";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import {
   normalizeSpanishText,
   type ParsedQuoteLine,
@@ -29,12 +30,33 @@ import {
 import { getSeedOverride, type GraphDependencies } from "../ports";
 import type { ObraLocalGraphState, ObraLocalGraphUpdate } from "../state";
 
+function sanitizeLines(
+  lines: Gate1QuoteDraftPayload["lines"]
+): Gate1QuoteDraftPayload["lines"] {
+  return lines.map((line) => ({
+    ...line,
+    description: sanitizeQuoteItemDescription(line.description, {
+      knownPricesCents: line.unit_price_cents > 0 ? [line.unit_price_cents] : [],
+    }),
+  }));
+}
+
 function buildQuoteEnvelope(draft: Gate1QuoteDraftPayload): ActiveWidgetEnvelope {
-  const totals = computeQuoteTotals(draft.lines, draft.vat_rate);
+  const cleanedLines = sanitizeLines(draft.lines);
+  const totals = computeQuoteTotalsByBillingMode({
+    billingMode: draft.modalidad_cobro ?? "solo_partidas",
+    laborSubMode: draft.solo_mano_obra_submodo ?? "por_horas",
+    lines: cleanedLines,
+    vatRate: draft.vat_rate,
+    horasEstimadasThousandths: draft.horas_estimadas_thousandths ?? 0,
+    tarifaHoraCents: draft.tarifa_hora_cents ?? 0,
+    manoObraFijaCents: draft.mano_obra_fija_cents ?? 0,
+  });
   return {
     ui_widget_type: "QuoteBuilderWidget",
     widget_payload: {
       ...draft,
+      lines: cleanedLines,
       subtotal_cents: totals.subtotalCents,
       vat_cents: totals.vatCents,
       total_cents: totals.totalCents,
@@ -116,6 +138,11 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           show_iban: appSettings.emitter_iban.trim().length > 0,
           notes: "",
           attachments: [],
+          modalidad_cobro: "solo_partidas",
+          solo_mano_obra_submodo: "por_horas",
+          horas_estimadas_thousandths: 0,
+          tarifa_hora_cents: appSettings.hourly_rate_cents,
+          mano_obra_fija_cents: 0,
           lines: [],
         };
         return {
@@ -163,6 +190,11 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             show_iban: appSettings.emitter_iban.trim().length > 0,
             notes: "",
             attachments: [],
+            modalidad_cobro: job.modalidad_cobro ?? "solo_partidas",
+            solo_mano_obra_submodo: job.solo_mano_obra_submodo ?? "por_horas",
+            horas_estimadas_thousandths: job.horas_estimadas_thousandths ?? 0,
+            tarifa_hora_cents: job.tarifa_hora_cents ?? appSettings.hourly_rate_cents,
+            mano_obra_fija_cents: job.mano_obra_fija_cents ?? 0,
             lines: [],
           };
           return {
@@ -203,9 +235,23 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
                 : ((existingQuote.iban_override ?? "").trim() || appSettings.emitter_iban).length > 0,
             notes: existingQuote.notes,
             attachments: parseQuoteAttachmentsJson(existingQuote.attachments_json),
+            modalidad_cobro:
+              existingQuote.modalidad_cobro ?? job.modalidad_cobro ?? "solo_partidas",
+            solo_mano_obra_submodo:
+              existingQuote.solo_mano_obra_submodo ?? job.solo_mano_obra_submodo ?? "por_horas",
+            horas_estimadas_thousandths:
+              existingQuote.horas_estimadas_thousandths ?? job.horas_estimadas_thousandths ?? 0,
+            tarifa_hora_cents:
+              existingQuote.tarifa_hora_cents ??
+              job.tarifa_hora_cents ??
+              appSettings.hourly_rate_cents,
+            mano_obra_fija_cents:
+              existingQuote.mano_obra_fija_cents ?? job.mano_obra_fija_cents ?? 0,
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
-              description: item.description,
+              description: sanitizeQuoteItemDescription(item.description, {
+                knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+              }),
               category: item.category,
               unit: item.unit,
               quantity_thousandths: item.quantity_thousandths,
@@ -447,9 +493,19 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
                 : ((q.iban_override ?? "").trim() || appSettings.emitter_iban).length > 0,
             notes: q.notes,
             attachments: parseQuoteAttachmentsJson(q.attachments_json),
+            modalidad_cobro: q.modalidad_cobro ?? j?.modalidad_cobro ?? "solo_partidas",
+            solo_mano_obra_submodo:
+              q.solo_mano_obra_submodo ?? j?.solo_mano_obra_submodo ?? "por_horas",
+            horas_estimadas_thousandths:
+              q.horas_estimadas_thousandths ?? j?.horas_estimadas_thousandths ?? 0,
+            tarifa_hora_cents:
+              q.tarifa_hora_cents ?? j?.tarifa_hora_cents ?? appSettings.hourly_rate_cents,
+            mano_obra_fija_cents: q.mano_obra_fija_cents ?? j?.mano_obra_fija_cents ?? 0,
             lines: items.map((item) => ({
               catalog_item_id: item.catalog_item_id,
-              description: item.description,
+              description: sanitizeQuoteItemDescription(item.description, {
+                knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+              }),
               category: item.category,
               unit: item.unit,
               quantity_thousandths: item.quantity_thousandths,
@@ -487,7 +543,9 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
           const unitPrice = line.explicit_price_cents ?? top.unit_price_cents;
           draftLines.push({
             catalog_item_id: top.id,
-            description: top.description,
+            description: sanitizeQuoteItemDescription(top.description, {
+              knownPricesCents: [top.unit_price_cents, unitPrice],
+            }),
             category: top.category,
             unit: top.unit,
             quantity_thousandths: line.quantity_thousandths,
@@ -496,13 +554,16 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             save_to_catalog: false,
           });
         } else {
+          const unitPrice = line.explicit_price_cents ?? 0;
           draftLines.push({
             catalog_item_id: null,
-            description: line.description,
+            description: sanitizeQuoteItemDescription(line.description, {
+              knownPricesCents: unitPrice > 0 ? [unitPrice] : [],
+            }),
             category: "General",
             unit: line.unit,
             quantity_thousandths: line.quantity_thousandths,
-            unit_price_cents: line.explicit_price_cents ?? 0,
+            unit_price_cents: unitPrice,
             original_unit_price_cents: 0,
             save_to_catalog: true,
           });
@@ -667,6 +728,12 @@ export function createQuoteSpecialistNode(deps: GraphDependencies) {
             ? "IVA 10 % sujeto a requisitos de reforma en vivienda."
             : "",
         attachments: [],
+        modalidad_cobro: existingJob?.modalidad_cobro ?? "solo_partidas",
+        solo_mano_obra_submodo: existingJob?.solo_mano_obra_submodo ?? "por_horas",
+        horas_estimadas_thousandths: existingJob?.horas_estimadas_thousandths ?? 0,
+        tarifa_hora_cents:
+          existingJob?.tarifa_hora_cents ?? appSettings.hourly_rate_cents,
+        mano_obra_fija_cents: existingJob?.mano_obra_fija_cents ?? 0,
         lines: draftLines,
       };
 

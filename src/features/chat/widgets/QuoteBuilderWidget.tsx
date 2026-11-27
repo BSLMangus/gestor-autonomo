@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Paperclip, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Info, Paperclip, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   patchQuoteDraftByVoice,
@@ -14,10 +14,13 @@ import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 import type {
   ActiveWidgetEnvelope,
   AppSettingsRecord,
+  BillingMode,
+  BillingModeConfig,
   CatalogCategory,
   CatalogItemRow,
   ClientRow,
   Gate1QuoteDraftPayload,
+  LaborOnlySubMode,
   QuoteAttachment,
   QuoteDurationUnit,
   QuoteVatRate,
@@ -25,9 +28,18 @@ import type {
 import { CatalogRepository } from "../../../core/db/repositories/catalogRepo";
 import { ClientsRepository } from "../../../core/db/repositories/clientsRepo";
 import { SettingsRepository } from "../../../core/db/repositories/settingsRepo";
-import { computeQuoteTotals, formatCentsEs } from "../../../core/fiscal/fiscalEngine";
+import { getLocalTodayIso } from "../../../core/fiscal/dateQuarter";
+import {
+  computeLineSubtotalCents,
+  computeQuoteTotalsByBillingMode,
+  computeQuoteValidUntilIso,
+  formatCentsEs,
+} from "../../../core/fiscal/fiscalEngine";
+import type { PdfQuoteDocumentInput } from "../../../core/ports/mediaPorts";
 import { formatPricingBreakdown } from "../../../core/pricing/pricingEngine";
+import { sanitizeQuoteItemDescription } from "../../../core/text/quoteDescriptionSanitizer";
 import { normalizeSpanishText } from "../../../core/text/spanishText";
+import { BillingModeSelector } from "../../jobs/BillingModeSelector";
 import {
   centsToInitialPriceText,
   eurInputToCents,
@@ -290,10 +302,62 @@ export function QuoteBuilderWidget({
       setVoiceDisambig(res.disambiguation ?? null);
     },
   });
-  const totals = useMemo(
-    () => computeQuoteTotals(draft.lines, draft.vat_rate),
-    [draft.lines, draft.vat_rate]
-  );
+  const billingMode: BillingMode = draft.modalidad_cobro ?? "solo_partidas";
+  const laborSubMode: LaborOnlySubMode = draft.solo_mano_obra_submodo ?? "por_horas";
+  const laborHoursThousandths = draft.horas_estimadas_thousandths ?? 0;
+  const effectiveHourlyRateCents = draft.tarifa_hora_cents ?? hourlyRateCents;
+  const fixedLaborCents = draft.mano_obra_fija_cents ?? 0;
+  const isLaborOnly = billingMode === "solo_mano_obra";
+
+  const billingConfig: BillingModeConfig = {
+    modalidad_cobro: billingMode,
+    solo_mano_obra_submodo: laborSubMode,
+    horas_estimadas_thousandths: laborHoursThousandths,
+    tarifa_hora_cents:
+      draft.tarifa_hora_cents !== undefined ? draft.tarifa_hora_cents : hourlyRateCents,
+    mano_obra_fija_cents: fixedLaborCents,
+  };
+
+  const totals = useMemo(() => {
+    const summary = computeQuoteTotalsByBillingMode({
+      billingMode,
+      laborSubMode,
+      lines: draft.lines,
+      vatRate: draft.vat_rate,
+      horasEstimadasThousandths: laborHoursThousandths,
+      tarifaHoraCents: effectiveHourlyRateCents,
+      manoObraFijaCents: fixedLaborCents,
+    });
+    const lineSubtotals = draft.lines.map((line) =>
+      billingMode === "solo_mano_obra"
+        ? 0
+        : computeLineSubtotalCents(line.quantity_thousandths, line.unit_price_cents)
+    );
+    return {
+      ...summary,
+      lineSubtotals,
+    };
+  }, [
+    billingMode,
+    laborSubMode,
+    draft.lines,
+    draft.vat_rate,
+    laborHoursThousandths,
+    effectiveHourlyRateCents,
+    fixedLaborCents,
+  ]);
+
+  const hasEmbeddedHoursCatalogItem = useMemo(() => {
+    if (billingMode !== "partidas_mas_horas") return false;
+    return draft.lines.some((line) => {
+      if (!line.catalog_item_id) return false;
+      const item = catalogItems.find((ci) => ci.id === line.catalog_item_id);
+      return Boolean(
+        item &&
+          (item.pricing_mode === "hourly_plus_materials" || item.estimated_hours_thousandths > 0)
+      );
+    });
+  }, [billingMode, draft.lines, catalogItems]);
 
   const isDirty = useMemo(() => JSON.stringify(draft) !== initialJson, [draft, initialJson]);
 
@@ -304,6 +368,19 @@ export function QuoteBuilderWidget({
     setDraft((prev) => ({
       ...prev,
       lines: prev.lines.map((line, i) => (i === idx ? { ...line, ...patch } : line)),
+    }));
+  };
+
+  const sanitizeLineDescription = (idx: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      lines: prev.lines.map((line, i) => {
+        if (i !== idx) return line;
+        const cleaned = sanitizeQuoteItemDescription(line.description, {
+          knownPricesCents: line.unit_price_cents > 0 ? [line.unit_price_cents] : [],
+        });
+        return cleaned !== line.description ? { ...line, description: cleaned } : line;
+      }),
     }));
   };
 
@@ -334,9 +411,12 @@ export function QuoteBuilderWidget({
   };
 
   const addLineFromCatalog = (item: CatalogItemRow) => {
+    const cleanDesc = sanitizeQuoteItemDescription(item.description, {
+      knownPricesCents: [item.unit_price_cents],
+    });
     const newLine: Gate1QuoteDraftPayload["lines"][number] = {
       catalog_item_id: item.id,
-      description: item.description,
+      description: cleanDesc || item.description,
       category: item.category,
       unit: item.unit,
       quantity_thousandths: 1000,
@@ -440,14 +520,116 @@ export function QuoteBuilderWidget({
     }));
   };
 
+  const getSanitizedLines = () =>
+    draft.lines.map((line) => {
+      const cleaned = sanitizeQuoteItemDescription(line.description, {
+        knownPricesCents: line.unit_price_cents > 0 ? [line.unit_price_cents] : [],
+      });
+      return {
+        ...line,
+        description: cleaned.trim() || line.description.trim(),
+        save_to_catalog: isLaborOnly ? false : line.save_to_catalog,
+      };
+    });
+
+  const handleOpenPreview = () => {
+    if (!runtime.onOpenDocumentPreview) return;
+    setValidationError(null);
+    const sanitizedLines = getSanitizedLines();
+    const nowMs = Date.now();
+    const selectedClient = draft.client_id
+      ? clients.find((c) => c.id === draft.client_id) ?? null
+      : null;
+
+    const previewInput: PdfQuoteDocumentInput = {
+      kind: "quote",
+      quoteCode: "BORRADOR",
+      issuedDateIso: getLocalTodayIso(),
+      validityDays: effectiveValidityDays,
+      validUntilIso: computeQuoteValidUntilIso(nowMs, effectiveValidityDays),
+      emitter: {
+        name: defaultSettings?.emitter_name || "Autónomo",
+        nif: defaultSettings?.emitter_nif ?? "",
+        fiscalAddress: defaultSettings?.emitter_fiscal_address ?? "",
+        phone: defaultSettings?.emitter_phone ?? "",
+        email: defaultSettings?.emitter_email ?? "",
+        iban: effectiveIban,
+        bankName: effectiveBankName,
+        logoDataUrl: defaultSettings?.emitter_logo_data_url ?? null,
+      },
+      client: selectedClient
+        ? {
+            name: selectedClient.name,
+            nif: selectedClient.nif,
+            fiscalAddress: selectedClient.fiscal_address,
+            phone: selectedClient.phone,
+            email: selectedClient.email,
+          }
+        : {
+            name: draft.new_client?.name?.trim() ?? "",
+            nif: draft.new_client?.nif?.trim().toUpperCase() ?? "",
+            fiscalAddress: draft.new_client?.fiscal_address?.trim() ?? "",
+            phone: draft.new_client?.phone?.trim() ?? "",
+            email: draft.new_client?.email?.trim() ?? "",
+          },
+      jobTitle:
+        draft.job_title.trim() || sanitizedLines[0]?.description || "Borrador de presupuesto",
+      generalDescription: effectiveGeneralDescription,
+      estimatedDurationValue: effectiveDurationValue,
+      estimatedDurationUnit: effectiveDurationUnit,
+      vatRate: draft.vat_rate,
+      billingMode,
+      laborSubMode,
+      laborHoursThousandths,
+      hourlyRateCents: effectiveHourlyRateCents,
+      laborCents: totals.laborCents,
+      itemsSubtotalCents: totals.itemsSubtotalCents,
+      subtotalCents: totals.subtotalCents,
+      vatCents: totals.vatCents,
+      totalCents: totals.totalCents,
+      paymentMethods: effectivePaymentMethods,
+      paymentSchedule: effectivePaymentSchedule,
+      paymentTermsText: effectivePaymentTermsText,
+      ibanOverride: effectiveIban,
+      bankName: effectiveBankName,
+      showIban: effectiveShowIban,
+      notes: draft.notes,
+      attachments: effectiveAttachments,
+      lines: sanitizedLines.map((line, i) => ({
+        description: line.description || `Partida ${i + 1}`,
+        unit: line.unit,
+        quantityThousandths: line.quantity_thousandths,
+        unitPriceCents: line.unit_price_cents,
+        lineSubtotalCents: totals.lineSubtotals[i] ?? 0,
+      })),
+    };
+
+    runtime.onOpenDocumentPreview({
+      docKind: "quote",
+      title: "Vista previa de presupuesto",
+      subtitle: draft.job_title.trim() || "Borrador sin guardar",
+      isDraft: true,
+      loadBytes: () => runtime.pdfPort.buildDocumentPdf(previewInput),
+      onDownloadOrShare: (bytes, fileName) =>
+        runtime.documentOpener.shareRawPdfBytes(bytes, fileName, "Borrador de presupuesto"),
+    });
+  };
+
   const handleConfirm = async () => {
     setValidationError(null);
     if (!isScheduleSumValid(effectivePaymentSchedule)) {
       setValidationError("Los porcentajes de forma de cobro deben sumar exactamente 100 %.");
       return;
     }
+    const sanitizedLines = getSanitizedLines();
     const candidatePayload = {
       ...draft,
+      lines: sanitizedLines,
+      modalidad_cobro: billingMode,
+      solo_mano_obra_submodo: laborSubMode,
+      horas_estimadas_thousandths: laborHoursThousandths,
+      tarifa_hora_cents: effectiveHourlyRateCents,
+      mano_obra_fija_cents: fixedLaborCents,
       general_description: effectiveGeneralDescription,
       estimated_duration_value: effectiveDurationValue,
       estimated_duration_unit: effectiveDurationUnit,
@@ -520,6 +702,35 @@ export function QuoteBuilderWidget({
       </div>
 
       <div className="mt-3 space-y-3">
+        <BillingModeSelector
+          value={billingConfig}
+          defaultHourlyRateCents={hourlyRateCents}
+          disabled={!canAct || isSubmitting}
+          onChange={(nextConfig) =>
+            setDraft((prev) => ({
+              ...prev,
+              modalidad_cobro: nextConfig.modalidad_cobro,
+              solo_mano_obra_submodo: nextConfig.solo_mano_obra_submodo,
+              horas_estimadas_thousandths: nextConfig.horas_estimadas_thousandths,
+              tarifa_hora_cents: nextConfig.tarifa_hora_cents,
+              mano_obra_fija_cents: nextConfig.mano_obra_fija_cents,
+            }))
+          }
+        />
+
+        {hasEmbeddedHoursCatalogItem && (
+          <div
+            data-testid="quote-embedded-hours-hint"
+            className="flex items-start gap-2 rounded-xl border border-[#BAE6FD] bg-[#E0F2FE]/65 px-3 py-2 text-[11px] text-[#0369A1]"
+          >
+            <Info className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span>
+              Alguna partida seleccionada del tarifario ya incluye horas estimadas en su precio
+              unitario. Revisa las horas globales para evitar duplicar mano de obra.
+            </span>
+          </div>
+        )}
+
         <div>
           <label className="block text-xs font-semibold text-[#2C2621]" htmlFor="qb-job-title">
             Título de la obra (opcional)
@@ -754,7 +965,7 @@ export function QuoteBuilderWidget({
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-[#2C2621]">
-              Partidas ({draft.lines.length})
+              {isLaborOnly ? `Tareas incluidas (${draft.lines.length})` : `Partidas (${draft.lines.length})`}
             </span>
             {canAct && (
               <div className="flex items-center gap-1.5">
@@ -776,7 +987,7 @@ export function QuoteBuilderWidget({
                   onClick={addEmptyLine}
                   className="rounded-lg bg-[#4B7094] px-2.5 py-1 text-xs font-semibold text-[#FFFDF9]"
                 >
-                  + Añadir partida
+                  {isLaborOnly ? "+ Añadir tarea" : "+ Añadir partida"}
                 </button>
               </div>
             )}
@@ -819,9 +1030,11 @@ export function QuoteBuilderWidget({
                           })}
                         </div>
                       </div>
-                      <span className="shrink-0 font-bold font-mono-nums tabular-nums text-[#D04B00]">
-                        {formatCentsEs(item.unit_price_cents)}/{item.unit}
-                      </span>
+                      {!isLaborOnly && (
+                        <span className="shrink-0 font-bold font-mono-nums tabular-nums text-[#D04B00]">
+                          {formatCentsEs(item.unit_price_cents)}/{item.unit}
+                        </span>
+                      )}
                     </button>
                   ))
                 )}
@@ -841,21 +1054,34 @@ export function QuoteBuilderWidget({
                 data-testid={`quote-line-${idx}`}
                 className="w-full max-w-full overflow-hidden ruled-notebook rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] p-2.5 pl-8 space-y-2"
               >
-                <div className="flex min-w-0 gap-2 items-start">
+                <div
+                  className="flex min-w-0 gap-2 items-start"
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                      sanitizeLineDescription(idx);
+                    }
+                  }}
+                >
                   <ZoomableTextField
                     as="textarea"
                     multiline
                     rows={2}
                     maxLength={TEXT_LIMITS.DESCRIPTION}
-                    zoomLabel={`Descripción de la partida ${idx + 1}`}
+                    zoomLabel={
+                      isLaborOnly ? `Descripción de la tarea ${idx + 1}` : `Descripción de la partida ${idx + 1}`
+                    }
                     aria-label={`Descripción partida ${idx + 1}`}
                     disabled={!canAct || isSubmitting}
                     value={line.description}
                     onValueChange={(next) => updateLine(idx, { description: next })}
-                    placeholder="Descripción de trabajo o material"
+                    placeholder={
+                      isLaborOnly
+                        ? "Descripción de tarea incluida"
+                        : "Descripción de trabajo o material"
+                    }
                     className="min-w-0 flex-1 resize-none rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2.5 py-1.5 text-xs font-medium text-[#2C2621] break-words disabled:bg-[#F5F1E6]"
                   />
-                  {canAct && draft.lines.length > 1 && (
+                  {canAct && (isLaborOnly || draft.lines.length > 1) && (
                     <button
                       type="button"
                       disabled={isSubmitting}
@@ -867,96 +1093,163 @@ export function QuoteBuilderWidget({
                   )}
                 </div>
 
-                <div className="grid grid-cols-4 gap-1.5 items-center text-xs">
-                  <div className="min-w-0">
-                    <label className="block text-[10px] text-[#6B6860]">Cant.</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      aria-label={`Cantidad partida ${idx + 1}`}
-                      disabled={!canAct || isSubmitting}
-                      value={thousandthsToQtyInput(line.quantity_thousandths)}
-                      onChange={(e) =>
-                        updateLine(idx, {
-                          quantity_thousandths: qtyInputToThousandths(e.target.value),
-                        })
-                      }
-                      className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-[10px] text-[#6B6860]">Ud</label>
-                    <input
-                      type="text"
-                      aria-label={`Unidad partida ${idx + 1}`}
-                      disabled={!canAct || isSubmitting}
-                      value={line.unit}
-                      onChange={(e) => updateLine(idx, { unit: e.target.value || "ud" })}
-                      className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-[10px] text-[#6B6860]">Precio (€)</label>
-                    <PriceInput
-                      valueCents={line.unit_price_cents}
-                      disabled={!canAct || isSubmitting}
-                      testId={`quote-line-price-${idx}`}
-                      ariaLabel={`Precio euros partida ${idx + 1}`}
-                      onChangeCents={(cents) =>
-                        updateLine(idx, {
-                          unit_price_cents: cents,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="min-w-0 text-right">
-                    <div className="text-[10px] text-[#6B6860]">Subtotal</div>
-                    <div className="truncate font-bold font-mono-nums text-[#2C2621] tabular-nums highlighter-yellow">
-                      {formatCentsEs(lineSubtotal)}
+                {isLaborOnly ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full bg-[#EAE5D9] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
+                        Tarea incluida
+                      </span>
+                      <select
+                        aria-label={`Categoría partida ${idx + 1}`}
+                        disabled={!canAct || isSubmitting}
+                        value={line.category}
+                        onChange={(e) =>
+                          updateLine(idx, { category: e.target.value as CatalogCategory })
+                        }
+                        className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        aria-label={`Cantidad partida ${idx + 1}`}
+                        disabled={!canAct || isSubmitting}
+                        value={thousandthsToQtyInput(line.quantity_thousandths)}
+                        onChange={(e) =>
+                          updateLine(idx, {
+                            quantity_thousandths: qtyInputToThousandths(e.target.value),
+                          })
+                        }
+                        className="w-14 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
+                      />
+                      <input
+                        type="text"
+                        aria-label={`Unidad partida ${idx + 1}`}
+                        disabled={!canAct || isSubmitting}
+                        value={line.unit}
+                        onChange={(e) => updateLine(idx, { unit: e.target.value || "ud" })}
+                        className="w-14 rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
+                      />
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-4 gap-1.5 items-center text-xs">
+                      <div className="min-w-0">
+                        <label className="block text-[10px] text-[#6B6860]">Cant.</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          aria-label={`Cantidad partida ${idx + 1}`}
+                          disabled={!canAct || isSubmitting}
+                          value={thousandthsToQtyInput(line.quantity_thousandths)}
+                          onChange={(e) =>
+                            updateLine(idx, {
+                              quantity_thousandths: qtyInputToThousandths(e.target.value),
+                            })
+                          }
+                          className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs font-mono-nums tabular-nums text-[#2C2621] disabled:bg-[#F5F1E6]"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="block text-[10px] text-[#6B6860]">Ud</label>
+                        <input
+                          type="text"
+                          aria-label={`Unidad partida ${idx + 1}`}
+                          disabled={!canAct || isSubmitting}
+                          value={line.unit}
+                          onChange={(e) => updateLine(idx, { unit: e.target.value || "ud" })}
+                          className="min-w-0 w-full rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-xs text-[#2C2621] disabled:bg-[#F5F1E6]"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="block text-[10px] text-[#6B6860]">Precio (€)</label>
+                        <PriceInput
+                          valueCents={line.unit_price_cents}
+                          disabled={!canAct || isSubmitting}
+                          testId={`quote-line-price-${idx}`}
+                          ariaLabel={`Precio euros partida ${idx + 1}`}
+                          onChangeCents={(cents) =>
+                            updateLine(idx, {
+                              unit_price_cents: cents,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <div className="text-[10px] text-[#6B6860]">Subtotal</div>
+                        <div className="truncate font-bold font-mono-nums text-[#2C2621] tabular-nums highlighter-yellow">
+                          {formatCentsEs(lineSubtotal)}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                  <select
-                    aria-label={`Categoría partida ${idx + 1}`}
-                    disabled={!canAct || isSubmitting}
-                    value={line.category}
-                    onChange={(e) =>
-                      updateLine(idx, { category: e.target.value as CatalogCategory })
-                    }
-                    className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <select
+                        aria-label={`Categoría partida ${idx + 1}`}
+                        disabled={!canAct || isSubmitting}
+                        value={line.category}
+                        onChange={(e) =>
+                          updateLine(idx, { category: e.target.value as CatalogCategory })
+                        }
+                        className="rounded-lg border border-[#E5DFD2] bg-[#FFFDF7] px-2 py-1 text-[11px] text-[#2C2621]"
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
 
-                  <label className="min-w-0 inline-flex items-center gap-1.5 text-[#2C2621] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      data-testid={`quote-line-save-catalog-${idx}`}
-                      disabled={!canAct || isSubmitting}
-                      checked={line.save_to_catalog}
-                      onChange={(e) => updateLine(idx, { save_to_catalog: e.target.checked })}
-                      className="h-4 w-4 shrink-0 rounded border-[#E5DFD2] text-[#EA580C]"
-                    />
-                    <span className="break-words leading-tight">
-                      {priceChanged
-                        ? `Guardar nuevo precio (${formatCentsEs(line.original_unit_price_cents)} → ${formatCentsEs(line.unit_price_cents)})`
-                        : "Guardar en tarifario"}
-                    </span>
-                  </label>
-                </div>
+                      <label className="min-w-0 inline-flex items-center gap-1.5 text-[#2C2621] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          data-testid={`quote-line-save-catalog-${idx}`}
+                          disabled={!canAct || isSubmitting}
+                          checked={line.save_to_catalog}
+                          onChange={(e) => updateLine(idx, { save_to_catalog: e.target.checked })}
+                          className="h-4 w-4 shrink-0 rounded border-[#E5DFD2] text-[#EA580C]"
+                        />
+                        <span className="break-words leading-tight">
+                          {priceChanged
+                            ? `Guardar nuevo precio (${formatCentsEs(line.original_unit_price_cents)} → ${formatCentsEs(line.unit_price_cents)})`
+                            : "Guardar en tarifario"}
+                        </span>
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}
         </div>
 
         <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-2.5 text-xs space-y-1">
+          {!isLaborOnly && totals.laborCents > 0 && (
+            <div className="flex justify-between text-[#6B6860]">
+              <span>Partidas</span>
+              <span className="font-semibold font-mono-nums tabular-nums text-[#2C2621]">
+                {formatCentsEs(totals.itemsSubtotalCents)}
+              </span>
+            </div>
+          )}
+          {(isLaborOnly || totals.laborCents > 0) && (
+            <div className="flex justify-between text-[#6B6860]">
+              <span>Mano de obra</span>
+              <span className="font-semibold font-mono-nums tabular-nums text-[#2C2621]">
+                {formatCentsEs(totals.laborCents)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-[#6B6860]">
             <span>Base imponible</span>
             <span className="font-semibold font-mono-nums tabular-nums text-[#2C2621]">
@@ -1358,15 +1651,25 @@ export function QuoteBuilderWidget({
         )}
 
         {canAct && (
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
               data-testid="quote-reject-btn"
               disabled={isSubmitting}
               onClick={() => void handleReject()}
-              className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
+              className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-3.5 text-xs font-bold text-[#9A2D08]"
             >
               Rechazar
+            </button>
+            <button
+              type="button"
+              data-testid="quote-builder-preview-btn"
+              disabled={isSubmitting || !runtime.onOpenDocumentPreview}
+              onClick={handleOpenPreview}
+              className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3.5 text-xs font-bold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-50 cursor-pointer"
+            >
+              <Eye className="h-4 w-4 shrink-0 text-[#D04B00]" aria-hidden="true" />
+              <span>Vista previa</span>
             </button>
             <button
               type="button"

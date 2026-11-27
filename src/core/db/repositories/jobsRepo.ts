@@ -1,6 +1,13 @@
-import { IsoDateSchema } from "../../contracts/schemas";
+import { BillingModeSchema, IsoDateSchema, LaborOnlySubModeSchema } from "../../contracts/schemas";
 import { getFiscalYearFromIso, getLocalTodayIso } from "../../fiscal/dateQuarter";
-import type { JobRow, JobStatus, SqliteExecutor } from "../../contracts/types";
+import type {
+  BillingMode,
+  BillingModeConfig,
+  JobRow,
+  JobStatus,
+  LaborOnlySubMode,
+  SqliteExecutor,
+} from "../../contracts/types";
 import { sanitizeFts5Query } from "../sqliteExecutor";
 import { allocateNextSequence } from "./settingsRepo";
 
@@ -94,6 +101,11 @@ export class JobsRepository {
     client_id?: string | null;
     start_date_iso?: string | null;
     end_date_iso?: string | null;
+    modalidad_cobro?: BillingMode;
+    solo_mano_obra_submodo?: LaborOnlySubMode;
+    horas_estimadas_thousandths?: number;
+    tarifa_hora_cents?: number | null;
+    mano_obra_fija_cents?: number;
   }): Promise<JobRow> {
     const title = input.title.trim();
     if (!title) {
@@ -104,6 +116,14 @@ export class JobsRepository {
     if (startDateIso && endDateIso && endDateIso < startDateIso) {
       throw new Error("SCHEMA_VALIDATION_ERROR: La fecha de fin no puede ser anterior al inicio");
     }
+    const modalidadCobro = BillingModeSchema.parse(input.modalidad_cobro ?? "solo_partidas");
+    const submodo = LaborOnlySubModeSchema.parse(input.solo_mano_obra_submodo ?? "por_horas");
+    const horasThousandths = Math.max(0, Math.round(input.horas_estimadas_thousandths ?? 0));
+    const tarifaHoraCents =
+      input.tarifa_hora_cents === undefined || input.tarifa_hora_cents === null
+        ? null
+        : Math.max(0, Math.round(input.tarifa_hora_cents));
+    const manoObraFijaCents = Math.max(0, Math.round(input.mano_obra_fija_cents ?? 0));
     const todayIso = getLocalTodayIso();
     const fiscalYear = getFiscalYearFromIso(todayIso);
     const now = Date.now();
@@ -114,8 +134,10 @@ export class JobsRepository {
       await tx.run(
         `INSERT INTO jobs (
           id, job_code, client_id, title, address, status, start_date_iso, end_date_iso,
+          modalidad_cobro, solo_mano_obra_submodo, horas_estimadas_thousandths,
+          tarifa_hora_cents, mano_obra_fija_cents,
           created_at_iso, created_at_ms, updated_at_ms
-        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           code,
@@ -124,6 +146,11 @@ export class JobsRepository {
           (input.address ?? "").trim(),
           startDateIso,
           endDateIso,
+          modalidadCobro,
+          submodo,
+          horasThousandths,
+          tarifaHoraCents,
+          manoObraFijaCents,
           todayIso,
           now,
           now,
@@ -134,6 +161,63 @@ export class JobsRepository {
     const created = await this.getById(id);
     if (!created) throw new Error("SQLITE_QUERY_ERROR: error creando obra directa");
     return created;
+  }
+
+  async updateBillingConfig(
+    jobId: string,
+    config: Partial<BillingModeConfig>
+  ): Promise<JobRow> {
+    const existing = await this.getById(jobId);
+    if (!existing) {
+      throw new Error("INVALID_STATE_TRANSITION: Obra no encontrada");
+    }
+
+    const modalidadCobro = BillingModeSchema.parse(
+      config.modalidad_cobro ?? existing.modalidad_cobro ?? "solo_partidas"
+    );
+    const submodo = LaborOnlySubModeSchema.parse(
+      config.solo_mano_obra_submodo ?? existing.solo_mano_obra_submodo ?? "por_horas"
+    );
+    const horasThousandths = Math.max(
+      0,
+      Math.round(
+        config.horas_estimadas_thousandths ?? existing.horas_estimadas_thousandths ?? 0
+      )
+    );
+    const tarifaHoraCents =
+      config.tarifa_hora_cents === undefined
+        ? (existing.tarifa_hora_cents ?? null)
+        : config.tarifa_hora_cents === null
+          ? null
+          : Math.max(0, Math.round(config.tarifa_hora_cents));
+    const manoObraFijaCents = Math.max(
+      0,
+      Math.round(config.mano_obra_fija_cents ?? existing.mano_obra_fija_cents ?? 0)
+    );
+
+    await this.executor.run(
+      `UPDATE jobs
+       SET modalidad_cobro = ?,
+           solo_mano_obra_submodo = ?,
+           horas_estimadas_thousandths = ?,
+           tarifa_hora_cents = ?,
+           mano_obra_fija_cents = ?,
+           updated_at_ms = ?
+       WHERE id = ?`,
+      [
+        modalidadCobro,
+        submodo,
+        horasThousandths,
+        tarifaHoraCents,
+        manoObraFijaCents,
+        Date.now(),
+        jobId,
+      ]
+    );
+
+    const updated = await this.getById(jobId);
+    if (!updated) throw new Error("SQLITE_QUERY_ERROR: error actualizando modalidad de obra");
+    return updated;
   }
 
   async updateJobScheduleDates(

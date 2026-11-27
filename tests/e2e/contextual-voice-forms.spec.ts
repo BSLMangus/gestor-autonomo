@@ -107,6 +107,7 @@ test.describe("Dictado por Voz Incremental y Contextual en Formularios (360px)",
       .getByTestId("contextual-voice-overlay-manual-input")
       .fill("IVA al 10 %, añade en notas garantía de 2 años");
     await page.getByTestId("contextual-voice-overlay-submit-btn").click();
+    await page.getByTestId("quote-toggle-document-conditions-btn").click();
     await expect(page.locator("#qb-notes")).toHaveValue(/garantía de 2 años/);
     // Base = 380 + 184 = 564 -> +10% IVA = 620,40 €
     await expect(page.getByTestId("quote-total-display")).toContainText("620,40");
@@ -147,6 +148,14 @@ test.describe("Dictado por Voz Incremental y Contextual en Formularios (360px)",
     await expect(page.getByTestId("gate3-client-address-input")).toHaveValue(
       "Av. Libertad 4, Madrid"
     );
+
+    // Vista previa de borrador de factura en Gate 3 sin consumir numeración
+    await page.getByTestId("invoice-gate3-preview-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-draft-badge")).toContainText("BORRADOR");
+    await expect(page.getByTestId("doc-preview-page-1")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("doc-preview-close-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
 
     await page.getByTestId("gate3-approve-btn").click();
     await expect(page.getByTestId("generative-widget-overlay")).toBeHidden();

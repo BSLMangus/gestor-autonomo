@@ -13,6 +13,7 @@ import type {
 } from "../../core/contracts/types";
 import { computeCatalogUnitPriceCents } from "../../core/pricing/pricingEngine";
 import type { OcrPort } from "../../core/ports/mediaPorts";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import { normalizeSpanishText, parseEurosToCents } from "../../core/text/spanishText";
 
 const MAX_PDF_PAGES = 15;
@@ -165,12 +166,17 @@ export function parseCatalogAndRatesFromText(params: {
         if (descCand.length >= 3 && pricePart) {
           const parsedCents = parseEurosToCents(pricePart.replace(/[^\d.,]/g, ""));
           if (parsedCents && parsedCents > 0) {
-            description = descCand;
-            unit = normalizeUnitToken(unitPart);
-            unitPriceCents = parsedCents;
-            if (vatPart) {
-              const vm = /\b(4|10|21)\b/.exec(vatPart);
-              if (vm?.[1]) lineVatRate = Number(vm[1]) as QuoteVatRate;
+            const cleanedDesc = sanitizeQuoteItemDescription(descCand, {
+              knownPricesCents: [parsedCents],
+            });
+            if (cleanedDesc.length >= 3) {
+              description = cleanedDesc;
+              unit = normalizeUnitToken(unitPart);
+              unitPriceCents = parsedCents;
+              if (vatPart) {
+                const vm = /\b(4|10|21)\b/.exec(vatPart);
+                if (vm?.[1]) lineVatRate = Number(vm[1]) as QuoteVatRate;
+              }
             }
           }
         }
@@ -233,7 +239,9 @@ export function parseCatalogAndRatesFromText(params: {
             }
 
             rawDesc = rawDesc.replace(/\biva\s*\d{1,2}\s*%/gi, "").trim();
-            description = rawDesc;
+            description = sanitizeQuoteItemDescription(rawDesc, {
+              knownPricesCents: [unitPriceCents, parsedMoney],
+            });
           }
         }
       }
@@ -622,7 +630,9 @@ export async function commitImportedCatalogAndConfig(
     }
 
     for (const item of selectedItems) {
-      const desc = item.description.trim();
+      const desc = sanitizeQuoteItemDescription(item.description.trim(), {
+        knownPricesCents: [item.unit_price_cents],
+      });
       if (!desc) {
         throw new Error("SCHEMA_VALIDATION_ERROR: Todas las partidas seleccionadas requieren descripción.");
       }

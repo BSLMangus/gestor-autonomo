@@ -4,6 +4,7 @@ import type {
   ActaRowSchema,
   ActionTypeSchema,
   ActiveWidgetEnvelopeSchema,
+  BillingModeSchema,
   BillingSubIntentSchema,
   CatalogCategorySchema,
   CatalogItemRowSchema,
@@ -38,6 +39,7 @@ import type {
   InvoiceStatusSchema,
   JobRowSchema,
   JobStatusSchema,
+  LaborOnlySubModeSchema,
   PendingCameraContextSchema,
   PendingCameraRestoreSchema,
   PendingDisambiguationSchema,
@@ -82,6 +84,15 @@ import type {
 } from "./schemas";
 
 export type JobStatus = z.infer<typeof JobStatusSchema>;
+export type BillingMode = z.infer<typeof BillingModeSchema>;
+export type LaborOnlySubMode = z.infer<typeof LaborOnlySubModeSchema>;
+export interface BillingModeConfig {
+  modalidad_cobro: BillingMode;
+  solo_mano_obra_submodo: LaborOnlySubMode;
+  horas_estimadas_thousandths: number;
+  tarifa_hora_cents: number | null;
+  mano_obra_fija_cents: number;
+}
 export type QuoteStatus = z.infer<typeof QuoteStatusSchema>;
 export type InvoiceStatus = z.infer<typeof InvoiceStatusSchema>;
 export type InvoiceKind = z.infer<typeof InvoiceKindSchema>;

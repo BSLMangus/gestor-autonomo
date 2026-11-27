@@ -12,6 +12,7 @@ interface QuotesViewProps {
   refreshTick: number;
   onStartEmptyQuote: () => Promise<void>;
   onOpenQuoteDetail: (quoteId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
   onDataChanged: () => Promise<void>;
   registerBackHandler?: (priority: number, handler: () => boolean) => () => void;
 }
@@ -49,6 +50,7 @@ export function QuotesView({
   refreshTick,
   onStartEmptyQuote,
   onOpenQuoteDetail,
+  onPreviewQuote,
   onDataChanged,
   registerBackHandler,
 }: QuotesViewProps) {
@@ -82,6 +84,14 @@ export function QuotesView({
       active = false;
     };
   }, [executor, search, statusFilter, refreshTick, localRefresh]);
+
+  const handleOpenQuoteCard = (q: QuoteWithJobSummary) => {
+    if ((q.status === "aceptado" || q.status === "enviado") && onPreviewQuote) {
+      onPreviewQuote(q.id);
+      return;
+    }
+    onOpenQuoteDetail(q.id);
+  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -155,7 +165,7 @@ export function QuotesView({
               <button
                 type="button"
                 data-testid={`quote-card-${q.id}`}
-                onClick={() => onOpenQuoteDetail(q.id)}
+                onClick={() => handleOpenQuoteCard(q)}
                 className="w-full p-4 pb-2.5 text-left cursor-pointer space-y-2"
               >
                 <div className="flex w-full min-w-0 items-start justify-between gap-2">
@@ -199,7 +209,7 @@ export function QuotesView({
               <div className="flex w-full min-w-0 items-center justify-between gap-2 px-4 py-2 border-t border-dashed border-[#E5DFD2]">
                 <button
                   type="button"
-                  onClick={() => onOpenQuoteDetail(q.id)}
+                  onClick={() => handleOpenQuoteCard(q)}
                   className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1 text-left cursor-pointer"
                 >
                   <span className="min-w-0 flex-1 truncate text-[12px] text-[#6B6860]">

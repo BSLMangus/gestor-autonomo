@@ -1,7 +1,9 @@
 import type { z } from "zod";
 import type {
   ActaPuestaEnMarchaData,
+  BillingMode,
   EstadoActa,
+  LaborOnlySubMode,
   QuoteAttachment,
   QuoteDurationUnit,
   QuotePaymentInstallment,
@@ -72,6 +74,12 @@ export interface PdfQuoteDocumentInput {
   estimatedDurationValue?: number | null;
   estimatedDurationUnit?: QuoteDurationUnit;
   vatRate: number;
+  billingMode?: BillingMode;
+  laborSubMode?: LaborOnlySubMode;
+  laborHoursThousandths?: number;
+  hourlyRateCents?: number | null;
+  laborCents?: number;
+  itemsSubtotalCents?: number;
   subtotalCents: number;
   vatCents: number;
   totalCents: number;

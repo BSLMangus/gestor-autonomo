@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, ClipboardCheck, FileText, Paperclip, Pencil, Send, Share2, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, FileText, Paperclip, Pencil, Send, Share2, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { parseQuoteAttachmentsJson } from "../../core/contracts/schemas";
 import type {
@@ -21,6 +21,7 @@ import type { DocumentOpenerService } from "../../core/files/documentOpener";
 import { formatLocalDateIso, getLocalTodayIso } from "../../core/fiscal/dateQuarter";
 import {
   computePaymentScheduleAmounts,
+  computeQuoteTotalsByBillingMode,
   computeQuoteValidUntilIso,
   formatCentsEs,
   formatPercentEs,
@@ -29,7 +30,9 @@ import {
   resolveQuoteAdvancePolicy,
 } from "../../core/fiscal/fiscalEngine";
 import type { PdfPort } from "../../core/ports/mediaPorts";
+import { sanitizeQuoteItemDescription } from "../../core/text/quoteDescriptionSanitizer";
 import { ConfirmDeleteDialog } from "../../ui/ConfirmDeleteDialog";
+import { getBillingModeBadgeLabel } from "../jobs/BillingModeSelector";
 import { PAYMENT_METHOD_LABELS } from "./QuotePaymentValidityEditor";
 
 interface QuoteDetailViewProps {
@@ -44,6 +47,8 @@ interface QuoteDetailViewProps {
   onOpenJob: (jobId: string) => void;
   onOpenClient: (clientId: string) => void;
   onOpenInvoice: (invoiceId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
   onStartJobQuote: (jobId: string) => Promise<void>;
   onCreateActa?: (params: {
     jobId: string;
@@ -98,6 +103,8 @@ export function QuoteDetailView({
   onOpenJob,
   onOpenClient,
   onOpenInvoice,
+  onPreviewQuote,
+  onPreviewInvoice,
   onStartJobQuote,
   onCreateActa,
   onRunQuoteLifecycleAction,
@@ -305,6 +312,34 @@ export function QuoteDetailView({
   const clientPhone = quote.client_phone_snapshot || client?.phone || "";
   const clientAddress = quote.client_address_snapshot || client?.fiscal_address || "";
 
+  const billingMode = quote.modalidad_cobro ?? job?.modalidad_cobro ?? "solo_partidas";
+  const laborSubMode = quote.solo_mano_obra_submodo ?? job?.solo_mano_obra_submodo ?? "por_horas";
+  const laborHoursThousandths =
+    quote.horas_estimadas_thousandths ?? job?.horas_estimadas_thousandths ?? 0;
+  const hourlyRateCents = quote.tarifa_hora_cents ?? job?.tarifa_hora_cents ?? 0;
+  const fixedLaborCents = quote.mano_obra_fija_cents ?? job?.mano_obra_fija_cents ?? 0;
+  const totalsSummary = computeQuoteTotalsByBillingMode({
+    billingMode,
+    laborSubMode,
+    lines: items,
+    vatRate: quote.vat_rate,
+    horasEstimadasThousandths: laborHoursThousandths,
+    tarifaHoraCents: hourlyRateCents,
+    manoObraFijaCents: fixedLaborCents,
+  });
+  const isLaborOnly = billingMode === "solo_mano_obra";
+  const isDraftOrRejected = quote.status === "borrador" || quote.status === "rechazado";
+
+  const handleOpenQuotePdf = () => {
+    if (onPreviewQuote) {
+      onPreviewQuote(quote.id);
+      return;
+    }
+    void runAction(async () => {
+      await documentOpener.openPdf(quote.pdf_uri, "quote", quote.id, pdfPort);
+    });
+  };
+
   return (
     <div
       data-testid="quote-detail-view"
@@ -322,20 +357,30 @@ export function QuoteDetailView({
           <span>Presupuestos</span>
         </button>
 
-        <button
-          type="button"
-          data-testid="quote-detail-pdf-btn"
-          disabled={busy}
-          onClick={() =>
-            void runAction(async () => {
-              await documentOpener.openPdf(quote.pdf_uri, "quote", quote.id, pdfPort);
-            })
-          }
-          className="paper-cream inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-[12px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer shadow-xs"
-        >
-          <FileText className="h-4 w-4 shrink-0" />
-          <span>PDF</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {isDraftOrRejected && (
+            <button
+              type="button"
+              data-testid="quote-detail-preview-btn"
+              disabled={busy}
+              onClick={handleOpenQuotePdf}
+              className="paper-cream inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[#EA580C]/50 bg-[#FFF3A1]/70 px-3.5 text-[12px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer shadow-xs"
+            >
+              <Eye className="h-4 w-4 shrink-0 text-[#D04B00]" />
+              <span>Vista previa</span>
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="quote-detail-pdf-btn"
+            disabled={busy}
+            onClick={handleOpenQuotePdf}
+            className="paper-cream inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[#E5DFD2] bg-[#FFFDF7] px-4 text-[12px] font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer shadow-xs"
+          >
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>PDF</span>
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
@@ -367,6 +412,12 @@ export function QuoteDetailView({
                 className={`rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase ${badge.cls}`}
               >
                 {badge.label}
+              </span>
+              <span
+                data-testid="quote-detail-billing-mode-badge"
+                className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-2.5 py-0.5 text-[10px] font-semibold text-[#2C2621]"
+              >
+                {getBillingModeBadgeLabel(billingMode, laborSubMode)}
               </span>
               {isExpired && (
                 <span
@@ -584,46 +635,92 @@ export function QuoteDetailView({
         <span className="absolute left-2.5 bottom-5 w-2.5 h-2.5 rounded-full paper-hole border" aria-hidden="true" />
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[13px] font-semibold text-[#2C2621]">
-            Partidas ({items.length})
+            {isLaborOnly ? `Tareas incluidas (${items.length})` : `Partidas (${items.length})`}
           </h3>
         </div>
 
         {items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#E5DFD2] bg-[#FFFDF7]/80 p-3 text-center text-[#6B6860]">
-            Este presupuesto no tiene partidas registradas.
+            {isLaborOnly
+              ? "Presupuesto de solo mano de obra sin desglose de tareas."
+              : "Este presupuesto no tiene partidas registradas."}
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((item, idx) => (
-              <div
-                key={item.id}
-                data-testid={`quote-detail-line-${idx}`}
-                className="w-full max-w-full overflow-hidden rounded-xl border border-[#E5DFD2] bg-[#FFFDF7]/90 p-3 space-y-1.5"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-[13px] font-semibold text-[#2C2621] leading-snug">
-                    {item.description}
-                  </div>
-                  <span className="shrink-0 rounded-full bg-[#EAE5D9] border border-[#E5DFD2] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
-                    {item.category}
-                  </span>
+            {items.map((item, idx) => {
+              const cleanDescription = sanitizeQuoteItemDescription(item.description, {
+                knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+              });
+              return (
+                <div
+                  key={item.id}
+                  data-testid={`quote-detail-line-${idx}`}
+                  className="w-full max-w-full overflow-hidden rounded-xl border border-[#E5DFD2] bg-[#FFFDF7]/90 p-3"
+                >
+                  {isLaborOnly ? (
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-[13px] font-semibold text-[#2C2621] leading-snug">
+                        {cleanDescription}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[#EAE5D9] border border-[#E5DFD2] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
+                        {item.category}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="break-words [overflow-wrap:anywhere] text-[13px] font-semibold text-[#2C2621] leading-snug">
+                          {cleanDescription}
+                        </div>
+                        <span className="inline-flex rounded-full bg-[#EAE5D9] border border-[#E5DFD2] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]">
+                          {item.category}
+                        </span>
+                      </div>
+                      <div className="shrink-0 text-right space-y-0.5">
+                        <div className="font-mono font-mono-nums text-[11px] text-[#6B6860] tabular-nums">
+                          {formatThousandthsEs(item.quantity_thousandths)} {item.unit} ×{" "}
+                          {formatCentsEs(item.unit_price_cents)}
+                        </div>
+                        <div className="font-mono font-mono-nums text-[13px] font-bold text-[#2C2621] tabular-nums">
+                          {formatCentsEs(item.line_subtotal_cents)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#6B6860]">
-                  <span className="font-mono font-mono-nums tabular-nums">
-                    {formatThousandthsEs(item.quantity_thousandths)} {item.unit} ×{" "}
-                    {formatCentsEs(item.unit_price_cents)}
-                  </span>
-                  <span className="font-mono font-mono-nums text-[13px] font-bold text-[#2C2621] tabular-nums">
-                    {formatCentsEs(item.line_subtotal_cents)}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         {/* Desglose económico */}
         <div className="rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 space-y-1.5">
+          {!isLaborOnly && totalsSummary.laborCents > 0 && (
+            <div className="flex justify-between text-[#6B6860]">
+              <span>Partidas</span>
+              <span className="font-mono font-mono-nums font-semibold text-[#2C2621] tabular-nums">
+                {formatCentsEs(totalsSummary.itemsSubtotalCents)}
+              </span>
+            </div>
+          )}
+          {(isLaborOnly || totalsSummary.laborCents > 0) && (
+            <div
+              data-testid="quote-detail-labor-row"
+              className="flex justify-between gap-2 text-[#6B6860]"
+            >
+              <span className="min-w-0">
+                {billingMode === "partidas_mas_horas" ||
+                (isLaborOnly && laborSubMode === "por_horas")
+                  ? `Mano de obra (${formatThousandthsEs(laborHoursThousandths)} h × ${formatCentsEs(hourlyRateCents)}/h)`
+                  : isLaborOnly && laborSubMode === "precio_cerrado"
+                    ? "Mano de obra (Precio cerrado)"
+                    : "Mano de obra (importe fijo)"}
+              </span>
+              <span className="shrink-0 font-mono font-mono-nums font-semibold text-[#2C2621] tabular-nums">
+                {formatCentsEs(isLaborOnly ? quote.subtotal_cents : totalsSummary.laborCents)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-[#6B6860]">
             <span>Base imponible</span>
             <span className="font-mono font-mono-nums font-semibold text-[#2C2621] tabular-nums">
@@ -747,7 +844,7 @@ export function QuoteDetailView({
                 key={inv.id}
                 type="button"
                 data-testid={`quote-detail-invoice-${inv.id}`}
-                onClick={() => onOpenInvoice(inv.id)}
+                onClick={() => (onPreviewInvoice ? onPreviewInvoice(inv.id) : onOpenInvoice(inv.id))}
                 className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] p-3 text-left hover:border-[#EA580C] cursor-pointer"
               >
                 <div className="min-w-0 flex-1">
@@ -836,11 +933,7 @@ export function QuoteDetailView({
             type="button"
             data-testid="quote-detail-open-pdf-btn"
             disabled={busy}
-            onClick={() =>
-              void runAction(async () => {
-                await documentOpener.openPdf(quote.pdf_uri, "quote", quote.id, pdfPort);
-              })
-            }
+            onClick={handleOpenQuotePdf}
             className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#FFFDF7] px-3 font-semibold text-[#2C2621] hover:border-[#EA580C] cursor-pointer disabled:opacity-50"
           >
             <FileText className="h-4 w-4 shrink-0" />

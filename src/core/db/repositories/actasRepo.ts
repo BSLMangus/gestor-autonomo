@@ -405,6 +405,69 @@ export class ActasRepository {
     return reloaded;
   }
 
+  async duplicateAsDraft(actaId: string): Promise<ActaRow> {
+    const existing = await this.getById(actaId);
+    if (!existing) {
+      throw new Error("INVALID_STATE_TRANSITION: Acta no encontrada");
+    }
+
+    const todayIso = getLocalTodayIso();
+    const fiscalYear = getFiscalYearFromIso(todayIso);
+    const now = Date.now();
+    const newId = `act_${crypto.randomUUID().slice(0, 12)}`;
+
+    return this.executor.inTransaction(async (tx) => {
+      const { code: codigoActa } = await allocateNextSequence(tx, "ACT", fiscalYear, now);
+      const duplicatedData = ActaPuestaEnMarchaDataSchema.parse({
+        ...existing.data,
+        codigo_acta: codigoActa,
+        fecha_emision: todayIso,
+      });
+      const datosJson = JSON.stringify(duplicatedData);
+
+      await tx.run(
+        `INSERT INTO actas_puesta_en_marcha (
+          id, codigo_acta, job_id, quote_id, client_id, especialidad, tipo_actuacion,
+          estado, fecha_emision_iso, datos_json, firma_cliente_base64,
+          firma_instalador_base64, pdf_uri, created_at_ms, updated_at_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, NULL, ?, NULL, ?, ?)`,
+        [
+          newId,
+          codigoActa,
+          existing.row.job_id,
+          existing.row.quote_id,
+          existing.row.client_id,
+          duplicatedData.especialidad,
+          duplicatedData.tipo_actuacion,
+          todayIso,
+          datosJson,
+          existing.row.firma_instalador_base64,
+          now,
+          now,
+        ]
+      );
+
+      const newRow: ActaRow = {
+        id: newId,
+        codigo_acta: codigoActa,
+        job_id: existing.row.job_id,
+        quote_id: existing.row.quote_id,
+        client_id: existing.row.client_id,
+        especialidad: duplicatedData.especialidad,
+        tipo_actuacion: duplicatedData.tipo_actuacion,
+        estado: "borrador",
+        fecha_emision_iso: todayIso,
+        datos_json: datosJson,
+        firma_cliente_base64: null,
+        firma_instalador_base64: existing.row.firma_instalador_base64,
+        pdf_uri: null,
+        created_at_ms: now,
+        updated_at_ms: now,
+      };
+      return newRow;
+    });
+  }
+
   async markSigned(
     id: string,
     input: {

@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
-import { Trash2 } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   patchInvoiceGate3ByVoice,
@@ -21,15 +21,20 @@ import type {
   JobRow,
   QuoteRow,
 } from "../../../core/contracts/types";
+import { ClientsRepository } from "../../../core/db/repositories/clientsRepo";
 import { InvoicesRepository } from "../../../core/db/repositories/invoicesRepo";
 import { JobsRepository } from "../../../core/db/repositories/jobsRepo";
 import { QuotesRepository } from "../../../core/db/repositories/quotesRepo";
+import { SettingsRepository } from "../../../core/db/repositories/settingsRepo";
 import {
+  computeAdvanceByPercent,
+  computeFinalInvoiceFromQuoteAndAdvance,
+  formatCentsEs,
   formatPercentEs,
   parseQuotePaymentScheduleJson,
   resolveQuoteAdvancePolicy,
 } from "../../../core/fiscal/fiscalEngine";
-import { formatCentsEs } from "../../../core/fiscal/fiscalEngine";
+import type { PdfInvoiceDocumentInput } from "../../../core/ports/mediaPorts";
 import { ConfirmDeleteDialog } from "../../../ui/ConfirmDeleteDialog";
 import { ZoomableTextField } from "../../../ui/ZoomableTextField";
 import type { WidgetCommonProps } from "./widgetTypes";
@@ -126,11 +131,119 @@ export function JobLifecycleActionWidget({
     docKind: "quote" | "invoice",
     docId: string
   ) => {
+    if (runtime.onOpenDocumentPreview) {
+      const title =
+        docKind === "invoice"
+          ? `Factura ${invoice?.invoice_number ?? ""}`.trim()
+          : `Presupuesto ${quote?.quote_code ?? ""}`.trim();
+      runtime.onOpenDocumentPreview({
+        docKind,
+        title,
+        subtitle: job ? `${job.job_code} · ${job.title}` : undefined,
+        isDraft: docKind === "quote" && quote?.status === "borrador",
+        loadBytes: () =>
+          runtime.documentOpener.resolvePdfBytes(pdfUri, docKind, docId, runtime.pdfPort),
+        onDownloadOrShare: (bytes, fileName) =>
+          runtime.documentOpener.shareRawPdfBytes(bytes, fileName, title),
+      });
+      return;
+    }
     if (runtime.onOpenPdf) {
       await runtime.onOpenPdf(pdfUri, docKind, docId);
     } else {
       await runtime.documentOpener.openPdf(pdfUri, docKind, docId, runtime.pdfPort);
     }
+  };
+
+  const handlePreviewGate3 = () => {
+    if (!g3Draft || !quote || !job || !runtime.onOpenDocumentPreview) return;
+    setValidationError(null);
+    const existingAnt = invoicesForJob.find((i) => i.series_type === "ANT") ?? null;
+
+    let invoiceKind: "advance_40" | "final" | "full" = "full";
+    let advancePercent = 100;
+    let baseCents = quote.subtotal_cents;
+    let vatCents = quote.vat_cents;
+    let totalCents = quote.total_cents;
+    let deductedBase = 0;
+    let deductedVat = 0;
+
+    if (g3Draft.sub_intent === "advance_40") {
+      invoiceKind = "advance_40";
+      advancePercent = advancePolicy.advancePercent;
+      const adv = computeAdvanceByPercent(quote.subtotal_cents, quote.vat_rate, advancePercent);
+      baseCents = adv.baseCents;
+      vatCents = adv.vatCents;
+      totalCents = adv.totalCents;
+    } else if (existingAnt) {
+      invoiceKind = "final";
+      deductedBase = existingAnt.base_cents;
+      deductedVat = existingAnt.vat_cents;
+      const fin = computeFinalInvoiceFromQuoteAndAdvance(
+        quote.subtotal_cents,
+        quote.vat_cents,
+        deductedBase,
+        deductedVat
+      );
+      baseCents = fin.baseCents;
+      vatCents = fin.vatCents;
+      totalCents = fin.totalCents;
+    }
+
+    runtime.onOpenDocumentPreview({
+      docKind: "invoice",
+      title: "Vista previa de factura",
+      subtitle: `${job.job_code} · ${job.title}`,
+      isDraft: true,
+      loadBytes: async () => {
+        const [settings, clientRow] = await Promise.all([
+          new SettingsRepository(runtime.executor).getAppSettings(),
+          new ClientsRepository(runtime.executor).getById(g3Draft.client_id),
+        ]);
+        const pdfInput: PdfInvoiceDocumentInput = {
+          kind: "invoice",
+          invoiceNumber: "BORRADOR",
+          invoiceKind,
+          advancePercent,
+          issuedAtIso: g3Draft.issued_at_iso,
+          dueAtIso: g3Draft.due_at_iso,
+          emitter: {
+            name: g3Draft.emitter_name || settings.emitter_name || "Autónomo",
+            nif: g3Draft.emitter_nif || settings.emitter_nif,
+            fiscalAddress: g3Draft.emitter_fiscal_address || settings.emitter_fiscal_address,
+            phone: settings.emitter_phone,
+            email: settings.emitter_email,
+            iban: settings.emitter_iban,
+            bankName: settings.emitter_bank_name,
+            logoDataUrl: settings.emitter_logo_data_url,
+          },
+          client: {
+            name: clientRow?.name || quote.client_name_snapshot,
+            nif: g3Draft.client_nif || clientRow?.nif || quote.client_nif_snapshot,
+            fiscalAddress:
+              g3Draft.client_fiscal_address ||
+              clientRow?.fiscal_address ||
+              quote.client_address_snapshot,
+            phone: clientRow?.phone || quote.client_phone_snapshot,
+            email: clientRow?.email ?? "",
+          },
+          jobCode: job.job_code,
+          jobTitle: job.title,
+          quoteCode: quote.quote_code,
+          vatRate: quote.vat_rate,
+          baseCents,
+          vatCents,
+          totalCents,
+          advanceDeductedBaseCents: deductedBase,
+          advanceDeductedVatCents: deductedVat,
+          notes: g3Draft.notes,
+          paymentStatus: "Borrador previo a emisión",
+        };
+        return runtime.pdfPort.buildDocumentPdf(pdfInput);
+      },
+      onDownloadOrShare: (bytes, fileName) =>
+        runtime.documentOpener.shareRawPdfBytes(bytes, fileName, "Borrador de factura"),
+    });
   };
 
   const triggerNativeOrWebShare = async (payload: {
@@ -727,15 +840,25 @@ export function JobLifecycleActionWidget({
           )}
 
           {canActGate3 && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 data-testid="gate3-reject-btn"
                 disabled={isSubmitting}
                 onClick={() => void handleReject("gate_3_invoice")}
-                className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-4 text-xs font-bold text-[#9A2D08]"
+                className="min-h-12 rounded-xl border border-[#DC2626]/40 bg-[#FFFDF7] px-3.5 text-xs font-bold text-[#9A2D08]"
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                data-testid="invoice-gate3-preview-btn"
+                disabled={isSubmitting || !quote || !job || !runtime.onOpenDocumentPreview}
+                onClick={handlePreviewGate3}
+                className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-[#E5DFD2] bg-[#F5F1E6] px-3.5 text-xs font-bold text-[#2C2621] hover:border-[#EA580C] disabled:opacity-50 cursor-pointer"
+              >
+                <Eye className="h-4 w-4 shrink-0 text-[#D04B00]" aria-hidden="true" />
+                <span>Vista previa</span>
               </button>
               <button
                 type="button"

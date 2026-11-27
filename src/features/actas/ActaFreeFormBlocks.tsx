@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Eye,
   PenTool,
   Plus,
   RotateCcw,
@@ -74,6 +75,7 @@ interface ActaFreeFormBlocksProps {
   onOpenClientSignature: () => void;
   onOpenInstallerSignature: () => void;
   onClearClientSignature: () => void;
+  onPreviewPdf?: () => Promise<void> | void;
   onGenerateAndSharePdf: () => Promise<void>;
 }
 
@@ -266,6 +268,7 @@ export function ActaFreeFormBlocks({
   onOpenClientSignature,
   onOpenInstallerSignature,
   onClearClientSignature,
+  onPreviewPdf,
   onGenerateAndSharePdf,
 }: ActaFreeFormBlocksProps) {
   const installerProfileAlreadySaved = appSettings
@@ -1605,6 +1608,19 @@ export function ActaFreeFormBlocks({
             </button>
           </div>
         </div>
+
+        {estado === "borrador" && onPreviewPdf && (
+          <button
+            type="button"
+            data-testid="acta-draft-preview-btn"
+            disabled={pdfBusy}
+            onClick={() => void onPreviewPdf()}
+            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#4B7094] bg-[#FFFDF7] hover:bg-[#F5F1E6] px-4 text-[13px] font-bold text-[#2C2621] disabled:opacity-50 cursor-pointer transition-colors"
+          >
+            <Eye className="h-4 w-4 shrink-0 text-[#4B7094]" />
+            <span>Vista previa</span>
+          </button>
+        )}
 
         <button
           type="button"

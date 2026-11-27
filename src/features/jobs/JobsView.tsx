@@ -7,6 +7,7 @@ import {
 } from "../../agent/voiceFormPatcher";
 import { TEXT_LIMITS } from "../../core/contracts/textLimits";
 import type {
+  BillingModeConfig,
   ClientRow,
   JobRow,
   JobStatus,
@@ -20,11 +21,17 @@ import {
   computeDailyWorkHoursThousandths,
   ScheduleRepository,
 } from "../../core/db/repositories/scheduleRepo";
+import { SettingsRepository } from "../../core/db/repositories/settingsRepo";
 import type { VoiceInputAdapter } from "../../core/hardware/voiceAdapter";
 import { InlineVoiceFormTrigger } from "../../ui/ContextualVoiceDock";
 import { ZoomableTextField } from "../../ui/ZoomableTextField";
 import { SubDayDurationPicker } from "../calendar/SubDayDurationPicker";
 import { JobDetailDrawer } from "../directory/JobDetailDrawer";
+import {
+  BillingModeSelector,
+  createDefaultBillingModeConfig,
+  getBillingModeBadgeLabel,
+} from "./BillingModeSelector";
 
 const FALLBACK_SCHEDULE_DEFAULTS: WorkScheduleDefaults = {
   work_days: [1, 2, 3, 4, 5],
@@ -48,6 +55,9 @@ interface JobsViewProps {
   onOpenInvoice: (invoiceId: string) => void;
   onOpenTicket: (ticketId: string) => void;
   onOpenActa: (actaId: string) => void;
+  onPreviewQuote?: (quoteId: string) => void;
+  onPreviewInvoice?: (invoiceId: string) => void;
+  onPreviewActa?: (actaId: string) => void;
   onCreateJobActa: (jobId: string, clientId: string | null) => Promise<void>;
   onDataChanged: () => Promise<void>;
   registerBackHandler: (priority: number, handler: () => boolean) => () => void;
@@ -74,6 +84,9 @@ export function JobsView({
   onOpenInvoice,
   onOpenTicket,
   onOpenActa,
+  onPreviewQuote,
+  onPreviewInvoice,
+  onPreviewActa,
   onCreateJobActa,
   onDataChanged,
   registerBackHandler,
@@ -102,6 +115,10 @@ export function JobsView({
     FALLBACK_SCHEDULE_DEFAULTS.afternoon_end
   );
   const [newPlanHoursThousandths, setNewPlanHoursThousandths] = useState<number>(8000);
+  const [defaultHourlyRateCents, setDefaultHourlyRateCents] = useState<number>(3800);
+  const [newBillingConfig, setNewBillingConfig] = useState<BillingModeConfig>(() =>
+    createDefaultBillingModeConfig(3800)
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newJobUndoStack, setNewJobUndoStack] = useState<NewJobFormState[]>([]);
@@ -118,7 +135,8 @@ export function JobsView({
 
   const loadJobs = async () => {
     const scheduleRepo = new ScheduleRepository(executor);
-    const [jobsRes, clientsRes, defaults] = await Promise.all([
+    const settingsRepo = new SettingsRepository(executor);
+    const [jobsRes, clientsRes, defaults, appSettings] = await Promise.all([
       new JobsRepository(executor).listPaginated({
         search: search.trim() || undefined,
         status: statusFilter || undefined,
@@ -127,15 +145,19 @@ export function JobsView({
       }),
       new ClientsRepository(executor).listPaginated({ limit: 100, offset: 0 }),
       scheduleRepo.getWorkScheduleDefaults(),
+      settingsRepo.getAppSettings(),
     ]);
+    const hourlyRate = appSettings.hourly_rate_cents ?? 3800;
     setJobs(jobsRes.items);
     setTotalCount(jobsRes.totalCount);
     setClients(clientsRes.items);
     setScheduleDefaults(defaults);
+    setDefaultHourlyRateCents(hourlyRate);
     if (!showNewJobForm) {
       setNewPlanStartTime(defaults.morning_start);
       setNewPlanEndTime(defaults.afternoon_end || defaults.morning_end);
       setNewPlanHoursThousandths(computeDailyWorkHoursThousandths(defaults) || 8000);
+      setNewBillingConfig(createDefaultBillingModeConfig(hourlyRate));
     }
   };
 
@@ -156,6 +178,11 @@ export function JobsView({
         client_id: newClientId || null,
         start_date_iso: newStartDate || null,
         end_date_iso: effectiveEndDate,
+        modalidad_cobro: newBillingConfig.modalidad_cobro,
+        solo_mano_obra_submodo: newBillingConfig.solo_mano_obra_submodo,
+        horas_estimadas_thousandths: newBillingConfig.horas_estimadas_thousandths,
+        tarifa_hora_cents: newBillingConfig.tarifa_hora_cents,
+        mano_obra_fija_cents: newBillingConfig.mano_obra_fija_cents,
       });
       if (newStartDate && effectiveEndDate) {
         const scheduleRepo = new ScheduleRepository(executor);
@@ -188,6 +215,7 @@ export function JobsView({
       setNewPlanStartTime(scheduleDefaults.morning_start);
       setNewPlanEndTime(scheduleDefaults.afternoon_end || scheduleDefaults.morning_end);
       setNewPlanHoursThousandths(computeDailyWorkHoursThousandths(scheduleDefaults) || 8000);
+      setNewBillingConfig(createDefaultBillingModeConfig(defaultHourlyRateCents));
       setShowNewJobForm(false);
       await loadJobs();
       await onDataChanged();
@@ -398,6 +426,12 @@ export function JobsView({
                 : "Si tienes activado el horario habitual, se generarán automáticamente las jornadas en el calendario."}
             </div>
           )}
+          <BillingModeSelector
+            value={newBillingConfig}
+            onChange={setNewBillingConfig}
+            defaultHourlyRateCents={defaultHourlyRateCents}
+            disabled={busy}
+          />
           <div className="flex gap-2">
             <button
               type="button"
@@ -460,19 +494,27 @@ export function JobsView({
                 <span className="font-mono font-mono-nums text-[12px] font-semibold text-[#6B6860] tabular-nums">
                   {job.job_code}
                 </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                    job.status === "en_curso"
-                      ? "status-emerald"
-                      : job.status === "finalizado"
-                        ? "status-cobalt"
-                        : job.status === "cancelado"
-                          ? "status-tangerine"
-                          : "status-gold"
-                  }`}
-                >
-                  {job.status}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    data-testid={`job-billing-badge-${job.id}`}
+                    className="rounded-full border border-[#E5DFD2] bg-[#F5F1E6] px-2 py-0.5 text-[10px] font-semibold text-[#3D352E]"
+                  >
+                    {getBillingModeBadgeLabel(job.modalidad_cobro, job.solo_mano_obra_submodo)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      job.status === "en_curso"
+                        ? "status-emerald"
+                        : job.status === "finalizado"
+                          ? "status-cobalt"
+                          : job.status === "cancelado"
+                            ? "status-tangerine"
+                            : "status-gold"
+                    }`}
+                  >
+                    {job.status}
+                  </span>
+                </div>
               </div>
               <div className="mt-1.5 text-[16px] font-semibold text-[#2C2621]">{job.title}</div>
               {(clName || job.address || job.start_date_iso) && (
@@ -544,6 +586,9 @@ export function JobsView({
           setSelectedJobId(null);
           onOpenActa(aid);
         }}
+        onPreviewQuote={onPreviewQuote}
+        onPreviewInvoice={onPreviewInvoice}
+        onPreviewActa={onPreviewActa}
         onCreateJobActa={async (jid, cid) => {
           setSelectedJobId(null);
           await onCreateJobActa(jid, cid);

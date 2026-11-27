@@ -113,6 +113,15 @@ CREATE TABLE IF NOT EXISTS jobs (
   end_date_iso TEXT CHECK (
     end_date_iso IS NULL OR end_date_iso GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
   ),
+  modalidad_cobro TEXT NOT NULL DEFAULT 'solo_partidas' CHECK (
+    modalidad_cobro IN ('solo_partidas', 'partidas_mas_horas', 'partidas_mas_fijo_mano_obra', 'solo_mano_obra')
+  ),
+  solo_mano_obra_submodo TEXT NOT NULL DEFAULT 'por_horas' CHECK (
+    solo_mano_obra_submodo IN ('por_horas', 'precio_cerrado')
+  ),
+  horas_estimadas_thousandths INTEGER NOT NULL DEFAULT 0 CHECK (horas_estimadas_thousandths >= 0),
+  tarifa_hora_cents INTEGER CHECK (tarifa_hora_cents IS NULL OR tarifa_hora_cents >= 0),
+  mano_obra_fija_cents INTEGER NOT NULL DEFAULT 0 CHECK (mano_obra_fija_cents >= 0),
   created_at_iso TEXT NOT NULL CHECK (created_at_iso GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
   updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
@@ -141,6 +150,15 @@ CREATE TABLE IF NOT EXISTS quotes (
   sent_at_iso TEXT CHECK (
     sent_at_iso IS NULL OR sent_at_iso GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
   ), -- fecha YYYY-MM-DD de envío (campo lógico sent_at en PRD)
+  modalidad_cobro TEXT NOT NULL DEFAULT 'solo_partidas' CHECK (
+    modalidad_cobro IN ('solo_partidas', 'partidas_mas_horas', 'partidas_mas_fijo_mano_obra', 'solo_mano_obra')
+  ),
+  solo_mano_obra_submodo TEXT NOT NULL DEFAULT 'por_horas' CHECK (
+    solo_mano_obra_submodo IN ('por_horas', 'precio_cerrado')
+  ),
+  horas_estimadas_thousandths INTEGER NOT NULL DEFAULT 0 CHECK (horas_estimadas_thousandths >= 0),
+  tarifa_hora_cents INTEGER CHECK (tarifa_hora_cents IS NULL OR tarifa_hora_cents >= 0),
+  mano_obra_fija_cents INTEGER NOT NULL DEFAULT 0 CHECK (mano_obra_fija_cents >= 0),
   created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0),
   updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0)
 );
@@ -159,7 +177,7 @@ CREATE TABLE IF NOT EXISTS quote_items (
     CHECK (category IN ('Fontanería', 'Electricidad', 'Albañilería', 'Pintura', 'General')),
   unit TEXT NOT NULL DEFAULT 'ud' CHECK (length(trim(unit)) > 0),
   quantity_thousandths INTEGER NOT NULL CHECK (quantity_thousandths > 0),
-  unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents > 0),
+  unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
   line_subtotal_cents INTEGER NOT NULL CHECK (line_subtotal_cents >= 0),
   UNIQUE (quote_id, line_order)
 );

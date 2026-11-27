@@ -295,11 +295,13 @@ export function createLifecycleBillingSpecialistNode(deps: GraphDependencies) {
       const effectiveSubIntent = singlePaymentRedirected ? "final_invoice" : subIntent;
       const advPctLabel = formatPercentEs(advancePolicy?.advancePercent ?? 40);
 
+      const hasBillableContent =
+        quoteItems.length > 0 || (activeQuote?.subtotal_cents ?? 0) > 0;
       const ineligibleReason =
         job.status === "cancelado"
           ? `La obra ${job.job_code} está cancelada.`
-          : !activeQuote || activeQuote.status === "rechazado" || quoteItems.length === 0
-            ? `La obra ${job.job_code} necesita un presupuesto no rechazado con al menos una partida para facturar.`
+          : !activeQuote || activeQuote.status === "rechazado" || !hasBillableContent
+            ? `La obra ${job.job_code} necesita un presupuesto no rechazado con al menos una partida o importe de mano de obra para facturar.`
             : !activeQuote.client_id
               ? `El presupuesto ${activeQuote.quote_code} no tiene cliente asignado. Asigna primero un cliente con NIF y domicilio fiscal (RD 1619/2012) en Presupuestos u Obras antes de facturar.`
               : effectiveSubIntent === "advance_40" && antInv

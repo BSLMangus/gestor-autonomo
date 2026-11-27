@@ -216,7 +216,8 @@ test.describe("Dictado Continuo Editable y Editor Flotante Ampliado (360px)", ()
       "Instalación completa de plato de ducha extraplano"
     );
 
-    // Cancelar con X descarta cambios
+    // Cancelar con X descarta cambios (expandir Condiciones y Datos del Documento donde vive #qb-notes)
+    await page.getByTestId("quote-toggle-document-conditions-btn").click();
     await page.locator("#qb-notes").click();
     await expect(page.getByTestId("zoom-editor-dialog")).toBeVisible();
     await page.getByTestId("zoom-editor-textarea").fill("Texto temporal que se descarta");

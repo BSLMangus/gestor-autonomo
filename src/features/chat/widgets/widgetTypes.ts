@@ -16,6 +16,7 @@ import type { CameraAdapter } from "../../../core/hardware/cameraAdapter";
 import type { VoiceInputAdapter } from "../../../core/hardware/voiceAdapter";
 import type { AppRoute } from "../../../core/navigation/routes";
 import type { PdfPort } from "../../../core/ports/mediaPorts";
+import type { DocumentPreviewRequest } from "../../pdf/DocumentPreviewModal";
 import type { SiteLogService } from "../../sitelog/siteLogService";
 
 export interface WidgetRuntimeContext {
@@ -33,6 +34,7 @@ export interface WidgetRuntimeContext {
     activeJobId: string | null
   ) => Promise<CameraCaptureResult>;
   onOpenPdf?: (pdfUri: string | null, docKind: "quote" | "invoice", docId: string) => Promise<void>;
+  onOpenDocumentPreview?: (req: DocumentPreviewRequest) => void;
   onDataMutated?: () => Promise<void> | void;
   onNavigateRoute?: (route: AppRoute) => void;
   onSiteLogSaved?: (log: SiteLogRecord, jobCode: string) => void;

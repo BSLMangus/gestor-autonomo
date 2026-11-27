@@ -568,3 +568,161 @@ describe("Diseño PDF Unificado — Acta de Puesta en Marcha", () => {
     assertValidPdfBytes(res.pdfBytes);
   });
 });
+
+describe("Diseño PDF Unificado — Presupuestos por modalidad y sanitización", () => {
+  it("sanitiza descripciones en tiempo de render y usa tabla de 4 columnas sin sub-línea qty × price", () => {
+    const docDef = buildQuoteDocDefinition(
+      makeQuoteInput({
+        lines: [
+          {
+            description: "Cable 2.5mm IP65 por 120,00 €",
+            unit: "m",
+            quantityThousandths: 10_000,
+            unitPriceCents: 12_000,
+            lineSubtotalCents: 120_000,
+          },
+        ],
+        subtotalCents: 120_000,
+        vatCents: 25_200,
+        totalCents: 145_200,
+      })
+    ) as unknown as DocDefShape;
+
+    const tasksTable = docDef.content[4] as {
+      table: { widths: Array<string | number>; body: Array<Array<Record<string, unknown>>> };
+    };
+    expect(tasksTable.table.widths).toEqual(["*", "auto", "auto", "auto"]);
+    expect(tasksTable.table.body[0]!.map((c) => c.text)).toEqual([
+      "Descripción de las tareas",
+      "Cant.",
+      "Precio unit.",
+      "Total",
+    ]);
+
+    const firstRow = tasksTable.table.body[1]!;
+    expect(firstRow[0]?.text).toBe("Cable 2.5mm IP65");
+    expect(firstRow[0]?.stack).toBeUndefined();
+    expect(firstRow[1]?.text).toBe("10 m");
+    expect(firstRow[2]?.text).toBe("120,00 €");
+    expect(firstRow[3]?.text).toBe("1.200,00 €");
+  });
+
+  it("añade fila de Mano de obra antes de Sub-Total en partidas_mas_horas y partidas_mas_fijo_mano_obra", () => {
+    const hourlyDoc = buildQuoteDocDefinition(
+      makeQuoteInput({
+        billingMode: "partidas_mas_horas",
+        laborHoursThousandths: 5_500,
+        hourlyRateCents: 4_000,
+        laborCents: 22_000,
+        itemsSubtotalCents: 200_000,
+        subtotalCents: 222_000,
+        vatCents: 46_620,
+        totalCents: 268_620,
+      })
+    ) as unknown as DocDefShape;
+
+    const hourlyTable = hourlyDoc.content[4] as {
+      table: { body: Array<Array<Record<string, unknown>>> };
+    };
+    const hourlyLaborRow = hourlyTable.table.body[2]!;
+    expect(hourlyLaborRow.map((c) => c.text)).toEqual([
+      "Mano de obra",
+      "5,5 h",
+      "40,00 €/h",
+      "220,00 €",
+    ]);
+    expect(hourlyTable.table.body[3]![3]?.text).toBe("2.220,00 €");
+
+    const fixedDoc = buildQuoteDocDefinition(
+      makeQuoteInput({
+        billingMode: "partidas_mas_fijo_mano_obra",
+        laborCents: 35_000,
+        itemsSubtotalCents: 200_000,
+        subtotalCents: 235_000,
+        vatCents: 49_350,
+        totalCents: 284_350,
+      })
+    ) as unknown as DocDefShape;
+
+    const fixedTable = fixedDoc.content[4] as {
+      table: { body: Array<Array<Record<string, unknown>>> };
+    };
+    const fixedLaborRow = fixedTable.table.body[2]!;
+    expect(fixedLaborRow.map((c) => c.text)).toEqual([
+      "Mano de obra (importe fijo)",
+      "1 ud",
+      "350,00 €",
+      "350,00 €",
+    ]);
+    expect(fixedTable.table.body[3]![3]?.text).toBe("2.350,00 €");
+  });
+
+  it("en solo_mano_obra oculta precios unitarios y totales de partida y renderiza tabla 1-col + resumen global", async () => {
+    const inputHourly = makeQuoteInput({
+      billingMode: "solo_mano_obra",
+      laborSubMode: "por_horas",
+      laborHoursThousandths: 8_000,
+      hourlyRateCents: 3_800,
+      laborCents: 30_400,
+      itemsSubtotalCents: 0,
+      subtotalCents: 30_400,
+      vatCents: 6_384,
+      totalCents: 36_784,
+      lines: [
+        {
+          description: "Sustitución de magnetotérmico y revisión general - 99,00 €",
+          unit: "ud",
+          quantityThousandths: 1000,
+          unitPriceCents: 9_900,
+          lineSubtotalCents: 9_900,
+        },
+        {
+          description: "Comprobación de derivaciones",
+          unit: "ud",
+          quantityThousandths: 2000,
+          unitPriceCents: 0,
+          lineSubtotalCents: 0,
+        },
+      ],
+    });
+
+    const docHourly = buildQuoteDocDefinition(inputHourly) as unknown as DocDefShape;
+    const allTextHourly = collectStrings(docHourly.content).join(" ");
+
+    expect(allTextHourly).toContain("Descripción de las tareas / trabajos incluidos");
+    expect(allTextHourly).toContain("Sustitución de magnetotérmico y revisión general");
+    expect(allTextHourly).toContain("Comprobación de derivaciones");
+    expect(allTextHourly).not.toContain("Precio unit.");
+    expect(allTextHourly).not.toContain("99,00 €");
+    expect(allTextHourly).toContain("Mano de obra (8 h × 38,00 €/h)");
+    expect(allTextHourly).toContain("304,00 €");
+    expect(allTextHourly).toContain("Sub-Total");
+
+    const taskTable = docHourly.content[4] as {
+      table: { widths: Array<string | number>; body: Array<Array<Record<string, unknown>>> };
+    };
+    expect(taskTable.table.widths).toEqual(["*"]);
+    expect(taskTable.table.body[0]).toHaveLength(1);
+
+    const inputClosed = makeQuoteInput({
+      billingMode: "solo_mano_obra",
+      laborSubMode: "precio_cerrado",
+      laborCents: 48_000,
+      itemsSubtotalCents: 0,
+      subtotalCents: 48_000,
+      vatCents: 10_080,
+      totalCents: 58_080,
+      lines: [],
+    });
+    const docClosed = buildQuoteDocDefinition(inputClosed) as unknown as DocDefShape;
+    const allTextClosed = collectStrings(docClosed.content).join(" ");
+    expect(allTextClosed).toContain("Mano de obra (Precio cerrado)");
+    expect(allTextClosed).toContain("480,00 €");
+
+    const adapter = new PdfMakeAdapter();
+    const pdfRes = await adapter.buildDocumentPdf(inputHourly);
+    assertValidPdfBytes(pdfRes.pdfBytes);
+    const pdfClosedRes = await adapter.buildDocumentPdf(inputClosed);
+    assertValidPdfBytes(pdfClosedRes.pdfBytes);
+  });
+});

@@ -4,15 +4,18 @@ import {
   QuotePaymentScheduleSchema,
 } from "../contracts/schemas";
 import type {
+  BillingMode,
   ExpenseTicketRow,
   FiscalPiggyBankPayload,
   InvoiceRow,
   JobFiscalSummary,
   JobRow,
+  LaborOnlySubMode,
   QuotePaymentInstallment,
   QuotePaymentMethod,
   QuoteRow,
   QuoteVatRate,
+  ScheduleEntryRow,
   TicketVatRate,
 } from "../contracts/types";
 
@@ -51,6 +54,78 @@ export function computeQuoteTotals(
   const vatCents = roundHalfUpDiv(subtotalCents * vatRateThousandths, 100_000);
   return {
     lineSubtotals,
+    subtotalCents,
+    vatCents,
+    totalCents: subtotalCents + vatCents,
+  };
+}
+
+export function computeQuoteTotalsByBillingMode(params: {
+  billingMode: BillingMode;
+  laborSubMode?: LaborOnlySubMode;
+  lines: ReadonlyArray<{ quantity_thousandths: number; unit_price_cents: number }>;
+  vatRate: QuoteVatRate;
+  horasEstimadasThousandths?: number;
+  tarifaHoraCents?: number | null;
+  manoObraFijaCents?: number;
+}): {
+  itemsSubtotalCents: number;
+  laborCents: number;
+  subtotalCents: number;
+  vatCents: number;
+  totalCents: number;
+} {
+  const {
+    billingMode,
+    laborSubMode = "por_horas",
+    lines,
+    vatRate,
+    horasEstimadasThousandths = 0,
+    tarifaHoraCents = 0,
+    manoObraFijaCents = 0,
+  } = params;
+
+  const safeHours = Math.max(0, Math.round(horasEstimadasThousandths));
+  const safeRate = Math.max(0, Math.round(tarifaHoraCents ?? 0));
+  const safeFixedLabor = Math.max(0, Math.round(manoObraFijaCents));
+
+  const rawItemsSubtotal = lines.reduce(
+    (acc, line) => acc + computeLineSubtotalCents(line.quantity_thousandths, line.unit_price_cents),
+    0
+  );
+
+  let itemsSubtotalCents = 0;
+  let laborCents = 0;
+
+  switch (billingMode) {
+    case "solo_partidas":
+      itemsSubtotalCents = rawItemsSubtotal;
+      laborCents = 0;
+      break;
+    case "partidas_mas_horas":
+      itemsSubtotalCents = rawItemsSubtotal;
+      laborCents = roundHalfUpDiv(safeHours * safeRate, 1000);
+      break;
+    case "partidas_mas_fijo_mano_obra":
+      itemsSubtotalCents = rawItemsSubtotal;
+      laborCents = safeFixedLabor;
+      break;
+    case "solo_mano_obra":
+      itemsSubtotalCents = 0;
+      laborCents =
+        laborSubMode === "por_horas"
+          ? roundHalfUpDiv(safeHours * safeRate, 1000)
+          : safeFixedLabor;
+      break;
+  }
+
+  const subtotalCents = itemsSubtotalCents + laborCents;
+  const vatRateThousandths = Math.round(vatRate * 1000);
+  const vatCents = roundHalfUpDiv(subtotalCents * vatRateThousandths, 100_000);
+
+  return {
+    itemsSubtotalCents,
+    laborCents,
     subtotalCents,
     vatCents,
     totalCents: subtotalCents + vatCents,
@@ -404,6 +479,102 @@ export function computeJobSummary(params: {
     has_advance_40: invoices.some((inv) => inv.series_type === "ANT"),
     has_final_invoice: invoices.some((inv) => inv.series_type === "FAC"),
   };
+}
+
+export interface JobBillingProfitability {
+  jobId: string;
+  billingMode: BillingMode;
+  laborSubMode: LaborOnlySubMode;
+  quotedBaseCents: number;
+  quotedItemsCents: number;
+  quotedLaborCents: number;
+  invoicedBaseCents: number;
+  ticketsBaseCents: number;
+  netProfitCents: number;
+  budgetedHoursThousandths: number;
+  loggedHoursThousandths: number;
+  hasUnexpectedMaterialTickets: boolean;
+}
+
+export function computeJobBillingProfitability(params: {
+  jobs: ReadonlyArray<JobRow>;
+  quotes: ReadonlyArray<QuoteRow>;
+  invoices: ReadonlyArray<InvoiceRow>;
+  tickets: ReadonlyArray<ExpenseTicketRow>;
+  scheduleEntries?: ReadonlyArray<ScheduleEntryRow>;
+}): JobBillingProfitability[] {
+  const { jobs, quotes, invoices, tickets, scheduleEntries = [] } = params;
+
+  return jobs.map((job) => {
+    const activeQuote =
+      quotes.find((q) => q.job_id === job.id && q.status !== "rechazado") ?? null;
+    const billingMode: BillingMode =
+      activeQuote?.modalidad_cobro ?? job.modalidad_cobro ?? "solo_partidas";
+    const laborSubMode: LaborOnlySubMode =
+      activeQuote?.solo_mano_obra_submodo ?? job.solo_mano_obra_submodo ?? "por_horas";
+
+    const rawBudgetedHours =
+      activeQuote?.horas_estimadas_thousandths ?? job.horas_estimadas_thousandths ?? 0;
+    const hourlyRateCents = activeQuote?.tarifa_hora_cents ?? job.tarifa_hora_cents ?? 0;
+    const fixedLaborCents = activeQuote?.mano_obra_fija_cents ?? job.mano_obra_fija_cents ?? 0;
+
+    const usesHourlyBudget =
+      billingMode === "partidas_mas_horas" ||
+      (billingMode === "solo_mano_obra" && laborSubMode === "por_horas");
+    const budgetedHoursThousandths = usesHourlyBudget ? Math.max(0, rawBudgetedHours) : 0;
+
+    const quotedBaseCents = activeQuote?.subtotal_cents ?? 0;
+    let quotedLaborCents = 0;
+    let quotedItemsCents = 0;
+
+    if (activeQuote) {
+      if (billingMode === "solo_partidas") {
+        quotedLaborCents = 0;
+        quotedItemsCents = quotedBaseCents;
+      } else if (billingMode === "partidas_mas_horas") {
+        quotedLaborCents = roundHalfUpDiv(
+          budgetedHoursThousandths * Math.max(0, hourlyRateCents ?? 0),
+          1000
+        );
+        quotedItemsCents = Math.max(0, quotedBaseCents - quotedLaborCents);
+      } else if (billingMode === "partidas_mas_fijo_mano_obra") {
+        quotedLaborCents = Math.max(0, fixedLaborCents);
+        quotedItemsCents = Math.max(0, quotedBaseCents - quotedLaborCents);
+      } else {
+        quotedItemsCents = 0;
+        quotedLaborCents = quotedBaseCents;
+      }
+    }
+
+    const jobInvoices = invoices.filter((inv) => inv.job_id === job.id);
+    const jobTickets = tickets.filter((tkt) => tkt.job_id === job.id);
+    const jobSchedule = scheduleEntries.filter((se) => se.job_id === job.id);
+
+    const invoicedBaseCents = jobInvoices.reduce((sum, inv) => sum + inv.base_cents, 0);
+    const ticketsBaseCents = jobTickets.reduce((sum, tkt) => sum + tkt.base_cents, 0);
+    const loggedHoursThousandths = jobSchedule.reduce(
+      (sum, se) => sum + (se.actual_hours_thousandths ?? 0),
+      0
+    );
+    const hasUnexpectedMaterialTickets =
+      billingMode === "solo_mano_obra" &&
+      jobTickets.some((tkt) => tkt.category.trim().toLowerCase().includes("material"));
+
+    return {
+      jobId: job.id,
+      billingMode,
+      laborSubMode,
+      quotedBaseCents,
+      quotedItemsCents,
+      quotedLaborCents,
+      invoicedBaseCents,
+      ticketsBaseCents,
+      netProfitCents: invoicedBaseCents - ticketsBaseCents,
+      budgetedHoursThousandths,
+      loggedHoursThousandths,
+      hasUnexpectedMaterialTickets,
+    };
+  });
 }
 
 export function formatCentsEs(cents: number): string {

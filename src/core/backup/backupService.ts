@@ -400,8 +400,10 @@ export class BackupService {
           `INSERT INTO jobs (
             id, job_code, client_id, title, address, status,
             start_date_iso, end_date_iso,
+            modalidad_cobro, solo_mano_obra_submodo, horas_estimadas_thousandths,
+            tarifa_hora_cents, mano_obra_fija_cents,
             created_at_iso, created_at_ms, updated_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             j.id,
             j.job_code,
@@ -411,6 +413,11 @@ export class BackupService {
             j.status,
             j.start_date_iso ?? null,
             j.end_date_iso ?? null,
+            j.modalidad_cobro ?? "solo_partidas",
+            j.solo_mano_obra_submodo ?? "por_horas",
+            j.horas_estimadas_thousandths ?? 0,
+            j.tarifa_hora_cents ?? null,
+            j.mano_obra_fija_cents ?? 0,
             j.created_at_iso,
             j.created_at_ms,
             j.updated_at_ms,
@@ -427,8 +434,10 @@ export class BackupService {
             estimated_duration_unit, validity_days, payment_methods_json,
             payment_schedule_json, payment_terms_text, iban_override, bank_name,
             show_iban, notes, attachments_json, pdf_uri, sent_at_iso,
+            modalidad_cobro, solo_mano_obra_submodo, horas_estimadas_thousandths,
+            tarifa_hora_cents, mano_obra_fija_cents,
             created_at_ms, updated_at_ms
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             q.id,
             q.quote_code,
@@ -457,6 +466,11 @@ export class BackupService {
             q.attachments_json ?? "[]",
             q.pdf_uri,
             q.sent_at_iso,
+            q.modalidad_cobro ?? "solo_partidas",
+            q.solo_mano_obra_submodo ?? "por_horas",
+            q.horas_estimadas_thousandths ?? 0,
+            q.tarifa_hora_cents ?? null,
+            q.mano_obra_fija_cents ?? 0,
             q.created_at_ms,
             q.updated_at_ms,
           ]

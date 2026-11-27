@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DemoSeeder } from "./agent/demoSeeder";
 import type { GraphRunner, StorageMode } from "./agent/graphRunner";
 import type { LocalInferenceAdapterImpl } from "./agent/inference/localInferenceAdapter";
+import type { SeedOverrides } from "./agent/ports";
+import { parseQuoteAttachmentsJson } from "./core/contracts/schemas";
+import { TEXT_LIMITS } from "./core/contracts/textLimits";
 import type {
   ActiveWidgetEnvelope,
   CameraCaptureResult,
@@ -25,9 +28,17 @@ import type {
 import { ActasRepository } from "./core/db/repositories/actasRepo";
 import { AuthRepository } from "./core/db/repositories/authRepo";
 import { ChatRepository } from "./core/db/repositories/chatRepo";
+import { ClientsRepository } from "./core/db/repositories/clientsRepo";
+import { InvoicesRepository } from "./core/db/repositories/invoicesRepo";
+import { JobsRepository } from "./core/db/repositories/jobsRepo";
+import { QuotesRepository } from "./core/db/repositories/quotesRepo";
 import { SettingsRepository } from "./core/db/repositories/settingsRepo";
 import type { DocumentOpenerService } from "./core/files/documentOpener";
 import { formatLocalDateTimeIso, getLocalTodayIso } from "./core/fiscal/dateQuarter";
+import {
+  parseQuotePaymentMethodsJson,
+  parseQuotePaymentScheduleJson,
+} from "./core/fiscal/fiscalEngine";
 import {
   registerTaxNotificationClickListener,
   syncTaxLocalNotifications,
@@ -36,6 +47,7 @@ import type { CameraAdapter } from "./core/hardware/cameraAdapter";
 import type { VoiceInputAdapter } from "./core/hardware/voiceAdapter";
 import { BACK_PRIORITY, getRouteTitle, useAppRouter, type AppRoute } from "./core/navigation/routes";
 import type { OcrPort, PdfPort, WatermarkPort } from "./core/ports/mediaPorts";
+import { sanitizeQuoteItemDescription } from "./core/text/quoteDescriptionSanitizer";
 import { ApkUpdaterService, type AvailableUpdateInfo } from "./core/updates/apkUpdaterService";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { ChatTimelineView } from "./features/chat/ChatTimelineView";
@@ -56,6 +68,10 @@ import { JobsView } from "./features/jobs/JobsView";
 import type { CapacitorLlmAdapter } from "./features/llm/capacitorLlmAdapter";
 import type { MediaPipeLlmAdapter } from "./features/llm/mediaPipeAdapter";
 import { OnboardingWizard } from "./features/onboarding/OnboardingWizard";
+import {
+  DocumentPreviewModal,
+  type DocumentPreviewRequest,
+} from "./features/pdf/DocumentPreviewModal";
 import { PricingCatalogView } from "./features/pricing/PricingCatalogView";
 import { QuoteDetailView } from "./features/quotes/QuoteDetailView";
 import { QuotesView } from "./features/quotes/QuotesView";
@@ -214,6 +230,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     null
   );
   const [overlayError, setOverlayError] = useState<string | null>(null);
+  const [docPreviewRequest, setDocPreviewRequest] = useState<DocumentPreviewRequest | null>(null);
 
   const [recoveredDrafts, setRecoveredDrafts] = useState<RecoveredDraft[]>(
     runtime.initialRecoveredDrafts
@@ -409,6 +426,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     setPendingCameraMediaUri(null);
     setProtagonistOverlay(null);
     setOverlayError(null);
+    setDocPreviewRequest(null);
     await authRepo.logout();
     selectAndSetActiveThreadId(null);
     await loadThreadsAndActive(null);
@@ -528,16 +546,19 @@ export function App({ runtime }: { runtime: AppRuntime }) {
       media_kind?: "ticket_photo" | "site_photo" | "voice_transcript";
       threadTitleIfNew?: string;
       forceNewThread?: boolean;
+      createFreshThread?: boolean;
       navigateToChatIfNoWidget?: boolean;
+      seedOverride?: SeedOverrides;
     }): Promise<TurnExecutionResult | null> => {
       setUiError(null);
       setIsSubmitting(true);
       try {
-        let targetTid = params.forceNewThread ? null : activeThreadIdRef.current;
+        let targetTid =
+          params.forceNewThread || params.createFreshThread ? null : activeThreadIdRef.current;
         let sessionJobId: string | null = params.target_ids?.job_id ?? null;
         let sessionQuoteId: string | null = params.target_ids?.quote_id ?? null;
 
-        if (!params.forceNewThread && targetTid) {
+        if (!params.forceNewThread && !params.createFreshThread && targetTid) {
           const thr = await chatRepo.getThread(targetTid);
           if (thr && thr.status !== "interrupted") {
             sessionJobId = sessionJobId ?? thr.active_job_id;
@@ -555,21 +576,25 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           targetTid = created.thread_id;
         }
 
-        const res = await graphRunner.runTurn(targetTid, {
-          client_turn_id: `turn_${crypto.randomUUID().slice(0, 10)}`,
-          text: params.text,
-          action_type: params.action_type ?? "free_text_or_voice",
-          target_ids: params.target_ids,
-          billing_sub_intent: params.billing_sub_intent,
-          disambiguation_choice: params.disambiguation_choice,
-          quarter: params.quarter,
-          raw_media_uri: params.raw_media_uri,
-          media_kind: params.media_kind,
-          session_context: {
-            active_job_id: sessionJobId,
-            active_quote_id: sessionQuoteId,
+        const res = await graphRunner.runTurn(
+          targetTid,
+          {
+            client_turn_id: `turn_${crypto.randomUUID().slice(0, 10)}`,
+            text: params.text,
+            action_type: params.action_type ?? "free_text_or_voice",
+            target_ids: params.target_ids,
+            billing_sub_intent: params.billing_sub_intent,
+            disambiguation_choice: params.disambiguation_choice,
+            quarter: params.quarter,
+            raw_media_uri: params.raw_media_uri,
+            media_kind: params.media_kind,
+            session_context: {
+              active_job_id: sessionJobId,
+              active_quote_id: sessionQuoteId,
+            },
           },
-        });
+          params.seedOverride
+        );
 
         await loadThreadsAndActive(targetTid);
         setRefreshTick((t) => t + 1);
@@ -782,6 +807,296 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     [executor, activeAccount, navigate]
   );
 
+  const handleDuplicateQuote = useCallback(
+    async (quoteId: string) => {
+      try {
+        const draftData = await new QuotesRepository(executor).getDuplicateDraftData(quoteId);
+        setDocPreviewRequest(null);
+        await runTurnAndOpenOverlay({
+          text: "",
+          action_type: "start_empty_quote",
+          threadTitleIfNew: "Presupuesto duplicado",
+          createFreshThread: true,
+          seedOverride: {
+            quoteFixtureOverride: {
+              summary_es:
+                "Borrador duplicado listo para revisar y generar un nuevo presupuesto independiente.",
+              proposed_payload: draftData,
+            },
+          },
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, runTurnAndOpenOverlay]
+  );
+
+  const handleRectifyInvoice = useCallback(
+    async (invoiceId: string) => {
+      try {
+        const invRepo = new InvoicesRepository(executor);
+        const quotesRepo = new QuotesRepository(executor);
+        const jobsRepo = new JobsRepository(executor);
+        const clientsRepo = new ClientsRepository(executor);
+
+        const inv = await invRepo.getById(invoiceId);
+        if (!inv) {
+          throw new Error("Factura no encontrada para rectificar.");
+        }
+
+        const [quote, job, client, quoteItems, appSettings] = await Promise.all([
+          quotesRepo.getById(inv.quote_id),
+          jobsRepo.getById(inv.job_id),
+          clientsRepo.getById(inv.client_id),
+          quotesRepo.getItems(inv.quote_id),
+          settingsRepo.getAppSettings(),
+        ]);
+
+        const billingMode = quote?.modalidad_cobro ?? job?.modalidad_cobro ?? "solo_partidas";
+        const laborSubMode =
+          quote?.solo_mano_obra_submodo ?? job?.solo_mano_obra_submodo ?? "por_horas";
+        const horasEstimadas =
+          quote?.horas_estimadas_thousandths ?? job?.horas_estimadas_thousandths ?? 0;
+        const tarifaHora =
+          quote?.tarifa_hora_cents ?? job?.tarifa_hora_cents ?? appSettings.hourly_rate_cents;
+        const manoObraFija = quote?.mano_obra_fija_cents ?? job?.mano_obra_fija_cents ?? 0;
+
+        const sanitizedLines =
+          quoteItems.length > 0
+            ? quoteItems.map((item) => ({
+                catalog_item_id: item.catalog_item_id,
+                description: sanitizeQuoteItemDescription(item.description, {
+                  knownPricesCents: [item.unit_price_cents, item.line_subtotal_cents],
+                }),
+                category: item.category,
+                unit: item.unit,
+                quantity_thousandths: item.quantity_thousandths,
+                unit_price_cents: item.unit_price_cents,
+                original_unit_price_cents: item.unit_price_cents,
+                save_to_catalog: false,
+              }))
+            : [
+                {
+                  catalog_item_id: null,
+                  description: sanitizeQuoteItemDescription(
+                    job?.title
+                      ? `Rectificación trabajos: ${job.title}`
+                      : `Rectificación de factura ${inv.invoice_number}`
+                  ),
+                  category: "General" as const,
+                  unit: "ud",
+                  quantity_thousandths: 1000,
+                  unit_price_cents: Math.max(0, inv.base_cents),
+                  original_unit_price_cents: Math.max(0, inv.base_cents),
+                  save_to_catalog: false,
+                },
+              ];
+
+        const rectifyPrefix = `Rectificación de factura ${inv.invoice_number}`;
+        const existingNotes = quote?.notes?.trim() ?? "";
+        const combinedNotes = (
+          existingNotes ? `${rectifyPrefix}\n\n${existingNotes}` : rectifyPrefix
+        ).slice(0, TEXT_LIMITS.NOTES);
+
+        const jobTitle = job?.title?.trim() || `Rectificación ${inv.invoice_number}`;
+        const generalDesc =
+          quote?.general_description?.trim() ||
+          (job?.address?.trim() ? `Dirección: ${job.address.trim()}` : "");
+
+        setDocPreviewRequest(null);
+        await runTurnAndOpenOverlay({
+          text: "",
+          action_type: "start_empty_quote",
+          threadTitleIfNew: `Rectificación ${inv.invoice_number}`,
+          createFreshThread: true,
+          seedOverride: {
+            quoteFixtureOverride: {
+              summary_es: `Borrador de rectificación para factura ${inv.invoice_number} listo.`,
+              proposed_payload: {
+                quote_id: null,
+                client_id: client ? client.id : null,
+                ...(!client && inv.client_name_snapshot.trim()
+                  ? {
+                      new_client: {
+                        name: inv.client_name_snapshot.trim(),
+                        ...(inv.client_nif_snapshot ? { nif: inv.client_nif_snapshot } : {}),
+                        ...(inv.client_address_snapshot
+                          ? { fiscal_address: inv.client_address_snapshot }
+                          : {}),
+                        ...(inv.client_phone_snapshot ? { phone: inv.client_phone_snapshot } : {}),
+                      },
+                    }
+                  : {}),
+                job_id: null,
+                job_title: jobTitle,
+                general_description: generalDesc,
+                estimated_duration_value: quote?.estimated_duration_value ?? null,
+                estimated_duration_unit: quote?.estimated_duration_unit ?? "dias_laborables",
+                vat_rate: inv.vat_rate,
+                validity_days: quote?.validity_days ?? appSettings.default_quote_validity_days,
+                payment_methods: quote
+                  ? parseQuotePaymentMethodsJson(quote.payment_methods_json)
+                  : appSettings.default_payment_methods,
+                payment_schedule: quote
+                  ? parseQuotePaymentScheduleJson(quote.payment_schedule_json)
+                  : appSettings.default_payment_schedule,
+                payment_terms_text: quote?.payment_terms_text ?? "",
+                iban_override: quote?.iban_override ?? appSettings.emitter_iban,
+                bank_name: quote?.bank_name ?? appSettings.emitter_bank_name,
+                show_iban:
+                  quote?.show_iban !== undefined
+                    ? quote.show_iban !== 0
+                    : appSettings.emitter_iban.trim().length > 0,
+                notes: combinedNotes,
+                attachments: quote ? parseQuoteAttachmentsJson(quote.attachments_json) : [],
+                modalidad_cobro: billingMode,
+                solo_mano_obra_submodo: laborSubMode,
+                horas_estimadas_thousandths: horasEstimadas,
+                tarifa_hora_cents: tarifaHora,
+                mano_obra_fija_cents: manoObraFija,
+                lines: sanitizedLines,
+              },
+            },
+          },
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, settingsRepo, runTurnAndOpenOverlay]
+  );
+
+  const handleDuplicateActa = useCallback(
+    async (actaId: string) => {
+      try {
+        const duplicated = await new ActasRepository(executor, memoryCoordinator).duplicateAsDraft(
+          actaId
+        );
+        setDocPreviewRequest(null);
+        setRefreshTick((t) => t + 1);
+        navigate({ name: "acta_detail", actaId: duplicated.id, initialMode: "free" });
+        showCleanToast({
+          message: `Acta ${duplicated.codigo_acta} duplicada como borrador.`,
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, memoryCoordinator, navigate, showCleanToast]
+  );
+
+  const openQuotePreview = useCallback(
+    async (quoteId: string) => {
+      try {
+        const quotesRepo = new QuotesRepository(executor);
+        const quote = await quotesRepo.getById(quoteId);
+        const job = quote ? await new JobsRepository(executor).getById(quote.job_id) : null;
+        const title = quote ? `Presupuesto ${quote.quote_code}` : "Presupuesto";
+        setDocPreviewRequest({
+          docKind: "quote",
+          title,
+          subtitle: quote?.client_name_snapshot || job?.title || undefined,
+          isDraft: quote ? quote.status === "borrador" : false,
+          loadBytes: () =>
+            documentOpener.resolvePdfBytes(quote?.pdf_uri ?? null, "quote", quoteId, pdfPort),
+          onDownloadOrShare: (bytes, fileName) =>
+            documentOpener.shareRawPdfBytes(bytes, fileName, title),
+          secondaryAction: {
+            label: "Duplicar",
+            icon: "duplicate",
+            testId: "doc-preview-duplicate-btn",
+            onClick: () => handleDuplicateQuote(quoteId),
+          },
+          openDetailAction: {
+            label: "Ver ficha",
+            testId: "doc-preview-detail-btn",
+            onClick: () => {
+              setDocPreviewRequest(null);
+              navigate({ name: "quote_detail", quoteId });
+            },
+          },
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, documentOpener, pdfPort, handleDuplicateQuote, navigate]
+  );
+
+  const openInvoicePreview = useCallback(
+    async (invoiceId: string) => {
+      try {
+        const inv = await new InvoicesRepository(executor).getById(invoiceId);
+        const title = inv ? `Factura ${inv.invoice_number}` : "Factura";
+        setDocPreviewRequest({
+          docKind: "invoice",
+          title,
+          subtitle: inv?.client_name_snapshot || undefined,
+          isDraft: false,
+          loadBytes: () =>
+            documentOpener.resolvePdfBytes(inv?.pdf_uri ?? null, "invoice", invoiceId, pdfPort),
+          onDownloadOrShare: (bytes, fileName) =>
+            documentOpener.shareRawPdfBytes(bytes, fileName, title),
+          secondaryAction: {
+            label: "Rectificar",
+            icon: "rectify",
+            testId: "doc-preview-rectify-btn",
+            onClick: () => handleRectifyInvoice(invoiceId),
+          },
+          openDetailAction: {
+            label: "Gestionar / Cobro",
+            testId: "doc-preview-detail-btn",
+            onClick: () => {
+              setDocPreviewRequest(null);
+              navigate({ name: "invoice_detail", invoiceId });
+            },
+          },
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, documentOpener, pdfPort, handleRectifyInvoice, navigate]
+  );
+
+  const openActaPreview = useCallback(
+    async (actaId: string) => {
+      try {
+        const loaded = await new ActasRepository(executor, memoryCoordinator).getById(actaId);
+        const title = loaded ? `Acta ${loaded.row.codigo_acta}` : "Acta de Puesta en Marcha";
+        setDocPreviewRequest({
+          docKind: "acta",
+          title,
+          subtitle:
+            loaded?.data.cliente.nombre_razon_social || loaded?.row.especialidad || undefined,
+          isDraft: loaded ? loaded.row.estado === "borrador" : false,
+          loadBytes: () =>
+            documentOpener.resolvePdfBytes(loaded?.row.pdf_uri ?? null, "acta", actaId, pdfPort),
+          onDownloadOrShare: (bytes, fileName) =>
+            documentOpener.shareRawPdfBytes(bytes, fileName, title),
+          secondaryAction: {
+            label: "Duplicar",
+            icon: "duplicate",
+            testId: "doc-preview-duplicate-btn",
+            onClick: () => handleDuplicateActa(actaId),
+          },
+          openDetailAction: {
+            label: "Ver / Editar ficha",
+            testId: "doc-preview-detail-btn",
+            onClick: () => {
+              setDocPreviewRequest(null);
+              navigate({ name: "acta_detail", actaId });
+            },
+          },
+        });
+      } catch (err) {
+        setUiError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [executor, memoryCoordinator, documentOpener, pdfPort, handleDuplicateActa, navigate]
+  );
+
   const handleResumeDecision = async (
     decision: HumanDecision
   ): Promise<TurnExecutionResult | null> => {
@@ -990,6 +1305,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
     registerBackHandler,
     onCapturePhoto: async (source, activeJobId) =>
       cameraAdapter.captureOrPick(source, activeThreadIdRef.current, activeJobId),
+    onOpenDocumentPreview: (req) => setDocPreviewRequest(req),
     onDataMutated: async () => {
       setRefreshTick((t) => t + 1);
       if (activeThreadIdRef.current) {
@@ -1215,14 +1531,16 @@ export function App({ runtime }: { runtime: AppRuntime }) {
                     <button
                       type="button"
                       data-testid="toast-open-pdf-btn"
-                      onClick={() =>
-                        void documentOpener.openPdf(
-                          toast.pdfAction!.pdfUri,
-                          toast.pdfAction!.docKind,
-                          toast.pdfAction!.docId,
-                          pdfPort
-                        )
-                      }
+                      onClick={() => {
+                        const action = toast.pdfAction!;
+                        if (action.docKind === "quote") {
+                          void openQuotePreview(action.docId);
+                        } else if (action.docKind === "invoice") {
+                          void openInvoicePreview(action.docId);
+                        } else {
+                          void openActaPreview(action.docId);
+                        }
+                      }}
                       className="shrink-0 rounded-xl bg-emerald-free px-3 py-1.5 text-[11px] font-bold text-white"
                     >
                       Abrir PDF
@@ -1317,6 +1635,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onOpenTicket={(tid) => navigate({ name: "ticket_detail", ticketId: tid })}
             onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onPreviewQuote={(qid) => void openQuotePreview(qid)}
+            onPreviewInvoice={(iid) => void openInvoicePreview(iid)}
+            onPreviewActa={(aid) => void openActaPreview(aid)}
             onCreateJobActa={async (jid, cid) => {
               await handleCreateActaFromContext({ jobId: jid, clientId: cid });
             }}
@@ -1358,6 +1679,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             refreshTick={refreshTick}
             onStartEmptyQuote={handleStartEmptyQuote}
             onOpenQuoteDetail={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
+            onPreviewQuote={(qid) => void openQuotePreview(qid)}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
             }}
@@ -1378,6 +1700,8 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenJob={(jobId) => navigate({ name: "jobs", focusJobId: jobId })}
             onOpenClient={(cid) => navigate({ name: "client_detail", clientId: cid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
+            onPreviewQuote={(qid) => void openQuotePreview(qid)}
+            onPreviewInvoice={(iid) => void openInvoicePreview(iid)}
             onStartJobQuote={handleStartJobQuote}
             onCreateActa={async ({ jobId, quoteId, clientId }) => {
               await handleCreateActaFromContext({ jobId, quoteId, clientId });
@@ -1404,6 +1728,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             executor={executor}
             refreshTick={refreshTick}
             onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onPreviewActa={(aid) => void openActaPreview(aid)}
             onCreateActa={handleCreateActaFromContext}
           />
         )}
@@ -1423,6 +1748,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             refreshTick={refreshTick}
             registerBackHandler={registerBackHandler}
             onBack={() => navigate({ name: "actas" })}
+            onOpenDocumentPreview={(req) => setDocPreviewRequest(req)}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
             }}
@@ -1445,6 +1771,8 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenClient={(cid) => navigate({ name: "client_detail", clientId: cid })}
             onOpenQuote={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
+            onPreviewQuote={(qid) => void openQuotePreview(qid)}
+            onPreviewInvoice={(iid) => void openInvoicePreview(iid)}
             onShareInvoice={async (inv) => {
               await runTurnAndOpenOverlay({
                 text: "",
@@ -1520,6 +1848,9 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             onOpenQuote={(qid) => navigate({ name: "quote_detail", quoteId: qid })}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
             onOpenActa={(aid) => navigate({ name: "acta_detail", actaId: aid })}
+            onPreviewQuote={(qid) => void openQuotePreview(qid)}
+            onPreviewInvoice={(iid) => void openInvoicePreview(iid)}
+            onPreviewActa={(aid) => void openActaPreview(aid)}
             onCreateClientActa={async (cid) => {
               await handleCreateActaFromContext({ clientId: cid });
             }}
@@ -1565,6 +1896,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
             }
             onQuickManualTicket={handleQuickManualTicket}
             onOpenInvoice={(iid) => navigate({ name: "invoice_detail", invoiceId: iid })}
+            onPreviewInvoice={(iid) => void openInvoicePreview(iid)}
             onOpenTicket={(tid) => navigate({ name: "ticket_detail", ticketId: tid })}
             onDataChanged={async () => {
               setRefreshTick((t) => t + 1);
@@ -1746,6 +2078,13 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           }
         }}
         onConfirm={handleConfirmDeleteThread}
+      />
+
+      <DocumentPreviewModal
+        request={docPreviewRequest}
+        memoryCoordinator={memoryCoordinator}
+        registerBackHandler={registerBackHandler}
+        onClose={() => setDocPreviewRequest(null)}
       />
     </>
     );

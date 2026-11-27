@@ -183,6 +183,17 @@ test.describe("Actas de Puesta en Marcha — Flujo completo offline móvil, modo
     await expect(firstActaCard).toBeVisible();
     await expect(firstActaCard).toContainText("Firmada");
 
+    // Al pulsar un acta firmada se abre primero DocumentPreviewModal y "Ver / Editar ficha" navega al editor
+    await firstActaCard.click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-detail-btn")).toContainText("Ver / Editar ficha");
+    await expect(page.getByTestId("doc-preview-page-1")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("doc-preview-detail-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
+    await expect(page.getByTestId("acta-editor-view")).toBeVisible();
+    await page.getByTestId("acta-back-btn").click();
+    await expect(page.getByTestId("actas-view")).toBeVisible();
+
     // Crear 2ª acta y verificar que la ficha y firma habituales ya vienen cargadas sin banner
     await page.getByTestId("actas-new-btn").click();
     await expect(page.getByTestId("actas-create-panel")).toBeVisible();
@@ -196,6 +207,15 @@ test.describe("Actas de Puesta en Marcha — Flujo completo offline móvil, modo
 
     await page.getByTestId("acta-block-7").locator("button").first().click();
     await expect(page.getByTestId("acta-block-7")).toContainText("Lista");
+
+    // Verificar botón "Vista previa" en borrador de acta
+    await expect(page.getByTestId("acta-draft-preview-btn")).toBeVisible();
+    await page.getByTestId("acta-draft-preview-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("doc-preview-draft-badge")).toContainText("BORRADOR");
+    await expect(page.getByTestId("doc-preview-page-1")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("doc-preview-close-btn").click();
+    await expect(page.getByTestId("document-preview-modal")).toBeHidden();
 
     expect(externalRequests).toEqual([]);
     expect(pageErrors).toEqual([]);
